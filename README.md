@@ -6,5 +6,11 @@ Personal outreach engine for job seekers: organize targets, predict/verify email
 - `docs/README.md`: feature build map (start here for build order).
 - `docs/features/<name>/SPEC.md`: self-contained build prompt per feature.
 
-## Stack (planned, not scaffolded yet)
-Next.js App Router + TypeScript, Tailwind + shadcn/ui, Prisma on Postgres, Better Auth, BullMQ + Redis, external email-verification API.
+## Stack
+Next.js App Router + TypeScript, Tailwind + shadcn/ui, Drizzle on Postgres, Better Auth, BullMQ + Redis, external email-verification API.
+
+## Quickstart
+- `pnpm install`
+- `cp .env.example .env` and fill in values (never commit `.env`)
+- `pnpm db:generate` (Drizzle schema check; migrations land per feature)
+- `pnpm dev`
