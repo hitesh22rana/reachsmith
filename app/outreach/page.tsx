@@ -1,7 +1,9 @@
 import { Send } from "lucide-react";
 import { EmptyState } from "@/components/empty-state";
+import { requireUserId } from "@/lib/auth";
 
-export default function OutreachPage() {
+export default async function OutreachPage() {
+  await requireUserId();
   return (
     <EmptyState
       icon={Send}

@@ -1,7 +1,9 @@
 import { Mail } from "lucide-react";
 import { EmptyState } from "@/components/empty-state";
+import { requireUserId } from "@/lib/auth";
 
-export default function TemplatesPage() {
+export default async function TemplatesPage() {
+  await requireUserId();
   return (
     <EmptyState
       icon={Mail}

@@ -1,7 +1,9 @@
 import { Users } from "lucide-react";
 import { EmptyState } from "@/components/empty-state";
+import { requireUserId } from "@/lib/auth";
 
-export default function TargetsPage() {
+export default async function TargetsPage() {
+  await requireUserId();
   return (
     <EmptyState
       icon={Users}
