@@ -1,9 +1,13 @@
 allowBuilds:
   esbuild: true
   unrs-resolver: true
+minimumReleaseAge: 1440
 minimumReleaseAgeExclude:
   - lucide-react@1.48.0
-# No minimumReleaseAge / trustPolicy: both fail fresh installs of our pinned
-# toolchain (minimumReleaseAge blocks next itself, published 2 days ago;
-# trustPolicy flags benign transitive deps like semver and undici-types
-# that never published attestations). Revisit when the ecosystem catches up.
+trustPolicy: no-downgrade
+# Existing pinned releases with older trust metadata; review on upgrade.
+trustPolicyExclude:
+  - eslint-import-resolver-typescript@3.10.1
+  - semver@6.3.1
+  - undici-types@6.21.0
+blockExoticSubdeps: true
