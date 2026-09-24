@@ -7,7 +7,7 @@ Login/signup + session-guarded app (`SPECS.md` §9.1, §11.1). Auth provider is 
 `docs/features/foundation/SPEC.md`. If its Drizzle client is missing, stub with an in-memory session map: do not build your own DB layer.
 
 ## Scope
-- Better Auth integration (Drizzle adapter): define its auth tables (`user`, `session`, `account`, `verification`) in `db/schema.ts` via the Better Auth Drizzle tooling: do not hand-write competing `User` tables.
+- Better Auth integration (Drizzle adapter): define its auth tables (`users`, `sessions`, `accounts`, `verifications`) in `db/schema.ts` via the Better Auth Drizzle tooling: do not hand-write competing `User` tables.
 - Email/password (provider default) + logout; post-login redirect to `/dashboard` (landing owns `/`). Client form validation with react-hook-form + Valibot resolver on shared schemas; sign-out via TanStack Query mutation.
 - Session helper (`lib/auth.ts`: `getUserId()` or Better Auth equivalent) returning the caller id for ownership scoping.
 - Guard `/dashboard`, `/targets`, `/templates`, `/outreach` + all `POST`/`PATCH` APIs: unauthenticated → login.
