@@ -44,7 +44,7 @@ Foundation, targets. Trigger is `POST /api/targets` and `PATCH /api/targets/[id]
 - No-MX domain → `invalid` without API call.
 - Unknown/missing model → deterministic order still verifies correctly.
 - Forged `{ targetId }` / `{ candidateId }` for another user's rows changes nothing.
-- Workers run as separate processes (`pnpm worker:email-guess`, `pnpm worker:email-verify`); no worker code imported by Next.js server.
+- Workers run as one process (`pnpm worker`) hosting both BullMQ workers; no worker code imported by Next.js server.
 
 ## Non-goals
 `DomainPattern` learning, enrichment worker, sending, all-MiniLM-L6-v2 (bench warmer for later similarity work, e.g. duplicate-target detection), frontend inference.

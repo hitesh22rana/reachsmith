@@ -12,8 +12,7 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:seed": "node --experimental-strip-types --no-warnings scripts/seed.ts",
-    "worker:email-guess": "node --experimental-strip-types --no-warnings workers/email-guess.ts",
-    "worker:email-verify": "node --experimental-strip-types --no-warnings workers/email-verify.ts"
+    "worker": "node --experimental-strip-types --no-warnings workers/run.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.8.0",
