@@ -71,6 +71,11 @@ async function processGuessJob(job: { data: { targetId: string } }): Promise<voi
     .map((id) => byId.get(id))
     .filter((candidate) => candidate !== undefined)
     .slice(0, VERIFY_BUDGET);
+  if (modelOrder) {
+    console.log(
+      `Ranked ${ordered.length} candidates for target ${target.id} (model order: ${modelOrder.join(",")})`,
+    );
+  }
 
   const rows = await db
     .insert(emailGuesses)

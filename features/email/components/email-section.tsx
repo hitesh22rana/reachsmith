@@ -18,22 +18,89 @@ const TRIED_STYLES: Record<ApiEmailGuess["status"], string> = {
   accept_all: "text-orange-600 dark:text-orange-400",
 };
 
-function TriedList({ guesses }: { guesses: ApiEmailGuess[] }) {
+function TriedList({
+  targetId,
+  guesses,
+  onVerify,
+}: {
+  targetId: string;
+  guesses: ApiEmailGuess[];
+  onVerify: () => void;
+}) {
+  const queryClient = useQueryClient();
+
+  const verify = useMutation({
+    mutationFn: async (email: string) => {
+      const response = await fetch(`/api/targets/${targetId}/guesses/verify`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+      if (!response.ok) {
+        const body = (await response.json().catch(() => null)) as { message?: string } | null;
+        throw new Error(body?.message ?? `Failed to verify (${response.status})`);
+      }
+    },
+    onSuccess: () => {
+      onVerify();
+      void queryClient.invalidateQueries({ queryKey: ["guesses", targetId] });
+    },
+  });
+
   return (
     <details className="text-sm">
       <summary className="cursor-pointer text-muted-foreground hover:text-foreground">
         What was tried ({guesses.length})
       </summary>
-      <ul className="mt-2 flex flex-col gap-1">
-        {guesses.map((guess) => (
-          <li key={guess.email} className="flex items-center justify-between gap-2">
-            <span className="min-w-0 truncate text-muted-foreground">{guess.email}</span>
-            <span className={`shrink-0 text-xs font-medium ${TRIED_STYLES[guess.status]}`}>
-              {guess.status.replace("_", "-")}
-            </span>
-          </li>
-        ))}
-      </ul>
+      <div className="mt-2 overflow-x-auto rounded-xl border">
+        <table className="w-full text-left text-sm">
+          <thead>
+            <tr className="border-b text-xs font-medium uppercase tracking-wider text-muted-foreground">
+              <th scope="col" className="px-3 py-2">Email</th>
+              <th scope="col" className="px-3 py-2">Pattern</th>
+              <th scope="col" className="px-3 py-2">Source</th>
+              <th scope="col" className="px-3 py-2">Status</th>
+              <th scope="col" className="px-3 py-2">
+                <span className="sr-only">Actions</span>
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {guesses.map((guess) => (
+              <tr key={guess.email} className="border-b align-top last:border-b-0">
+                <td className="max-w-56 truncate px-3 py-2">{guess.email}</td>
+                <td className="px-3 py-2 whitespace-nowrap text-muted-foreground">
+                  {guess.patternUsed}
+                </td>
+                <td className="px-3 py-2 whitespace-nowrap text-muted-foreground">{guess.source}</td>
+                <td
+                  className={`px-3 py-2 text-xs font-medium whitespace-nowrap ${TRIED_STYLES[guess.status]}`}
+                >
+                  {guess.status.replace("_", "-")}
+                </td>
+                <td className="px-3 py-2 text-right">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    disabled={
+                      verify.isPending || guess.status === "pending" || guess.status === "verifying"
+                    }
+                    onClick={() => verify.mutate(guess.email)}
+                  >
+                    Verify
+                  </Button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {verify.isError ? (
+        <p role="alert" className="mt-1 text-xs text-destructive">
+          {verify.error instanceof Error ? verify.error.message : "Could not verify."}
+        </p>
+      ) : null}
     </details>
   );
 }
@@ -192,10 +259,19 @@ export function TargetEmailSection({
 }) {
   const queryClient = useQueryClient();
   const [copiedEmail, setCopiedEmail] = useState<string | null>(null);
+  // After a manual verify, keep polling past the settled state so the
+  // worker's verdict lands without a refresh.
+  const [watchUntil, setWatchUntil] = useState(0);
   const guesses = useQuery({
     queryKey: ["guesses", targetId],
     queryFn: () => fetchGuesses(targetId),
-    refetchInterval: (query) => (settled(query.state.data) ? false : 3000),
+    refetchInterval: (query) => {
+      const data = query.state.data;
+      if (!settled(data)) {
+        return 3000;
+      }
+      return Date.now() < watchUntil ? 3000 : false;
+    },
   });
 
   const running = guesses.isPending || (!!guesses.data && !settled(guesses.data));
@@ -231,7 +307,11 @@ export function TargetEmailSection({
         </p>
       ) : null}
       {guesses.data && guesses.data.length > 0 && settled(guesses.data) ? (
-        <TriedList guesses={guesses.data} />
+        <TriedList
+          targetId={targetId}
+          guesses={guesses.data}
+          onVerify={() => setWatchUntil(Date.now() + 90_000)}
+        />
       ) : null}
 
       <OverrideForm
