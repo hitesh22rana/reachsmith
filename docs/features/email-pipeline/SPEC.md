@@ -20,7 +20,7 @@ Foundation, targets. Trigger is `POST /api/targets`; if targets missing, drive w
 - Verifier API key stays server-side in workers only; rate-limit verify jobs to respect provider limits and avoid abuse.
 
 ## Tasks
-1. Prisma model + migration.
+1. Drizzle table + migration.
 2. `lib/email-patterns.ts` + `lib/queues/` + `POST` hook wiring.
 3. Both workers + verifier client (key from `EMAIL_VERIFIER_API_KEY`, mockable offline).
 4. Email section UI with pending/confidence/override states.

@@ -137,7 +137,7 @@ For a selected contact:
 
 - **Frontend & backend**: Next.js (App Router, TypeScript).
 - **Database**: Managed SQL (e.g., Postgres via Supabase, Neon, PlanetScale, or Railway).
-- **ORM**: Prisma (for schema, migrations, and type-safe access).
+- **ORM**: Drizzle (for schema, migrations, and type-safe access).
 - **Styling/UI**: Tailwind CSS + shadcn/ui components.
 - **Background jobs**: BullMQ + Redis (e.g., Upstash or any hosted Redis).
 - **Email verification**: External API (e.g., QuickEmailVerification or similar free-tier provider).
@@ -168,7 +168,7 @@ For a selected contact:
 
 ## 6. Data Model (Initial Draft)
 
-Using generic field names; actual implementation will use Prisma schema.
+Using generic field names; actual implementation will use Drizzle tables.
 
 ### 6.1 User
 
@@ -531,7 +531,7 @@ Sections:
 
   - `app/` – Next.js app router pages and layouts.
   - `app/api/` – API route handlers/server actions.
-  - `prisma/` – Prisma schema and migrations.
+  - `db/` – Drizzle schema (`db/schema.ts`) and client (`db/index.ts`); `drizzle/` – generated migrations.
   - `lib/` – shared utilities (email pattern generation, template engine, etc.).
   - `lib/queues/` – BullMQ queue definitions.
   - `workers/` – worker entrypoints (email-guess, email-verify, etc.).

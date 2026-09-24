@@ -17,7 +17,7 @@ Foundation (+ auth for `user_id`; if auth missing, hardcode a stub `user_id` con
 - `DELETE` cascade must only touch rows owned by the caller (scoped child deletes).
 
 ## Tasks
-1. Prisma model + migration.
+1. Drizzle table + migration.
 2. API routes with `user_id` scoping + validation.
 3. Table + modal + detail page with empty states.
 

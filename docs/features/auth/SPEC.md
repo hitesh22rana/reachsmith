@@ -4,10 +4,10 @@
 Login/signup + session-guarded app (`SPECS.md` §9.1, §11.1). Auth provider is **Better Auth**: no NextAuth/Auth.js, no Supabase Auth, no hand-rolled passwords/sessions.
 
 ## Dependencies
-`docs/features/foundation/SPEC.md`. If its Prisma client is missing, stub with an in-memory session map: do not build your own DB layer.
+`docs/features/foundation/SPEC.md`. If its Drizzle client is missing, stub with an in-memory session map: do not build your own DB layer.
 
 ## Scope
-- Better Auth integration (Prisma adapter): use its schema models (`user`, `session`, `account`, `verification`) via the Better Auth CLI/schema tooling: do not hand-write competing `User` tables.
+- Better Auth integration (Drizzle adapter): define its auth tables (`user`, `session`, `account`, `verification`) in `db/schema.ts` via the Better Auth Drizzle tooling: do not hand-write competing `User` tables.
 - Email/password (provider default) + logout; post-login redirect to `/`.
 - Session helper (`lib/auth.ts`: `getUserId()` or Better Auth equivalent) returning the caller id for ownership scoping.
 - Guard `/targets`, `/templates`, `/outreach` + all `POST`/`PATCH` APIs: unauthenticated → login.

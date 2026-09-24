@@ -17,7 +17,7 @@ Foundation (+ auth for `user_id`, same stub rule as targets). Independent of tar
 - Preview renders server-side or with the user's own rows only: never fetch another user's templates by ID.
 
 ## Tasks
-1. Prisma model + migration.
+1. Drizzle table + migration.
 2. `lib/templates.ts` + unit check (render sample body with all four vars + one unknown var).
 3. API routes + list/editor/preview UI.
 
