@@ -3,3 +3,7 @@ allowBuilds:
   unrs-resolver: true
 minimumReleaseAgeExclude:
   - lucide-react@1.48.0
+# No minimumReleaseAge / trustPolicy: both fail fresh installs of our pinned
+# toolchain (minimumReleaseAge blocks next itself, published 2 days ago;
+# trustPolicy flags benign transitive deps like semver and undici-types
+# that never published attestations). Revisit when the ecosystem catches up.

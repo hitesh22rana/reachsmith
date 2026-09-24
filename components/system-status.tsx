@@ -7,6 +7,9 @@ import { cn } from "@/lib/utils";
 
 async function fetchHealth(): Promise<v.InferOutput<typeof HealthSchema>> {
   const response = await fetch("/api/health");
+  if (!response.ok) {
+    throw new Error(`Health check failed with status ${response.status}`);
+  }
   const data: unknown = await response.json();
   return v.parse(HealthSchema, data);
 }
