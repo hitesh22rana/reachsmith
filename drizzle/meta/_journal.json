@@ -8,6 +8,13 @@
       "when": 1790264054336,
       "tag": "0000_happy_killer_shrike",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1790265000000,
+      "tag": "0001_pluralize_auth_tables",
+      "breakpoints": true
     }
   ]
 }
