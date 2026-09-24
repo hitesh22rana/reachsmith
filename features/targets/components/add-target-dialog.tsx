@@ -46,11 +46,10 @@ const STEPS: { title: string; description: string; fields: FieldName[] }[] = [
     description: "How to reach them",
     fields: [
       "primary_email",
-      "profile_url",
+      "domain",
       "source_type",
       "company_website",
-      "github_url",
-      "linkedin_url",
+      "social_urls",
     ],
   },
   {
@@ -167,15 +166,14 @@ function ContactStep({ form }: { form: StepForm }) {
       </div>
       <div className="grid grid-cols-2 gap-4">
         <div className="flex flex-col gap-1.5">
-          <Label htmlFor="target-profile">Profile URL</Label>
+          <Label htmlFor="target-domain">Email domain (if known)</Label>
           <Input
-            id="target-profile"
-            type="url"
+            id="target-domain"
             autoComplete="off"
-            placeholder="https://"
-            {...register("profile_url")}
+            placeholder="company.com"
+            {...register("domain")}
           />
-          <FieldError message={errors.profile_url?.message} />
+          <FieldError message={errors.domain?.message} />
         </div>
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="target-source">Source</Label>
@@ -217,28 +215,17 @@ function ContactStep({ form }: { form: StepForm }) {
           />
           <FieldError message={errors.company_website?.message} />
         </div>
-        <div className="flex flex-col gap-1.5">
-          <Label htmlFor="target-github">GitHub URL</Label>
-          <Input
-            id="target-github"
-            type="url"
-            autoComplete="off"
-            placeholder="https://"
-            {...register("github_url")}
-          />
-          <FieldError message={errors.github_url?.message} />
-        </div>
       </div>
       <div className="flex flex-col gap-1.5">
-        <Label htmlFor="target-linkedin">LinkedIn URL</Label>
-        <Input
-          id="target-linkedin"
-          type="url"
+        <Label htmlFor="target-social">Social URLs (one per line, up to 5)</Label>
+        <Textarea
+          id="target-social"
+          rows={3}
           autoComplete="off"
-          placeholder="https://"
-          {...register("linkedin_url")}
+          placeholder={"https://linkedin.com/in/…\nhttps://github.com/…"}
+          {...register("social_urls")}
         />
-        <FieldError message={errors.linkedin_url?.message} />
+        <FieldError message={errors.social_urls?.message} />
       </div>
     </>
   );
@@ -306,13 +293,12 @@ export function AddTargetDialog() {
       company: "",
       role_title: "",
       primary_email: "",
-      profile_url: "",
+      domain: "",
       source_type: "manual",
       notes: "",
       location: "",
       company_website: "",
-      github_url: "",
-      linkedin_url: "",
+      social_urls: "",
     },
   });
   const { handleSubmit, reset, trigger, formState: { isSubmitting } } = form;

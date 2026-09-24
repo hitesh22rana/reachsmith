@@ -19,6 +19,17 @@ function cleanText(value: string | undefined): string | null {
   return value === undefined || value === "" ? null : value;
 }
 
+function cleanUrls(value: string | undefined): string[] | null {
+  if (value === undefined) {
+    return null;
+  }
+  const lines = value
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line !== "");
+  return lines.length > 0 ? lines : null;
+}
+
 export function toTargetInsert(userId: string, data: TargetCreateInput): NewTarget {
   return {
     userId,
@@ -28,13 +39,12 @@ export function toTargetInsert(userId: string, data: TargetCreateInput): NewTarg
     company: cleanText(data.company),
     roleTitle: cleanText(data.role_title),
     primaryEmail: cleanText(data.primary_email),
-    profileUrl: cleanText(data.profile_url),
     sourceType: data.source_type ?? "manual",
     notes: cleanText(data.notes),
     location: cleanText(data.location),
     companyWebsite: cleanText(data.company_website),
-    githubUrl: cleanText(data.github_url),
-    linkedinUrl: cleanText(data.linkedin_url),
+    domain: cleanText(data.domain),
+    socialUrls: cleanUrls(data.social_urls),
   };
 }
 
@@ -60,9 +70,6 @@ export function toTargetPatch(data: TargetPatchInput): Partial<NewTarget> {
   if (data.primary_email !== undefined) {
     patch.primaryEmail = cleanText(data.primary_email);
   }
-  if (data.profile_url !== undefined) {
-    patch.profileUrl = cleanText(data.profile_url);
-  }
   if (data.source_type !== undefined) {
     patch.sourceType = data.source_type;
   }
@@ -75,11 +82,11 @@ export function toTargetPatch(data: TargetPatchInput): Partial<NewTarget> {
   if (data.company_website !== undefined) {
     patch.companyWebsite = cleanText(data.company_website);
   }
-  if (data.github_url !== undefined) {
-    patch.githubUrl = cleanText(data.github_url);
+  if (data.domain !== undefined) {
+    patch.domain = cleanText(data.domain);
   }
-  if (data.linkedin_url !== undefined) {
-    patch.linkedinUrl = cleanText(data.linkedin_url);
+  if (data.social_urls !== undefined) {
+    patch.socialUrls = cleanUrls(data.social_urls);
   }
   return patch;
 }

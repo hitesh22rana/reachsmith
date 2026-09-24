@@ -54,9 +54,10 @@ async function main(): Promise<void> {
       company: "FinEdge Technologies",
       roleTitle: "Senior Backend Engineer",
       primaryEmail: "aarav.sharma@example.com",
-      profileUrl: "https://www.linkedin.com/in/example-aarav",
       sourceType: "linkedin",
       location: "Bengaluru",
+      domain: "finedge.tech",
+      socialUrls: ["https://www.linkedin.com/in/example-aarav"],
       notes: "Met at the backend meetup; hiring for platform roles.",
     })
     .returning();
