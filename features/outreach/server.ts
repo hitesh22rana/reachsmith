@@ -26,10 +26,19 @@ export function buildOutreachBody(
   });
 }
 
-// JSON-safe outreach: dates leave the server as ISO strings.
-export type OutreachJson = Omit<Outreach, "createdAt" | "updatedAt" | "sentAt" | "lastStatusChangeAt"> & {
-  createdAt: string;
-  updatedAt: string;
+// JSON-safe outreach, trimmed to what the client renders: dates leave
+// the server as ISO strings; ownership and relation IDs stay server-side.
+export type OutreachJson = Omit<
+  Outreach,
+  | "userId"
+  | "targetId"
+  | "templateId"
+  | "metadata"
+  | "createdAt"
+  | "updatedAt"
+  | "sentAt"
+  | "lastStatusChangeAt"
+> & {
   sentAt: string | null;
   lastStatusChangeAt: string;
   targetName: string;
@@ -41,9 +50,11 @@ export function toOutreachJson(
   target: { fullName: string; company: string | null },
 ): OutreachJson {
   return {
-    ...outreach,
-    createdAt: outreach.createdAt.toISOString(),
-    updatedAt: outreach.updatedAt.toISOString(),
+    id: outreach.id,
+    channel: outreach.channel,
+    subject: outreach.subject,
+    bodyFinal: outreach.bodyFinal,
+    status: outreach.status,
     sentAt: outreach.sentAt ? outreach.sentAt.toISOString() : null,
     lastStatusChangeAt: outreach.lastStatusChangeAt.toISOString(),
     targetName: target.fullName,

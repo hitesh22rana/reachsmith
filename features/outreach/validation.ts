@@ -29,21 +29,16 @@ export type OutreachCreateInput = v.InferOutput<typeof OutreachCreateSchema>;
 export type OutreachPatchInput = v.InferOutput<typeof OutreachPatchSchema>;
 
 // Server-to-client outreach shape (dates cross as ISO strings),
-// with the target's name alongside for list views.
+// with the target's name alongside for list views. No user_id, target_id,
+// template_id, or metadata: nothing client-side reads them.
 export const OutreachJsonSchema = v.object({
   id: v.string(),
-  userId: v.string(),
-  targetId: v.string(),
-  templateId: v.nullable(v.string()),
   channel: ChannelSchema,
   subject: v.nullable(v.string()),
   bodyFinal: v.string(),
   status: OutreachStatusSchema,
   sentAt: v.nullable(v.pipe(v.string(), v.isoTimestamp())),
   lastStatusChangeAt: v.pipe(v.string(), v.isoTimestamp()),
-  metadata: v.unknown(),
-  createdAt: v.pipe(v.string(), v.isoTimestamp()),
-  updatedAt: v.pipe(v.string(), v.isoTimestamp()),
   targetName: v.string(),
   targetCompany: v.nullable(v.string()),
 });

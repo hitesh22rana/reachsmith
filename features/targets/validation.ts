@@ -112,10 +112,9 @@ export const TargetPatchSchema = v.partial(TargetCreateSchema);
 export type TargetCreateInput = v.InferOutput<typeof TargetCreateSchema>;
 export type TargetPatchInput = v.InferOutput<typeof TargetPatchSchema>;
 
-// Server-to-client target shape (dates cross as ISO strings).
+// Server-to-client target shape (dates cross as ISO strings; no user_id).
 export const TargetJsonSchema = v.object({
   id: v.string(),
-  userId: v.string(),
   fullName: v.string(),
   firstName: v.nullable(v.string()),
   lastName: v.nullable(v.string()),

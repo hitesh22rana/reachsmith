@@ -38,10 +38,9 @@ export const TemplatePatchSchema = v.partial(TemplateCreateSchema);
 export type TemplateCreateInput = v.InferOutput<typeof TemplateCreateSchema>;
 export type TemplatePatchInput = v.InferOutput<typeof TemplatePatchSchema>;
 
-// Server-to-client template shape (dates cross as ISO strings).
+// Server-to-client template shape (dates cross as ISO strings; no user_id).
 export const TemplateJsonSchema = v.object({
   id: v.string(),
-  userId: v.string(),
   name: v.string(),
   channel: ChannelSchema,
   audienceType: AudienceTypeSchema,
