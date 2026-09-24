@@ -3,8 +3,9 @@ import { NextResponse, type NextRequest } from "next/server";
 import { getDb } from "@/db";
 import { targets } from "@/db/schema";
 import { getUserId } from "@/lib/auth";
-import { toTargetInsert, toTargetJson } from "@/lib/targets";
-import { parseBody, TargetCreateSchema } from "@/lib/validators";
+import { toTargetInsert, toTargetJson } from "@/features/targets/server";
+import { parseBody } from "@/lib/validators";
+import { TargetCreateSchema } from "@/features/targets/validation";
 
 export async function GET(): Promise<NextResponse> {
   const userId = await getUserId();

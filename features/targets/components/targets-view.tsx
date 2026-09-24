@@ -9,8 +9,8 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/empty-state";
-import { AddTargetDialog } from "@/components/targets/add-target-dialog";
-import { TargetListSchema, type ApiTarget } from "@/lib/validators";
+import { AddTargetDialog } from "./add-target-dialog";
+import { TargetListSchema, type ApiTarget } from "../validation";
 import { cn, initials } from "@/lib/utils";
 
 async function fetchTargets(): Promise<ApiTarget[]> {

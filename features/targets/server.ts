@@ -1,5 +1,5 @@
 import type { NewTarget, Target } from "@/db/schema";
-import type { TargetCreateInput, TargetPatchInput } from "@/lib/validators";
+import type { TargetCreateInput, TargetPatchInput } from "./validation";
 
 // JSON-safe target: dates leave the server as ISO strings.
 export type TargetJson = Omit<Target, "createdAt" | "updatedAt"> & {

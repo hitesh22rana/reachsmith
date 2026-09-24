@@ -3,8 +3,9 @@ import { NextResponse, type NextRequest } from "next/server";
 import { getDb } from "@/db";
 import { targets } from "@/db/schema";
 import { getUserId } from "@/lib/auth";
-import { toTargetJson, toTargetPatch } from "@/lib/targets";
-import { parseBody, TargetPatchSchema } from "@/lib/validators";
+import { toTargetJson, toTargetPatch } from "@/features/targets/server";
+import { parseBody } from "@/lib/validators";
+import { TargetPatchSchema } from "@/features/targets/validation";
 
 interface RouteContext {
   params: Promise<{ id: string }>;

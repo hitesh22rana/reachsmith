@@ -9,7 +9,7 @@ import * as v from "valibot";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { TargetJsonSchema, TargetPatchSchema } from "@/lib/validators";
+import { TargetJsonSchema, TargetPatchSchema } from "../validation";
 
 const NotesSchema = v.object({
   notes: v.optional(v.string()),
