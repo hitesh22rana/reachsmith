@@ -126,7 +126,7 @@ For a selected contact:
 ### 4.2 Power user / builder (secondary)
 
 - Someone who wants to experiment with email pattern guessing and enrichment.
-- Comfortable self-hosting and customizing ReachSmith.
+- Comfortable customizing ReachSmith and trying experimental features.
 - May connect their own enrichment / verification APIs.
 
 ---
