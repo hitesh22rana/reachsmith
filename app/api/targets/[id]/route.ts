@@ -3,6 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { getDb } from "@/db";
 import { targets } from "@/db/schema";
 import { getUserId } from "@/lib/auth";
+import { enqueueEmailGuess } from "@/lib/queues/email";
 import { toTargetJson, toTargetPatch } from "@/features/targets/server";
 import { parseBody } from "@/lib/validators";
 import { TargetPatchSchema } from "@/features/targets/validation";
@@ -52,6 +53,12 @@ export async function PATCH(request: NextRequest, context: RouteContext): Promis
     .returning();
   if (!updated) {
     return NextResponse.json({ message: "Not found" }, { status: 404 });
+  }
+  // Best effort: re-guess on updates; the worker skips existing candidates.
+  try {
+    await enqueueEmailGuess(updated.id);
+  } catch (error) {
+    console.error("Failed to enqueue email-guess", error);
   }
   return NextResponse.json({ target: toTargetJson(updated) });
 }
