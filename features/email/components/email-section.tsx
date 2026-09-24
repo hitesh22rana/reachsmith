@@ -13,7 +13,7 @@ const STATUS_STYLES: Record<ApiEmailGuess["status"], string> = {
   pending: "border-amber-500/40 text-amber-600 dark:text-amber-400",
   verifying: "border-amber-500/40 text-amber-600 dark:text-amber-400",
   valid: "border-green-500/40 text-green-600 dark:text-green-400",
-  invalid: "text-muted-foreground",
+  invalid: "border-red-500/40 text-red-600 dark:text-red-400",
   unknown: "text-muted-foreground",
   accept_all: "border-orange-500/40 text-orange-600 dark:text-orange-400",
 };
