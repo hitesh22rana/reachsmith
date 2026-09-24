@@ -5,6 +5,7 @@ import { auth } from "@/lib/auth";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { SignOutButton } from "@/components/sign-out-button";
+import { ModeToggle } from "@/components/mode-toggle";
 import { SystemStatus } from "@/components/system-status";
 import { cn } from "@/lib/utils";
 
@@ -58,18 +59,21 @@ export default async function Home() {
               {session ? ` Signed in as ${session.user.email}.` : " Log in to get started."}
             </p>
           </div>
-          {session ? (
-            <SignOutButton />
-          ) : (
-            <div className="flex items-center gap-2">
-              <Link href="/login" className={cn(buttonVariants({ variant: "ghost" }), "pressable")}>
-                Log in
-              </Link>
-              <Link href="/signup" className={cn(buttonVariants(), "pressable")}>
-                Create account
-              </Link>
-            </div>
-          )}
+          <div className="flex items-center gap-2">
+            <ModeToggle />
+            {session ? (
+              <SignOutButton />
+            ) : (
+              <>
+                <Link href="/login" className={cn(buttonVariants({ variant: "ghost" }), "pressable")}>
+                  Log in
+                </Link>
+                <Link href="/signup" className={cn(buttonVariants(), "pressable")}>
+                  Create account
+                </Link>
+              </>
+            )}
+          </div>
         </div>
         <div className="self-start">
           <SystemStatus />
