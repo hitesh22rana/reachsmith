@@ -1,7 +1,7 @@
-# Outreach — SPEC
+# Outreach: SPEC
 
 ## Goal
-Generate message, copy manually, track status (`SPECS.md` §3.5, §6.4, §9.4, §9.6). Sending is manual — no email integration.
+Generate message, copy manually, track status (`SPECS.md` §3.5, §6.4, §9.4, §9.6). Sending is manual: no email integration.
 
 ## Dependencies
 Foundation, targets, templates. If either missing: hardcode `target_id` / allow null `template_id` (custom message path) with `// TODO` markers; do not rebuild those features.
@@ -13,7 +13,7 @@ Foundation, targets, templates. If either missing: hardcode `target_id` / allow 
 - UI: "New Outreach" flow on `/targets/[id]` (purpose, channel, template picker, edit, copy-to-clipboard, mark `sent`); `/outreach` pipeline table with status filter + inline status change, sorted by `sent_at`/`last_status_change`.
 
 ## Security
-- Scope all queries by session `user_id`. On create/update, verify `target_id` (and `template_id` if set) belong to the caller — reject with 404 otherwise. Never trust client `user_id` or cross-user IDs.
+- Scope all queries by session `user_id`. On create/update, verify `target_id` (and `template_id` if set) belong to the caller: reject with 404 otherwise. Never trust client `user_id` or cross-user IDs.
 - `GET` filters (`status`, `targetId`) apply inside the caller's rows only.
 
 ## Tasks

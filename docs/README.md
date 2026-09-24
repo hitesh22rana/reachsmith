@@ -1,15 +1,15 @@
-# ReachSmith — Feature Build Map
+# ReachSmith: Feature Build Map
 
-`SPECS.md` is source of truth. `AGENTS.md` holds repo constraints. Each `docs/features/<name>/SPEC.md` is a self-contained build prompt — give one to one agent/session.
+`SPECS.md` is source of truth. `AGENTS.md` holds repo constraints. Each `docs/features/<name>/SPEC.md` is a self-contained build prompt: give one to one agent/session.
 
 ## Features (build order)
 
-1. `foundation` — scaffolding only. No dependencies.
-2. `auth` (Better Auth) — needs foundation. Stub-able: skip session check, hardcode `user_id`.
-3. `targets` — needs foundation (+ auth for ownership; stub `user_id` if missing).
-4. `templates` — needs foundation (+ auth for ownership). Independent of targets except preview uses a sample target — hardcode one if targets missing.
-5. `outreach` — needs foundation, targets, templates. If missing: hardcoded `target_id` / nullable `template_id` (custom message path).
-6. `email-pipeline` — needs foundation, targets. Enqueues from `POST /api/targets`; if targets missing, trigger via script with a raw `targetId`.
+1. `foundation`: scaffolding only. No dependencies.
+2. `auth` (Better Auth): needs foundation. Stub-able: skip session check, hardcode `user_id`.
+3. `targets`: needs foundation (+ auth for ownership; stub `user_id` if missing).
+4. `templates`: needs foundation (+ auth for ownership). Independent of targets except preview uses a sample target: hardcode one if targets missing.
+5. `outreach`: needs foundation, targets, templates. If missing: hardcoded `target_id` / nullable `template_id` (custom message path).
+6. `email-pipeline`: needs foundation, targets. Enqueues from `POST /api/targets`; if targets missing, trigger via script with a raw `targetId`.
 
 Parallel-safe pairs: targets + templates, then outreach + email-pipeline.
 

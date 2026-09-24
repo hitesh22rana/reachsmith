@@ -1,10 +1,10 @@
 # AGENTS.md
 
-Follow `MEMORY.md` — it holds durable user preferences.
+Follow `MEMORY.md`: it holds durable user preferences.
 
-Greenfield repo. `SPECS.md` is the source of truth — read it before coding. Per-feature build prompts live in `docs/features/<name>/SPEC.md` (`docs/README.md` maps build order).
+Greenfield repo. `SPECS.md` is the source of truth: read it before coding. Per-feature build prompts live in `docs/features/<name>/SPEC.md` (`docs/README.md` maps build order).
 
-## Planned stack (not scaffolded yet — no package.json, no toolchain)
+## Planned stack (not scaffolded yet: no package.json, no toolchain)
 - Next.js App Router + TypeScript, Tailwind + shadcn/ui, Prisma on managed Postgres, Better Auth, BullMQ + Redis workers, external email-verification API. See `SPECS.md` §5.
 
 ## Layout to follow when scaffolding (`SPECS.md` §12)
@@ -18,4 +18,4 @@ Greenfield repo. `SPECS.md` is the source of truth — read it before coding. Pe
 - Outreach sending is manual in MVP: generate message, copy to clipboard, mark `sent`. No Gmail/Outlook sync, no `send-email` worker yet (`SPECS.md` §3.5, §8.1).
 - Keep Prisma enums exactly as specced: `source_type`, `enrichment_status`, `channel`, `audience_type`, `Outreach.status`, `EmailGuess.status` (`SPECS.md` §6). Template vars are `{{first_name}}`, `{{company}}`, `{{job_title}}`, `{{job_link}}`.
 - Email pipeline order: `POST /api/targets` → `email-guess { targetId }` → `EmailGuess` rows → `email-verify { candidateId }` → `target.primary_email`. Workers are standalone Node processes, not in the Next.js server (`SPECS.md` §7–8).
-- Build order: `docs/README.md` — foundation → auth → targets/templates → outreach/email-pipeline. Don't build SaaS/billing/multi-region (`SPECS.md` §2.2, §11).
+- Build order: `docs/README.md`: foundation → auth → targets/templates → outreach/email-pipeline. Don't build SaaS/billing/multi-region (`SPECS.md` §2.2, §11).
