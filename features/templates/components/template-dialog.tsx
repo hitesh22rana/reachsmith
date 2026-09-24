@@ -24,7 +24,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { renderTemplate } from "@/lib/templates";
 import {
   TemplateCreateSchema,
   TemplateJsonSchema,
@@ -76,16 +75,11 @@ export function TemplateDialog({ template }: { template?: ApiTemplate }) {
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
-  const [sampleName, setSampleName] = useState("Ada");
-  const [sampleCompany, setSampleCompany] = useState("Acme");
-  const [sampleJobTitle, setSampleJobTitle] = useState("");
-  const [sampleJobLink, setSampleJobLink] = useState("");
 
   const {
     register,
     control,
     handleSubmit,
-    watch,
     reset,
     formState: { errors, isSubmitting },
   } = useForm<TemplateFormInput>({
@@ -111,13 +105,6 @@ export function TemplateDialog({ template }: { template?: ApiTemplate }) {
     onError: (error) => {
       setServerError(error instanceof Error ? error.message : "Failed to save template");
     },
-  });
-
-  const preview = renderTemplate(watch("body") ?? "", {
-    first_name: sampleName,
-    company: sampleCompany,
-    job_title: sampleJobTitle,
-    job_link: sampleJobLink,
   });
 
   return (
@@ -227,36 +214,6 @@ export function TemplateDialog({ template }: { template?: ApiTemplate }) {
               {...register("body")}
             />
             <FieldError message={errors.body?.message} />
-          </div>
-          <div className="flex flex-col gap-2 rounded-lg border bg-muted/40 p-3">
-            <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-              Preview with a sample target
-            </p>
-            <div className="grid grid-cols-2 gap-2">
-              <Input
-                aria-label="Sample first name"
-                value={sampleName}
-                onChange={(event) => setSampleName(event.target.value)}
-              />
-              <Input
-                aria-label="Sample company"
-                value={sampleCompany}
-                onChange={(event) => setSampleCompany(event.target.value)}
-              />
-              <Input
-                aria-label="Sample job title"
-                placeholder="Job title"
-                value={sampleJobTitle}
-                onChange={(event) => setSampleJobTitle(event.target.value)}
-              />
-              <Input
-                aria-label="Sample job link"
-                placeholder="Job link"
-                value={sampleJobLink}
-                onChange={(event) => setSampleJobLink(event.target.value)}
-              />
-            </div>
-            <p className="text-sm whitespace-pre-wrap">{preview || "Nothing to preview yet."}</p>
           </div>
           {serverError ? (
             <p role="alert" className="text-sm text-destructive">
