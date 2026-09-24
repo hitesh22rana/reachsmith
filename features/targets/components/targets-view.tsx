@@ -1,15 +1,14 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import * as v from "valibot";
 import { ArrowLeft, ArrowUpRight, Mail, Users } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/empty-state";
+import { DeleteDialog } from "@/components/delete-dialog";
 import { AddTargetDialog } from "./add-target-dialog";
 import { TargetListSchema, type ApiTarget } from "../validation";
 import { cn, initials } from "@/lib/utils";
@@ -80,14 +79,12 @@ function SkeletonCards() {
 
 export function TargetsView() {
   const queryClient = useQueryClient();
-  const [confirmId, setConfirmId] = useState<string | null>(null);
   const targets = useQuery({ queryKey: ["targets"], queryFn: fetchTargets });
 
   const remove = useMutation({
     mutationFn: deleteTarget,
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["targets"] });
-      setConfirmId(null);
     },
   });
 
@@ -172,23 +169,12 @@ export function TargetsView() {
                     Open
                     <ArrowUpRight aria-hidden="true" />
                   </Link>
-                  {confirmId === target.id ? (
-                    <>
-                      <Button variant="ghost" size="sm" onClick={() => setConfirmId(null)}>Cancel</Button>
-                      <Button variant="destructive" size="sm" disabled={remove.isPending} onClick={() => remove.mutate(target.id)}>
-                        Delete
-                      </Button>
-                    </>
-                  ) : (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setConfirmId(target.id)}
-                      aria-label={`Delete ${target.fullName}`}
-                    >
-                      Delete
-                    </Button>
-                  )}
+                  <DeleteDialog
+                    itemName={target.fullName}
+                    description="This permanently deletes the target, its email candidates, and its outreach history. This cannot be undone."
+                    onConfirm={() => remove.mutate(target.id)}
+                    pending={remove.isPending}
+                  />
                 </div>
               </CardFooter>
             </Card>
