@@ -116,7 +116,7 @@ function SignupForm() {
       setServerError(message);
       return;
     }
-    router.push("/dashboard");
+    router.push("/login?new=1");
     router.refresh();
   }
 
