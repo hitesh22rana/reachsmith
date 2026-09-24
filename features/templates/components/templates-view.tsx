@@ -49,7 +49,7 @@ function SkeletonCard({ hidden = false }: { hidden?: boolean }) {
         <div className="h-6 w-2/3 animate-pulse rounded bg-muted" />
         <div className="h-5 w-1/2 animate-pulse rounded bg-muted" />
       </CardHeader>
-      <CardContent className="flex flex-col gap-1 text-sm">
+      <CardContent className="flex flex-1 flex-col gap-1 text-sm">
         <div className="h-5 w-full animate-pulse rounded bg-muted" />
         <div className="h-5 w-11/12 animate-pulse rounded bg-muted" />
         <div className="h-5 w-2/3 animate-pulse rounded bg-muted" />
@@ -132,7 +132,7 @@ export function TemplatesView() {
                   {template.purpose ? ` · ${template.purpose}` : ""}
                 </CardDescription>
               </CardHeader>
-              <CardContent className="text-sm text-muted-foreground">
+              <CardContent className="flex flex-1 flex-col text-sm text-muted-foreground">
                 <p className="line-clamp-3 whitespace-pre-wrap">{template.body}</p>
               </CardContent>
               <CardFooter className="justify-between gap-2 bg-transparent py-3">
