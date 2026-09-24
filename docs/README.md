@@ -15,7 +15,7 @@ Parallel-safe pairs: targets + templates, then outreach + email-pipeline.
 
 ## Shared contracts (do not reinvent per feature)
 
-- Layout: `app/`, `app/api/`, `prisma/`, `lib/`, `lib/queues/`, `workers/`, `components/` (`SPECS.md` §12).
+- Layout: `app/`, `app/api/`, `db/`, `drizzle/`, `lib/`, `lib/queues/`, `workers/`, `components/` (`SPECS.md` §12).
 - Enums verbatim (`SPECS.md` §6): `source_type: linkedin|github|website|manual|other`, `enrichment_status: not_started|pending|success|failed`, `channel: email|linkedin_dm|other`, `audience_type: hr|recruiter|engineer|founder|generic`, `Outreach.status: draft|sent|replied|rejected|no_response|success`, `EmailGuess.status: pending|verifying|valid|invalid|unknown|accept_all`.
 - Template vars only: `{{first_name}}`, `{{company}}`, `{{job_title}}`, `{{job_link}}`.
 - Hard rules: no server-side LinkedIn scraping; outreach sending is manual (copy + mark `sent`); workers are standalone Node processes, never inside Next.js.

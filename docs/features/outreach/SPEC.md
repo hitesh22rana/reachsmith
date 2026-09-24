@@ -17,7 +17,7 @@ Foundation, targets, templates. If either missing: hardcode `target_id` / allow 
 - `GET` filters (`status`, `targetId`) apply inside the caller's rows only.
 
 ## Tasks
-1. Prisma model + migration.
+1. Drizzle table + migration.
 2. `lib/outreach.ts` + APIs.
 3. Compose flow + pipeline view.
 
