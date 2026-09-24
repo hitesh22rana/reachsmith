@@ -25,11 +25,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { Stepper } from "@/components/targets/stepper";
+import { Stepper } from "./stepper";
 import {
   TargetCreateSchema,
   TargetJsonSchema,
-} from "@/lib/validators";
+} from "../validation";
 
 type TargetFormInput = v.InferInput<typeof TargetCreateSchema>;
 type FieldName = keyof TargetFormInput;

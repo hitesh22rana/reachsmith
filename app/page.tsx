@@ -1,11 +1,11 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { getUserId } from "@/lib/auth";
-import { SiteFooter, SiteHeader } from "@/components/landing/chrome";
-import { Hero } from "@/components/landing/hero";
-import { Tagline } from "@/components/landing/tagline";
-import { Accuracy, Benefits, HowItWorks, Problem } from "@/components/landing/sections";
-import { Faq, FinalCta } from "@/components/landing/closing";
+import { SiteFooter, SiteHeader } from "@/features/landing";
+import { Hero } from "@/features/landing";
+import { Tagline } from "@/features/landing";
+import { Accuracy, Benefits, HowItWorks, Problem } from "@/features/landing";
+import { Faq, FinalCta } from "@/features/landing";
 
 export const metadata: Metadata = {
   title: "ReachSmith — Referral outreach without the spreadsheet",
