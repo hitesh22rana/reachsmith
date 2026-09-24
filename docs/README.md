@@ -9,7 +9,7 @@
 - [x] `landing`: public `/`, guarded `/dashboard`, and post-auth redirects.
 - [x] `targets`: table + enums + migration, scoped CRUD APIs with Valibot validation, card grid/multi-step wizard/detail UI; verified isolation (404s) plus doctor clean.
 - [x] `templates`: table + channel/audience enums + migration, `renderTemplate` + unit check, scoped CRUD APIs with Valibot validation, list/editor UI; verified CRUD, isolation (404s), and 400/401 cases.
-- [ ] `outreach`
+- [x] `outreach`: table + status enum + migration, `buildOutreachBody` on `renderTemplate`, scoped CRUD APIs with owned-target/template checks, compose flow (picker, edit, copy, mark sent) + per-target history + pipeline with filter/inline status; verified transitions, isolation (404s), and 400/401 cases.
 - [ ] `email-pipeline`
 
 ## Features (build order)
