@@ -47,7 +47,7 @@ function SkeletonCards() {
               <div className="size-12 shrink-0 animate-pulse rounded-xl bg-muted" />
               <div className="flex min-w-0 flex-1 flex-col">
                 <div className="mb-1 h-4 w-24 animate-pulse rounded bg-muted" />
-                <div className="h-7 w-2/3 animate-pulse rounded bg-muted" />
+                <div className="h-6 w-2/3 animate-pulse rounded bg-muted" />
                 <div className="mt-1 h-5 w-1/2 animate-pulse rounded bg-muted" />
               </div>
             </div>
@@ -137,7 +137,7 @@ export function TargetsView() {
                     <p className="mb-1 truncate text-xs font-medium uppercase tracking-wider text-muted-foreground">
                       {target.company || "Independent contact"}
                     </p>
-                    <CardTitle className="truncate text-lg font-semibold tracking-tight">
+                    <CardTitle className="truncate text-lg leading-6 font-semibold tracking-tight">
                       <Link href={`/targets/${target.id}`} className="rounded-sm outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50">
                         {target.fullName}
                       </Link>
