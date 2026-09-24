@@ -108,9 +108,20 @@ export function OutreachView() {
         </div>
       </div>
 
-      {outreach.isPending ? (
-        <div className="overflow-x-auto rounded-2xl border bg-card" aria-label="Loading outreach">
-          <table className="w-full min-w-2xl text-left text-sm" aria-hidden="true">
+      {outreach.isError ? (
+        <p role="alert" className="text-sm text-destructive">
+          Could not load outreach. Check the connection and try again.
+        </p>
+      ) : null}
+      {outreach.isPending || (outreach.data && outreach.data.length > 0) ? (
+        <div className="overflow-x-auto rounded-2xl border bg-card">
+          <table className="w-full min-w-[44rem] table-fixed text-left text-sm" aria-label="Outreach messages" aria-busy={outreach.isPending}>
+            <colgroup>
+              <col className="w-[35%]" />
+              <col className="w-[19%]" />
+              <col className="w-[27%]" />
+              <col className="w-[19%]" />
+            </colgroup>
             <thead>
               <tr className="border-b text-xs font-medium uppercase tracking-wider text-muted-foreground">
                 <th scope="col" className="px-4 py-3">Target</th>
@@ -120,9 +131,9 @@ export function OutreachView() {
               </tr>
             </thead>
             <tbody>
-              {[0, 1, 2].map((row) => (
-                <tr key={row} className="border-b align-top last:border-b-0">
-                  <td className="max-w-64 px-4 py-3">
+              {outreach.isPending ? [0, 1, 2].map((row) => (
+                <tr key={row} className="border-b align-top last:border-b-0" aria-hidden="true">
+                  <td className="px-4 py-3">
                     <div className="h-5 w-2/3 animate-pulse rounded bg-muted" />
                     <div className="mt-1 h-4 w-full animate-pulse rounded bg-muted" />
                     <div className="mt-1 h-4 w-5/6 animate-pulse rounded bg-muted" />
@@ -131,44 +142,15 @@ export function OutreachView() {
                     <div className="h-5 w-24 animate-pulse rounded bg-muted" />
                   </td>
                   <td className="px-4 py-3">
-                    <div className="h-9 w-36 animate-pulse rounded-lg bg-muted" />
+                    <div className="h-8 w-36 animate-pulse rounded-lg bg-muted" />
                   </td>
                   <td className="px-4 py-3">
                     <div className="h-5 w-24 animate-pulse rounded bg-muted" />
                   </td>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      ) : null}
-      {outreach.isError ? (
-        <p role="alert" className="text-sm text-destructive">
-          Could not load outreach. Check the connection and try again.
-        </p>
-      ) : null}
-      {outreach.data && outreach.data.length === 0 ? (
-        <EmptyState
-          icon={Send}
-          title="No outreach yet"
-          description="Compose a message from a template, copy it, and mark it sent."
-        />
-      ) : null}
-      {outreach.data && outreach.data.length > 0 ? (
-        <div className="overflow-x-auto rounded-2xl border bg-card">
-          <table className="w-full min-w-2xl text-left text-sm">
-            <thead>
-              <tr className="border-b text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                <th scope="col" className="px-4 py-3">Target</th>
-                <th scope="col" className="px-4 py-3">Channel</th>
-                <th scope="col" className="px-4 py-3">Status</th>
-                <th scope="col" className="px-4 py-3">Updated</th>
-              </tr>
-            </thead>
-            <tbody>
-              {outreach.data.map((item) => (
+              )) : outreach.data?.map((item) => (
                 <tr key={item.id} className="border-b align-top last:border-b-0">
-                  <td className="max-w-64 px-4 py-3">
+                  <td className="px-4 py-3">
                     <p className="truncate font-medium">{item.targetName}</p>
                     <p className="line-clamp-2 text-muted-foreground">{item.bodyFinal}</p>
                   </td>
@@ -205,6 +187,13 @@ export function OutreachView() {
             </tbody>
           </table>
         </div>
+      ) : null}
+      {outreach.data && outreach.data.length === 0 ? (
+        <EmptyState
+          icon={Send}
+          title="No outreach yet"
+          description="Compose a message from a template, copy it, and mark it sent."
+        />
       ) : null}
       {changeStatus.isError ? (
         <p role="alert" className="text-sm text-destructive">
