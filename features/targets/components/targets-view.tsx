@@ -5,7 +5,8 @@ import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import * as v from "valibot";
 import { ArrowLeft, ArrowUpRight, Mail, Users } from "lucide-react";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button-variants";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/empty-state";
@@ -36,6 +37,8 @@ const SOURCE_LABELS = {
   website: "From website",
   other: "Other source",
 } as const;
+
+const RESERVED_SLOTS = ["reserved-one", "reserved-two", "reserved-three"] as const;
 
 function SkeletonCard({ hidden = false }: { hidden?: boolean }) {
   return (
@@ -190,8 +193,8 @@ export function TargetsView() {
               </CardFooter>
             </Card>
           ))}
-          {Array.from({ length: Math.max(0, 3 - targets.data.length) }, (_, index) => (
-            <SkeletonCard key={`reserved-${index}`} hidden />
+          {RESERVED_SLOTS.slice(0, Math.max(0, 3 - targets.data.length)).map((slot) => (
+            <SkeletonCard key={slot} hidden />
           ))}
         </div>
       ) : null}
