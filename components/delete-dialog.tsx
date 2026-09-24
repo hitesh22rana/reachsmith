@@ -33,7 +33,12 @@ export function DeleteDialog({
     <AlertDialog open={open} onOpenChange={setOpen}>
       <AlertDialogTrigger
         render={
-          <Button variant="ghost" size="sm" aria-label={`Delete ${itemName}`}>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-destructive hover:text-destructive"
+            aria-label={`Delete ${itemName}`}
+          >
             Delete
           </Button>
         }
