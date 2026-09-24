@@ -68,8 +68,7 @@ export async function DELETE(_request: NextRequest, context: RouteContext): Prom
   if (!userId) {
     return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
   }
-  // EmailGuess/Outreach tables do not exist yet; their scoped deletes land
-  // with the outreach/email-pipeline features.
+  // Email guesses and outreach cascade via FK; template links set-null.
   const [deleted] = await getDb()
     .delete(targets)
     .where(and(eq(targets.id, (await context.params).id), eq(targets.userId, userId)))

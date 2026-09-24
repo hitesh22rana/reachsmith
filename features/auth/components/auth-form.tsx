@@ -25,8 +25,6 @@ type AuthPayload =
   | { mode: "login"; data: LoginInput }
   | { mode: "signup"; data: SignupInput };
 
-// Calls Better Auth and returns the failure message, or null on success.
-// The discriminated payload keeps both branches type-exact with no casts.
 async function submitAuth(payload: AuthPayload): Promise<string | null> {
   const result =
     payload.mode === "signup"

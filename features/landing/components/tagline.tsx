@@ -6,7 +6,6 @@ import { cn } from "@/lib/utils";
 const SENTENCE =
   "Every conversation tracked. Every follow up kept. Nothing lost to a messy spreadsheet.";
 
-// Stable keys for repeated words (e.g. "Every" appears twice).
 const WORDS: { id: string; text: string }[] = (() => {
   const seen = new Map<string, number>();
   return SENTENCE.split(" ").map((text) => {

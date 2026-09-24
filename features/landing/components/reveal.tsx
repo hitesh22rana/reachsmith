@@ -3,8 +3,6 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
-// Scroll reveal wrapper. Elements fade up with a soft blur as they enter
-// the viewport, using an IntersectionObserver (never scroll listeners).
 export function Reveal({
   children,
   className,

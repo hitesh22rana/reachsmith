@@ -17,8 +17,6 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 
-// Avatar button opening a profile popup: name, email, and a
-// confirm-to-logout action. Replaces the old "Signed in as" line.
 export function ProfileMenu({ name, email }: { name: string; email: string }) {
   const router = useRouter();
   const queryClient = useQueryClient();
