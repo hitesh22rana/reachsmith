@@ -257,7 +257,7 @@ function ReviewList({ values }: { values: TargetFormInput }) {
       {entries.map(([key, value]) => (
         <div key={key} className="flex items-baseline justify-between gap-4 text-sm">
           <dt className="font-medium text-muted-foreground">{key.replaceAll("_", " ")}</dt>
-          <dd className="truncate text-right">{value}</dd>
+          <dd className="min-w-0 truncate text-right">{value}</dd>
         </div>
       ))}
     </dl>
@@ -377,7 +377,7 @@ export function AddTargetDialog() {
           </Button>
         }
       />
-      <DialogContent ref={contentRef} className="max-h-[85vh] overflow-y-auto">
+      <DialogContent ref={contentRef} className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>Add target</DialogTitle>
           <DialogDescription>
