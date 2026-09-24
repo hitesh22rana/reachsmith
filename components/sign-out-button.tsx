@@ -1,13 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { authClient } from "@/lib/auth-client";
 import { Button } from "@/components/ui/button";
 
 export function SignOutButton() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [error, setError] = useState<string | null>(null);
 
   const signOut = useMutation({
@@ -17,6 +18,9 @@ export function SignOutButton() {
         setError(result.error.message ?? "Sign out failed");
         return;
       }
+      // Session changed: drop all cached queries so the next user
+      // never sees the previous user's data.
+      queryClient.clear();
       router.push("/login");
       router.refresh();
     },
