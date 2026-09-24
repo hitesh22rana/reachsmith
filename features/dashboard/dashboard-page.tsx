@@ -3,7 +3,7 @@ import Link from "next/link";
 import { count, eq } from "drizzle-orm";
 import { ArrowRight, Mail, Send, Users, type LucideIcon } from "lucide-react";
 import { getDb } from "@/db";
-import { targets } from "@/db/schema";
+import { outreaches, targets, templates } from "@/db/schema";
 import { auth, requireUserId } from "@/lib/auth";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,7 +15,6 @@ interface Section {
   icon: LucideIcon;
   title: string;
   description: string;
-  stat: string;
   href: string;
   linkLabel: string;
 }
@@ -25,7 +24,6 @@ const SECTIONS: Section[] = [
     icon: Users,
     title: "Targets",
     description: "Recruiters, hiring managers, and employees to reach.",
-    stat: "0 targets",
     href: "/targets",
     linkLabel: "Open targets",
   },
@@ -33,7 +31,6 @@ const SECTIONS: Section[] = [
     icon: Mail,
     title: "Templates",
     description: "Reusable messages with variables that fill themselves in.",
-    stat: "0 templates",
     href: "/templates",
     linkLabel: "Open templates",
   },
@@ -41,21 +38,29 @@ const SECTIONS: Section[] = [
     icon: Send,
     title: "Outreach",
     description: "Drafts, sent messages, replies, and outcomes in one pipeline.",
-    stat: "0 outreach",
     href: "/outreach",
     linkLabel: "Open outreach",
   },
 ];
 
+function pluralize(count: number, singular: string): string {
+  return count === 1 ? `1 ${singular}` : `${count} ${singular}s`;
+}
+
 export default async function DashboardPage() {
   const userId = await requireUserId();
   const session = await auth.api.getSession({ headers: await headers() });
-  const [row] = await getDb()
-    .select({ count: count() })
-    .from(targets)
-    .where(eq(targets.userId, userId));
-  const targetCount = row?.count ?? 0;
-  const targetStat = targetCount === 1 ? "1 target" : `${targetCount} targets`;
+  const [[targetRow], [templateRow], [outreachRow]] = await Promise.all([
+    getDb().select({ count: count() }).from(targets).where(eq(targets.userId, userId)),
+    getDb().select({ count: count() }).from(templates).where(eq(templates.userId, userId)),
+    getDb().select({ count: count() }).from(outreaches).where(eq(outreaches.userId, userId)),
+  ]);
+  const targetCount = targetRow?.count ?? 0;
+  const stats: Record<string, string> = {
+    Targets: pluralize(targetCount, "target"),
+    Templates: pluralize(templateRow?.count ?? 0, "template"),
+    Outreach: `${outreachRow?.count ?? 0} outreach`,
+  };
 
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-10 px-6 py-12">
@@ -107,7 +112,7 @@ export default async function DashboardPage() {
             </CardHeader>
             <div className="flex items-center justify-between px-(--card-spacing) pb-1">
               <span className="text-sm font-medium">
-                {section.title === "Targets" ? targetStat : section.stat}
+                {stats[section.title] ?? ""}
               </span>
               <Link
                 href={section.href}
