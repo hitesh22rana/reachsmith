@@ -1,5 +1,5 @@
 import { relations } from "drizzle-orm";
-import { pgTable, text, timestamp, boolean, index } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, boolean, index, jsonb, pgEnum } from "drizzle-orm/pg-core";
 
 // Convention: table names and their consts are always plural.
 // Better Auth models map to these tables explicitly in lib/auth.ts.
@@ -92,3 +92,56 @@ export const accountsRelations = relations(accounts, ({ one }) => ({
     references: [users.id],
   }),
 }));
+
+export const sourceTypeEnum = pgEnum("source_type", [
+  "linkedin",
+  "github",
+  "website",
+  "manual",
+  "other",
+]);
+
+export const enrichmentStatusEnum = pgEnum("enrichment_status", [
+  "not_started",
+  "pending",
+  "success",
+  "failed",
+]);
+
+export const targets = pgTable(
+  "targets",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    fullName: text("full_name").notNull(),
+    firstName: text("first_name"),
+    lastName: text("last_name"),
+    company: text("company"),
+    roleTitle: text("role_title"),
+    primaryEmail: text("primary_email"),
+    profileUrl: text("profile_url"),
+    sourceType: sourceTypeEnum("source_type").notNull().default("manual"),
+    enrichmentStatus: enrichmentStatusEnum("enrichment_status")
+      .notNull()
+      .default("not_started"),
+    notes: text("notes"),
+    location: text("location"),
+    companyWebsite: text("company_website"),
+    githubUrl: text("github_url"),
+    linkedinUrl: text("linkedin_url"),
+    extraEnrichment: jsonb("extra_enrichment"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at")
+      .defaultNow()
+      .$onUpdate(() => /* @__PURE__ */ new Date())
+      .notNull(),
+  },
+  (table) => [index("targets_user_id_idx").on(table.userId)],
+);
+
+export type Target = typeof targets.$inferSelect;
+export type NewTarget = typeof targets.$inferInsert;

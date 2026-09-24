@@ -1,12 +1,14 @@
 import { headers } from "next/headers";
 import Link from "next/link";
+import { count, eq } from "drizzle-orm";
 import { ArrowRight, Mail, Send, Users, type LucideIcon } from "lucide-react";
+import { getDb } from "@/db";
+import { targets } from "@/db/schema";
 import { auth, requireUserId } from "@/lib/auth";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { SignOutButton } from "@/components/sign-out-button";
+import { ProfileMenu } from "@/components/profile-menu";
 import { ModeToggle } from "@/components/mode-toggle";
-import { SystemStatus } from "@/components/system-status";
 import { cn } from "@/lib/utils";
 
 interface Section {
@@ -46,8 +48,14 @@ const SECTIONS: Section[] = [
 ];
 
 export default async function DashboardPage() {
-  await requireUserId();
+  const userId = await requireUserId();
   const session = await auth.api.getSession({ headers: await headers() });
+  const [row] = await getDb()
+    .select({ count: count() })
+    .from(targets)
+    .where(eq(targets.userId, userId));
+  const targetCount = row?.count ?? 0;
+  const targetStat = targetCount === 1 ? "1 target" : `${targetCount} targets`;
 
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-10 px-6 py-12">
@@ -57,13 +65,12 @@ export default async function DashboardPage() {
             <h1 className="text-3xl font-semibold tracking-tight">ReachSmith</h1>
             <p className="max-w-xl text-muted-foreground">
               Organize targets, predict and verify emails, and track outreach.
-              {session ? ` Signed in as ${session.user.email}.` : " Log in to get started."}
             </p>
           </div>
           <div className="flex items-center gap-2">
             <ModeToggle />
             {session ? (
-              <SignOutButton />
+              <ProfileMenu name={session.user.name} email={session.user.email} />
             ) : (
               <>
                 <Link href="/login" className={cn(buttonVariants({ variant: "ghost" }), "pressable")}>
@@ -76,10 +83,7 @@ export default async function DashboardPage() {
             )}
           </div>
         </div>
-        <div className="self-start">
-          <SystemStatus />
-        </div>
-        {session ? (
+        {session && targetCount === 0 ? (
           <Link href="/targets" className={cn(buttonVariants(), "pressable", "self-start")}>
             Add your first target
             <ArrowRight aria-hidden="true" />
@@ -102,7 +106,9 @@ export default async function DashboardPage() {
               <CardDescription>{section.description}</CardDescription>
             </CardHeader>
             <div className="flex items-center justify-between px-(--card-spacing) pb-1">
-              <span className="text-sm font-medium">{section.stat}</span>
+              <span className="text-sm font-medium">
+                {section.title === "Targets" ? targetStat : section.stat}
+              </span>
               <Link
                 href={section.href}
                 className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline"
