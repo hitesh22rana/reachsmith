@@ -14,8 +14,9 @@ Next.js App Router + TypeScript, Tailwind + shadcn/ui, Drizzle on Postgres, Bett
 - `pnpm install`
 - `cp .env.example .env` and fill in values (never commit `.env`)
 - `docker compose up -d` (local Postgres + Redis)
-- `pnpm db:generate` (Drizzle schema check; migrations land per feature)
-- `pnpm dev`
+- `pnpm db:migrate` (fresh DBs; migrations are a single squashed baseline)
+- `pnpm dev` and, for the email pipeline, `pnpm worker`
+- Production images: `docker compose --profile prod up --build` (migrates, then runs web + worker with the rank model baked in)
 
 ## Code structure
 
@@ -23,5 +24,6 @@ Next.js App Router + TypeScript, Tailwind + shadcn/ui, Drizzle on Postgres, Bett
 - `features/`: domain UI and logic. Each feature exposes route-facing UI through `index.ts`; server-only logic has a separate entry point.
 - `components/ui/`: reusable UI primitives; `components/`: cross-feature UI and providers.
 - `lib/`: shared framework setup and request parsing; `db/` and `drizzle/`: database schema, client, and migrations.
+- `workers/`: BullMQ email workers (one process, `pnpm worker`); `scripts/`: one-off tooling (`db:seed`); `Dockerfile` + `compose.yaml`: production web/worker images and local services.
 
 Keep domain validation and client queries with their feature. Use local state for local UI, TanStack Query for client server state, and direct reads in server components. Add folders or state libraries when real code needs them.

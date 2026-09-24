@@ -369,11 +369,11 @@ Later (optional):
 - `send-email`:
   - To send emails via SMTP/third-party providers, if implemented.
 
-### 8.2 Worker processes
+### 8.2 Worker process
 
-- Independent Node processes (not part of Next.js web server).
-- Each worker connects to Redis with BullMQ.
-- Configuration:
+- One Node process hosting both BullMQ workers (not part of Next.js web server).
+- Connects to Redis with BullMQ.
+- Configuration per queue:
   - Concurrency per queue (e.g., 5–10).
   - Rate limiting to respect external API limits.
   - Retries with exponential backoff.
@@ -426,7 +426,9 @@ Three-step wizard (Basics, Contact, Notes plus review) with a stepper. Fields:
 - Company (optional but recommended).
 - Role/title (optional).
 - Email (optional, if known).
-- Profile URL (optional).
+- Email domain (optional, drives guessing).
+- Social URLs (up to 5, one per line).
+- Company website (optional contact link).
 - Notes (optional).
 
 Behavior:
@@ -531,12 +533,14 @@ Sections:
 - Directory layout (high-level):
 
   - `app/` – Next.js App Router entry points, layouts, route handlers, and global CSS. Route files connect URLs to features.
-  - `features/<name>/` – domain UI, schemas, and logic that change together. Existing features are `auth`, `landing`, `dashboard`, `targets`, and `templates`; add others when implemented.
+  - `features/<name>/` – domain UI, schemas, and logic that change together. Existing features are `auth`, `landing`, `dashboard`, `targets`, `templates`, `outreach`, and `email`; add others when implemented.
   - `features/<name>/index.ts` – public UI entry point for routes and other features. Server-only code uses an explicit server entry point so client bundles cannot import database logic.
   - `components/ui/` – domain-agnostic UI primitives; other shared components stay in `components/` only when used across features.
   - `lib/` – shared framework setup and cross-feature helpers, including the common request body parser and Better Auth server setup.
   - `db/` – Drizzle schema (`db/schema.ts`) and client (`db/index.ts`); `drizzle/` – generated migrations.
-  - `lib/queues/` – BullMQ queue definitions when the email pipeline is implemented.
+  - `lib/queues/` – BullMQ queue definitions for the email pipeline.
+  - `workers/` – email pipeline workers (one `pnpm worker` process); `scripts/` – one-off tooling.
+  - `Dockerfile` (multi-stage `web`/`worker` images, rank model baked in) + `compose.yaml` (local Postgres 18 + Redis 8, prod profile).
   - `workers/` – standalone worker entry points when the email pipeline is implemented.
 
 - Keep feature internals local. Other features import public entry points; shared UI and helpers never import feature code. Colocate feature-specific validation and TanStack Query hooks. Use server components for direct data reads, TanStack Query for client server state, and local React state for local UI state. Add global client state only when a real cross-feature need appears.

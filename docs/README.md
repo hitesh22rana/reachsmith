@@ -7,10 +7,11 @@
 - [x] `foundation`: scaffolded and verified (`typecheck`, `lint`, `build`, dev render, `db:generate`); local `compose.yaml` (Postgres + Redis) included.
 - [x] `auth`: Better Auth email/password, Drizzle tables + migration, login/signup UI, guards on `/targets` `/templates` `/outreach`; verified signup → session → guarded 200 / logged-out 307.
 - [x] `landing`: public `/`, guarded `/dashboard`, and post-auth redirects.
-- [x] `targets`: table + enums + migration, scoped CRUD APIs with Valibot validation, card grid/multi-step wizard/detail UI with full edit dialog; verified isolation (404s) plus doctor clean.
+- [x] `targets`: table + enums + migration, scoped CRUD APIs with Valibot validation, card grid/multi-step wizard/detail UI with full edit dialog, cascade-warning delete dialogs; fields are domain + social URLs (website is a dumb link); verified isolation (404s) plus doctor clean.
 - [x] `templates`: table + channel/audience enums + migration, `renderTemplate` + unit check, scoped CRUD APIs with Valibot validation, list/editor UI; verified CRUD, isolation (404s), and 400/401 cases.
-- [x] `outreach`: table + status enum + migration, `buildOutreachBody` on `renderTemplate`, scoped CRUD APIs with owned-target/template checks, compose flow (picker, edit, copy, mark sent) + per-target history + pipeline with filter/inline status; verified transitions, isolation (404s), and 400/401 cases.
+- [x] `outreach`: table + status enum + migration, `buildOutreachBody` on `renderTemplate`, scoped CRUD APIs with owned-target/template checks, compose flow (picker, subject, edit, copy, mark sent) + per-target history + pipeline with filter/inline status; verified transitions, isolation (404s), and 400/401 cases.
 - [x] `email-pipeline`: v1 shipped earlier; v2 ranked discovery: evidence-ranked candidates (notes extraction, context cues, handle derivation, pattern inference), domain without website, backend grammar-enforced SLM re-rank, top-10 budget, hidden candidate list with processing/found/not-found states, squashed migration. Verified live resolution, isolation, forged-job drops. Needs `EMAIL_VERIFIER_API_KEY` for real `valid` verdicts.
+- [x] `docker`: single multi-stage `Dockerfile` (`web`, `worker`, `builder`-as-migrator), rank model baked at build (pinned revision), prod profile in `compose.yaml` (Postgres 18.0, Redis 8.2.1, healthchecks, non-root, pruned prod deps). Verified `runner-web` + `runner-worker` images build.
 
 ## Features (build order)
 

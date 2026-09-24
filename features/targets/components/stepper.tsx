@@ -6,8 +6,6 @@ export interface StepDef {
   description: string;
 }
 
-// Centered stepper: circle on top, title and description below, progress
-// line running through the circles. Completed steps are clickable to go back.
 export function Stepper({
   steps,
   current,
