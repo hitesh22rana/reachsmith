@@ -19,4 +19,4 @@ Greenfield repo. `SPECS.md` is the source of truth: read it before coding. Per-f
 - Outreach sending is manual in MVP: generate message, copy to clipboard, mark `sent`. No Gmail/Outlook sync, no `send-email` worker yet (`SPECS.md` §3.5, §8.1).
 - Keep Postgres enums (Drizzle pgEnum) exactly as specced: `source_type`, `enrichment_status`, `channel`, `audience_type`, `Outreach.status`, `EmailGuess.status` (`SPECS.md` §6). Template vars are `{{first_name}}`, `{{company}}`, `{{job_title}}`, `{{job_link}}`.
 - Email pipeline order: `POST /api/targets` → `email-guess { targetId }` → `EmailGuess` rows → `email-verify { candidateId }` → `target.primary_email`. Workers are standalone Node processes, not in the Next.js server (`SPECS.md` §7–8).
-- Build order: `docs/README.md`: foundation → auth → targets/templates → outreach/email-pipeline. Don't build SaaS/billing/multi-region (`SPECS.md` §2.2, §11).
+- Build order: `docs/README.md`: foundation → auth → landing → targets/templates → outreach/email-pipeline. Don't build SaaS/billing/multi-region (`SPECS.md` §2.2, §11).

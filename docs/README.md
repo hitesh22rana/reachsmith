@@ -6,7 +6,7 @@
 
 - [x] `foundation`: scaffolded and verified (`typecheck`, `lint`, `build`, dev render, `db:generate`); local `compose.yaml` (Postgres + Redis) included.
 - [x] `auth`: Better Auth email/password, Drizzle tables + migration, login/signup UI, guards on `/targets` `/templates` `/outreach`; verified signup → session → guarded 200 / logged-out 307.
-- [ ] `targets`: up next.
+- [ ] `landing`: up next (after auth; guards and redirects depend on it).
 - [ ] `targets`
 - [ ] `templates`
 - [ ] `outreach`
@@ -16,10 +16,11 @@
 
 1. `foundation`: scaffolding only. No dependencies.
 2. `auth` (Better Auth): needs foundation. Stub-able: skip session check, hardcode `user_id`.
-3. `targets`: needs foundation (+ auth for ownership; stub `user_id` if missing).
-4. `templates`: needs foundation (+ auth for ownership). Independent of targets except preview uses a sample target: hardcode one if targets missing.
-5. `outreach`: needs foundation, targets, templates. If missing: hardcoded `target_id` / nullable `template_id` (custom message path).
-6. `email-pipeline`: needs foundation, targets. Enqueues from `POST /api/targets`; if targets missing, trigger via script with a raw `targetId`.
+3. `landing`: public `/`, dashboard moves to guarded `/dashboard`. Needs foundation + auth.
+4. `targets`: needs foundation (+ auth for ownership; stub `user_id` if missing).
+5. `templates`: needs foundation (+ auth for ownership). Independent of targets except preview uses a sample target: hardcode one if targets missing.
+6. `outreach`: needs foundation, targets, templates. If missing: hardcoded `target_id` / nullable `template_id` (custom message path).
+7. `email-pipeline`: needs foundation, targets. Enqueues from `POST /api/targets`; if targets missing, trigger via script with a raw `targetId`.
 
 Parallel-safe pairs: targets + templates, then outreach + email-pipeline.
 

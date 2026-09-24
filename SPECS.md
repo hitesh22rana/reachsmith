@@ -149,7 +149,8 @@ For a selected contact:
 
 - Next.js app:
   - Pages:
-    - `/` – landing / dashboard.
+    - `/` – public landing page.
+    - `/dashboard` – dashboard (auth required).
     - `/targets` – list of targets.
     - `/targets/[id]` – target details.
     - `/templates` – template list and CRUD.
@@ -401,7 +402,7 @@ Later (optional):
 ### 9.1 Onboarding
 
 - Simple login/signup.
-- Post-login:
+- Post-login redirect to `/dashboard`:
   - A minimal dashboard showing:
     - “Add your first target” CTA.
     - Empty states for targets and outreach.
