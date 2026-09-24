@@ -90,7 +90,7 @@ User can:
   - Channel: email, LinkedIn DM (and others later).
   - Audience type: HR, recruiter, engineer, founder, generic.
   - Purpose: referral request, cold intro, follow-up, etc.
-- Preview how templates render for a specific contact + job.
+- Render templates for a specific contact + job when composing outreach.
 
 ### 3.5 Outreach creation and tracking
 
@@ -465,8 +465,6 @@ Sections:
   - Audience type.
   - Purpose.
   - Body text with placeholder hints (list of supported variables).
-- Preview:
-  - Test rendering using a sample target.
 
 ### 9.6 Outreach view
 

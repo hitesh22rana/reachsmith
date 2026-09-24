@@ -8,7 +8,7 @@
 - [x] `auth`: Better Auth email/password, Drizzle tables + migration, login/signup UI, guards on `/targets` `/templates` `/outreach`; verified signup → session → guarded 200 / logged-out 307.
 - [x] `landing`: public `/`, guarded `/dashboard`, and post-auth redirects.
 - [x] `targets`: table + enums + migration, scoped CRUD APIs with Valibot validation, card grid/multi-step wizard/detail UI; verified isolation (404s) plus doctor clean.
-- [x] `templates`: table + channel/audience enums + migration, `renderTemplate` + unit check, scoped CRUD APIs with Valibot validation, list/editor/live-preview UI; verified CRUD, isolation (404s), and 400/401 cases.
+- [x] `templates`: table + channel/audience enums + migration, `renderTemplate` + unit check, scoped CRUD APIs with Valibot validation, list/editor UI; verified CRUD, isolation (404s), and 400/401 cases.
 - [ ] `outreach`
 - [ ] `email-pipeline`
 
@@ -18,7 +18,7 @@
 2. `auth` (Better Auth): needs foundation. Stub-able: skip session check, hardcode `user_id`.
 3. `landing`: public `/`, dashboard moves to guarded `/dashboard`. Needs foundation + auth.
 4. `targets`: needs foundation (+ auth for ownership; stub `user_id` if missing).
-5. `templates`: needs foundation (+ auth for ownership). Independent of targets except preview uses a sample target: hardcode one if targets missing.
+5. `templates`: needs foundation (+ auth for ownership). Independent of targets.
 6. `outreach`: needs foundation, targets, templates. If missing: hardcoded `target_id` / nullable `template_id` (custom message path).
 7. `email-pipeline`: needs foundation, targets. Enqueues from `POST /api/targets`; if targets missing, trigger via script with a raw `targetId`.
 
