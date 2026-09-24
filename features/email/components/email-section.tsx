@@ -37,7 +37,9 @@ function TriedList({ guesses }: { guesses: ApiEmailGuess[] }) {
           <tbody>
             {guesses.map((guess) => (
               <tr key={guess.email} className="border-b align-top last:border-b-0">
-                <td className="max-w-56 truncate px-3 py-2">{guess.email}</td>
+                <td className="px-3 py-2">
+                  <span className="block max-w-56 truncate">{guess.email}</span>
+                </td>
                 <td className="px-3 py-2 whitespace-nowrap text-muted-foreground">
                   {guess.patternUsed}
                 </td>
