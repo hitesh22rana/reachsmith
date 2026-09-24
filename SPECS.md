@@ -531,7 +531,7 @@ Sections:
 - Directory layout (high-level):
 
   - `app/` – Next.js App Router entry points, layouts, route handlers, and global CSS. Route files connect URLs to features.
-  - `features/<name>/` – domain UI, schemas, and logic that change together. Existing features are `auth`, `landing`, `dashboard`, and `targets`; add others when implemented.
+  - `features/<name>/` – domain UI, schemas, and logic that change together. Existing features are `auth`, `landing`, `dashboard`, `targets`, and `templates`; add others when implemented.
   - `features/<name>/index.ts` – public UI entry point for routes and other features. Server-only code uses an explicit server entry point so client bundles cannot import database logic.
   - `components/ui/` – domain-agnostic UI primitives; other shared components stay in `components/` only when used across features.
   - `lib/` – shared framework setup and cross-feature helpers, including the common request body parser and Better Auth server setup.
