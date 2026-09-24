@@ -10,7 +10,6 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { EmptyState } from "@/components/empty-state";
 import { TemplateDialog } from "./template-dialog";
 import { TemplateListSchema, type ApiTemplate } from "../validation";
-import { cn } from "@/lib/utils";
 
 async function fetchTemplates(): Promise<ApiTemplate[]> {
   const response = await fetch("/api/templates");
@@ -42,14 +41,14 @@ const AUDIENCE_LABELS = {
   generic: "Generic",
 } as const;
 
-function SkeletonCard({ hidden = false }: { hidden?: boolean }) {
+function SkeletonCard() {
   return (
-    <Card aria-hidden="true" className={cn("min-h-48 min-w-0 gap-4", hidden && "invisible")}>
+    <Card aria-hidden="true" className="min-h-52 min-w-0 gap-4 last:hidden md:last:flex">
       <CardHeader className="gap-1">
         <div className="h-6 w-2/3 animate-pulse rounded bg-muted" />
         <div className="h-5 w-1/2 animate-pulse rounded bg-muted" />
       </CardHeader>
-      <CardContent className="flex flex-1 flex-col gap-1 text-sm">
+      <CardContent className="flex flex-1 flex-col text-sm">
         <div className="h-5 w-full animate-pulse rounded bg-muted" />
         <div className="h-5 w-11/12 animate-pulse rounded bg-muted" />
         <div className="h-5 w-2/3 animate-pulse rounded bg-muted" />
@@ -57,8 +56,8 @@ function SkeletonCard({ hidden = false }: { hidden?: boolean }) {
       <CardFooter className="justify-between gap-2 bg-transparent py-3">
         <div className="h-4 w-24 animate-pulse rounded bg-muted" />
         <div className="flex items-center gap-1">
-          <div className="h-8 w-14 animate-pulse rounded-lg bg-muted" />
-          <div className="h-8 w-16 animate-pulse rounded-lg bg-muted" />
+          <div className="h-7 w-14 animate-pulse rounded-lg bg-muted" />
+          <div className="h-7 w-16 animate-pulse rounded-lg bg-muted" />
         </div>
       </CardFooter>
     </Card>
@@ -101,7 +100,7 @@ export function TemplatesView() {
 
       {templates.isPending ? (
         <div className="grid gap-4 md:grid-cols-2" aria-label="Loading templates">
-          {[0, 1, 2].map((card) => <SkeletonCard key={card} />)}
+          {[0, 1].map((card) => <SkeletonCard key={card} />)}
         </div>
       ) : null}
       {templates.isError ? (
@@ -121,13 +120,13 @@ export function TemplatesView() {
           {templates.data.map((template) => (
             <Card
               key={template.id}
-              className="min-h-48 min-w-0 gap-4 transition-shadow duration-200 hover:ring-foreground/20"
+              className="min-h-52 min-w-0 gap-4 transition-shadow duration-200 hover:ring-foreground/20"
             >
               <CardHeader className="gap-1">
                 <CardTitle className="truncate text-lg leading-6 font-semibold tracking-tight">
                   {template.name}
                 </CardTitle>
-                <CardDescription>
+                <CardDescription className="truncate">
                   {CHANNEL_LABELS[template.channel]} · {AUDIENCE_LABELS[template.audienceType]}
                   {template.purpose ? ` · ${template.purpose}` : ""}
                 </CardDescription>
@@ -166,9 +165,6 @@ export function TemplatesView() {
                 </div>
               </CardFooter>
             </Card>
-          ))}
-          {Array.from({ length: Math.max(0, 3 - templates.data.length) }, (_, index) => (
-            <SkeletonCard key={`reserved-${index}`} hidden />
           ))}
         </div>
       ) : null}
