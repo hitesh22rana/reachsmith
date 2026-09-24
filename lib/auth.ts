@@ -15,6 +15,10 @@ export const auth = betterAuth({
   }),
   emailAndPassword: {
     enabled: true,
+    // No auto sign-in: existing emails get a generic success-shaped
+    // response (plus dummy hashing) instead of an "already exists"
+    // error, so signups do not reveal which emails are registered.
+    autoSignIn: false,
   },
 });
 

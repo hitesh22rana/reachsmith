@@ -26,7 +26,7 @@ None.
 
 ## Acceptance
 - `npm run dev` renders `/` with no errors; placeholder routes return empty states.
-- `pnpm db:generate` passes; `fetch('/api/health')` (or equivalent) confirms DB connectivity path exists.
+- `pnpm db:generate` passes; `pnpm db:migrate` applies against the compose Postgres and the app boots with `DATABASE_URL` set.
 
 ## Non-goals
 Auth, any domain model/API/UI, queues, workers.
