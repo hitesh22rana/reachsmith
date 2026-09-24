@@ -237,6 +237,16 @@ export function NewOutreachDialog({
               <FieldError message={errors.template_id?.message} />
             </div>
           </div>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="outreach-subject">Subject</Label>
+            <Input
+              id="outreach-subject"
+              autoComplete="off"
+              placeholder="For email; skipped for DMs"
+              {...register("subject")}
+            />
+            <FieldError message={errors.subject?.message} />
+          </div>
           <div className="grid grid-cols-2 gap-4">
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="outreach-job-title">Job title</Label>

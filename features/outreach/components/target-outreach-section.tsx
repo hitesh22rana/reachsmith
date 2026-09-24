@@ -106,6 +106,9 @@ export function TargetOutreachSection({
         <ul className="flex flex-col gap-3">
           {history.data.map((item) => (
             <li key={item.id} className="flex flex-col gap-2 rounded-xl border p-4">
+              {item.subject ? (
+                <p className="truncate text-sm font-medium">{item.subject}</p>
+              ) : null}
               <p className="text-sm whitespace-pre-wrap">{item.bodyFinal}</p>
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <span className="text-xs font-medium text-muted-foreground">
