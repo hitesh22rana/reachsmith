@@ -1,7 +1,10 @@
 # Local Postgres + Redis for development. No secrets here are real.
+# Production stack (app + workers, model baked into the worker image):
+#   docker compose --profile prod up --build
+# Dev default (`docker compose up`) stays Postgres + Redis only.
 services:
   postgres:
-    image: postgres:17-alpine
+    image: postgres:18.0-alpine
     restart: unless-stopped
     environment:
       POSTGRES_USER: reachsmith
@@ -10,15 +13,71 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - pgdata:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U reachsmith -d reachsmith"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
   redis:
-    image: redis:7-alpine
+    image: redis:8.2.1-alpine
     restart: unless-stopped
     command: redis-server --appendonly yes
     ports:
       - "6379:6379"
     volumes:
       - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+  migrator:
+    build:
+      context: .
+      target: builder
+    profiles: ["prod"]
+    env_file: .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: ["pnpm", "db:migrate"]
+  web:
+    build:
+      context: .
+      target: runner-web
+    profiles: ["prod"]
+    restart: unless-stopped
+    init: true
+    env_file: .env
+    ports:
+      - "3000:3000"
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"fetch('http://localhost:3000/login').then(r=>{if(r.status!==200)process.exit(1)}).catch(()=>process.exit(1))\""]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrator:
+        condition: service_completed_successfully
+  worker:
+    build:
+      context: .
+      target: runner-worker
+    profiles: ["prod"]
+    restart: unless-stopped
+    init: true
+    env_file: .env
+    depends_on:
+      redis:
+        condition: service_healthy
+      migrator:
+        condition: service_completed_successfully
 
 volumes:
   pgdata:

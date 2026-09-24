@@ -19,7 +19,7 @@ function redisConnection() {
 // worker stops the line at the first valid candidate.
 const VERIFY_BUDGET = 10;
 
-async function processGuessJob(job: { data: { targetId: string } }): Promise<void> {
+export async function processGuessJob(job: { data: { targetId: string } }): Promise<void> {
   const db = getWorkerDb();
   const [target] = await db
     .select()
@@ -89,9 +89,15 @@ async function processGuessJob(job: { data: { targetId: string } }): Promise<voi
   await Promise.all(rows.map((row) => enqueueEmailVerify(row.id)));
 }
 
-new Worker("email-guess", processGuessJob, {
-  connection: redisConnection(),
-  concurrency: 5,
-});
+export function startGuessWorker(): Worker {
+  const worker = new Worker("email-guess", processGuessJob, {
+    connection: redisConnection(),
+    concurrency: 5,
+  });
+  console.log("email-guess worker running (concurrency 5)");
+  return worker;
+}
 
-console.log("email-guess worker running (concurrency 5)");
+if (process.argv[1]?.endsWith("workers/email-guess.ts")) {
+  startGuessWorker();
+}

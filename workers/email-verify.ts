@@ -39,7 +39,7 @@ async function setStatus(
     .where(and(eq(emailGuesses.id, guess.id), eq(emailGuesses.userId, guess.userId)));
 }
 
-async function processVerifyJob(job: { data: { candidateId: string } }): Promise<void> {
+export async function processVerifyJob(job: { data: { candidateId: string } }): Promise<void> {
   const db = getWorkerDb();
   const [guess] = await db
     .select()
@@ -83,10 +83,16 @@ async function processVerifyJob(job: { data: { candidateId: string } }): Promise
   await recomputePrimaryEmail(target.id);
 }
 
-new Worker("email-verify", processVerifyJob, {
-  connection: redisConnection(),
-  concurrency: 5,
-  limiter: { max: 10, duration: 60_000 },
-});
+export function startVerifyWorker(): Worker {
+  const worker = new Worker("email-verify", processVerifyJob, {
+    connection: redisConnection(),
+    concurrency: 5,
+    limiter: { max: 10, duration: 60_000 },
+  });
+  console.log("email-verify worker running (concurrency 5, 10 verifications/min)");
+  return worker;
+}
 
-console.log("email-verify worker running (concurrency 5, 10 verifications/min)");
+if (process.argv[1]?.endsWith("workers/email-verify.ts")) {
+  startVerifyWorker();
+}
