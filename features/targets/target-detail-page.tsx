@@ -5,7 +5,9 @@ import { getDb } from "@/db";
 import { targets } from "@/db/schema";
 import { requireUserId } from "@/lib/auth";
 import { NotesForm } from "./components/notes-form";
+import { EditTargetDialog } from "./components/edit-target-dialog";
 import { TargetOutreachSection } from "@/features/outreach";
+import { toTargetJson } from "./server";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -57,9 +59,12 @@ export default async function TargetDetailPage({
           <h1 className="text-3xl font-semibold tracking-tight">{target.fullName}</h1>
           {title ? <p className="text-muted-foreground">{title}</p> : null}
         </div>
-        <Link href="/targets" className={cn(buttonVariants({ variant: "outline" }), "pressable")}>
-          Back to targets
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link href="/targets" className={cn(buttonVariants({ variant: "outline" }), "pressable")}>
+            Back to targets
+          </Link>
+          <EditTargetDialog target={toTargetJson(target)} />
+        </div>
       </div>
 
       <section aria-label="Contact info" className="animate-enter rounded-2xl border bg-card p-6">
