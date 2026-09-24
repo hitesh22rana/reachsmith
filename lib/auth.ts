@@ -3,14 +3,15 @@ import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { getDb } from "@/db";
-import * as schema from "@/db/schema";
+import { accounts, sessions, users, verifications } from "@/db/schema";
 
 export const auth = betterAuth({
   secret: process.env.BETTER_AUTH_SECRET,
   baseURL: process.env.BETTER_AUTH_URL,
   database: drizzleAdapter(getDb(), {
     provider: "pg",
-    schema,
+    // Model names stay singular for Better Auth; tables are plural.
+    schema: { user: users, session: sessions, account: accounts, verification: verifications },
   }),
   emailAndPassword: {
     enabled: true,
