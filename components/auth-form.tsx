@@ -68,7 +68,7 @@ function LoginForm() {
       setServerError(message);
       return;
     }
-    router.push("/");
+    router.push("/dashboard");
     router.refresh();
   }
 
@@ -116,7 +116,7 @@ function SignupForm() {
       setServerError(message);
       return;
     }
-    router.push("/");
+    router.push("/dashboard");
     router.refresh();
   }
 
