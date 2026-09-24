@@ -9,6 +9,7 @@ Foundation (+ auth for `user_id`; if auth missing, hardcode a stub `user_id` con
 ## Scope
 - `Target` model exactly per `SPECS.md` §6.2: `user_id, full_name, first_name?, last_name?, company?, role_title?, primary_email?, profile_url?, source_type, enrichment_status, notes?, created_at, updated_at` (+ optional `location, company_website, github_url, linkedin_url, extra_enrichment Json?` only if trivial).
 - APIs: `GET/POST /api/targets`, `GET/PATCH/DELETE /api/targets/[id]`. `POST` validates `full_name` required; sets `enrichment_status: not_started`. `DELETE` cascades to `EmailGuess`/`Outreach` rows if those tables exist, else just deletes target (add cascade when outreach/email-pipeline land).
+- Validate `POST`/`PATCH` bodies with `parseBody` (`lib/validators.ts`), 400 + message on failure; client fetching via TanStack Query.
 - UI: `/targets` table (name, company, role, primary_email or "not set", latest outreach status or "No outreach yet"), add-target modal (fields per §9.3), `/targets/[id]` detail (header, contact info/notes, placeholders for email-candidates + outreach history sections owned by email-pipeline/outreach).
 - `POST /api/targets` must enqueue `email-guess { targetId }` if `lib/queues/` exists; otherwise leave a clearly marked hook point (`// TODO(email-pipeline): enqueue email-guess`): do not build queues here.
 

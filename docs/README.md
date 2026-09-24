@@ -2,6 +2,16 @@
 
 `SPECS.md` is source of truth. `AGENTS.md` holds repo constraints. Each `docs/features/<name>/SPEC.md` is a self-contained build prompt: give one to one agent/session.
 
+## Status
+
+- [x] `foundation`: scaffolded and verified (`typecheck`, `lint`, `build`, dev render, `db:generate`); local `compose.yaml` (Postgres + Redis) included.
+- [x] `auth`: Better Auth email/password, Drizzle tables + migration, login/signup UI, guards on `/targets` `/templates` `/outreach`; verified signup → session → guarded 200 / logged-out 307.
+- [ ] `targets`: up next.
+- [ ] `targets`
+- [ ] `templates`
+- [ ] `outreach`
+- [ ] `email-pipeline`
+
 ## Features (build order)
 
 1. `foundation`: scaffolding only. No dependencies.
@@ -18,6 +28,7 @@ Parallel-safe pairs: targets + templates, then outreach + email-pipeline.
 - Layout: `app/`, `app/api/`, `db/`, `drizzle/`, `lib/`, `lib/queues/`, `workers/`, `components/` (`SPECS.md` §12).
 - Enums verbatim (`SPECS.md` §6): `source_type: linkedin|github|website|manual|other`, `enrichment_status: not_started|pending|success|failed`, `channel: email|linkedin_dm|other`, `audience_type: hr|recruiter|engineer|founder|generic`, `Outreach.status: draft|sent|replied|rejected|no_response|success`, `EmailGuess.status: pending|verifying|valid|invalid|unknown|accept_all`.
 - Template vars only: `{{first_name}}`, `{{company}}`, `{{job_title}}`, `{{job_link}}`.
+- Validation: shared Valibot schemas in `lib/validators.ts`; forms use react-hook-form with the Valibot resolver, API routes check bodies with `parseBody` (400 + message). Client fetching via TanStack Query (`components/providers.tsx`); server components fetch directly.
 - Hard rules: no server-side LinkedIn scraping; outreach sending is manual (copy + mark `sent`); workers are standalone Node processes, never inside Next.js.
 
 ## Security (every feature, no exceptions)
