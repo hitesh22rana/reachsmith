@@ -9,15 +9,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { GuessListSchema, PrimaryEmailSchema, type ApiEmailGuess } from "../validation";
 
-const STATUS_STYLES: Record<ApiEmailGuess["status"], string> = {
-  pending: "border-amber-500/40 text-amber-600 dark:text-amber-400",
-  verifying: "border-amber-500/40 text-amber-600 dark:text-amber-400",
-  valid: "border-green-500/40 text-green-600 dark:text-green-400",
-  invalid: "border-red-500/40 text-red-600 dark:text-red-400",
-  unknown: "text-muted-foreground",
-  accept_all: "border-orange-500/40 text-orange-600 dark:text-orange-400",
-};
-
 async function fetchGuesses(targetId: string): Promise<ApiEmailGuess[]> {
   const response = await fetch(`/api/targets/${targetId}/guesses`);
   if (!response.ok) {
@@ -67,29 +58,6 @@ function ResultCard({
         {copiedEmail === primaryEmail ? "Copied" : "Copy"}
       </Button>
     </div>
-  );
-}
-
-function CandidateList({ guesses }: { guesses: ApiEmailGuess[] }) {
-  return (
-    <ul className="flex flex-col gap-2">
-      {guesses.map((guess) => (
-        <li
-          key={guess.id}
-          className="flex flex-wrap items-center justify-between gap-2 rounded-xl border px-4 py-2.5 text-sm"
-        >
-          <span className="min-w-0 truncate">
-            {guess.email}
-            <span className="ml-2 text-xs text-muted-foreground">{guess.patternUsed}</span>
-          </span>
-          <span
-            className={`rounded-full border px-2 py-0.5 text-xs font-medium ${STATUS_STYLES[guess.status]}`}
-          >
-            {guess.status.replace("_", "-")}
-          </span>
-        </li>
-      ))}
-    </ul>
   );
 }
 
@@ -201,9 +169,11 @@ export function TargetEmailSection({
     refetchInterval: (query) => (settled(query.state.data) ? false : 3000),
   });
 
-  const running = !!guesses.data && !settled(guesses.data);
+  const running = guesses.isPending || (!!guesses.data && !settled(guesses.data));
+  // Settled with no winner (all invalid/unknown, nothing set) is the same
+  // "not found" state as zero guesses: the section must never go silent.
   const empty =
-    !running && !!guesses.data && guesses.data.length === 0 && !primaryEmail;
+    !!guesses.data && settled(guesses.data) && !primaryEmail;
 
   async function copyEmail() {
     if (!primaryEmail) {

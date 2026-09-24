@@ -1,15 +1,16 @@
 import type { NewTemplate, Template } from "@/db/schema";
 import type { TemplateCreateInput, TemplatePatchInput } from "./validation";
 
-// JSON-safe template: dates leave the server as ISO strings.
-export type TemplateJson = Omit<Template, "createdAt" | "updatedAt"> & {
+// JSON-safe template, trimmed to what the client renders: no user_id.
+export type TemplateJson = Omit<Template, "userId" | "createdAt" | "updatedAt"> & {
   createdAt: string;
   updatedAt: string;
 };
 
 export function toTemplateJson(template: Template): TemplateJson {
+  const { userId: _userId, ...rest } = template;
   return {
-    ...template,
+    ...rest,
     createdAt: template.createdAt.toISOString(),
     updatedAt: template.updatedAt.toISOString(),
   };

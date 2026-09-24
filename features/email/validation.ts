@@ -5,20 +5,13 @@ export const EmailGuessStatusSchema = v.picklist(
   "Pick a valid status",
 );
 
-// Server-to-client guess shape (dates cross as ISO strings).
+// Server-to-client guess shape: only what the section renders
+// (email, pattern, provenance, status). IDs and audit fields stay server-side.
 export const EmailGuessJsonSchema = v.object({
-  id: v.string(),
-  userId: v.string(),
-  targetId: v.string(),
   email: v.string(),
   patternUsed: v.string(),
   source: v.string(),
-  score: v.number(),
-  context: v.nullable(v.string()),
   status: EmailGuessStatusSchema,
-  verificationMeta: v.unknown(),
-  createdAt: v.pipe(v.string(), v.isoTimestamp()),
-  updatedAt: v.pipe(v.string(), v.isoTimestamp()),
 });
 
 export const GuessListSchema = v.object({

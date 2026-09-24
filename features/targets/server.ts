@@ -1,15 +1,20 @@
 import type { NewTarget, Target } from "@/db/schema";
 import type { TargetCreateInput, TargetPatchInput } from "./validation";
 
-// JSON-safe target: dates leave the server as ISO strings.
-export type TargetJson = Omit<Target, "createdAt" | "updatedAt"> & {
+// JSON-safe target, trimmed to what the client renders: no user_id,
+// which the session already implies and no UI reads.
+export type TargetJson = Omit<
+  Target,
+  "userId" | "createdAt" | "updatedAt"
+> & {
   createdAt: string;
   updatedAt: string;
 };
 
 export function toTargetJson(target: Target): TargetJson {
+  const { userId: _userId, ...rest } = target;
   return {
-    ...target,
+    ...rest,
     createdAt: target.createdAt.toISOString(),
     updatedAt: target.updatedAt.toISOString(),
   };

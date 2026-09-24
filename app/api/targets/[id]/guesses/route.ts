@@ -27,9 +27,10 @@ export async function GET(_request: NextRequest, context: RouteContext): Promise
     .where(and(eq(emailGuesses.targetId, target.id), eq(emailGuesses.userId, userId)));
   return NextResponse.json({
     guesses: rows.map((row) => ({
-      ...row,
-      createdAt: row.createdAt.toISOString(),
-      updatedAt: row.updatedAt.toISOString(),
+      email: row.email,
+      patternUsed: row.patternUsed,
+      source: row.source,
+      status: row.status,
     })),
   });
 }
