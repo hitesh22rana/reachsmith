@@ -6,6 +6,7 @@ import { targets } from "@/db/schema";
 import { requireUserId } from "@/lib/auth";
 import { NotesForm } from "./components/notes-form";
 import { EditTargetDialog } from "./components/edit-target-dialog";
+import { TargetEmailSection } from "@/features/email";
 import { TargetOutreachSection } from "@/features/outreach";
 import { toTargetJson } from "./server";
 import { buttonVariants } from "@/components/ui/button-variants";
@@ -81,10 +82,7 @@ export default async function TargetDetailPage({
       </section>
 
       <section aria-label="Email candidates" className="animate-enter rounded-2xl border bg-card p-6">
-        <p className="text-base font-semibold tracking-tight">Email candidates</p>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Guessed addresses and verification states arrive with the email pipeline.
-        </p>
+        <TargetEmailSection targetId={target.id} primaryEmail={target.primaryEmail} />
       </section>
 
       <section aria-label="Outreach history" className="animate-enter rounded-2xl border bg-card p-6">
