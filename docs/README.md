@@ -6,7 +6,7 @@
 
 - [x] `foundation`: scaffolded and verified (`typecheck`, `lint`, `build`, dev render, `db:generate`); local `compose.yaml` (Postgres + Redis) included.
 - [x] `auth`: Better Auth email/password, Drizzle tables + migration, login/signup UI, guards on `/targets` `/templates` `/outreach`; verified signup → session → guarded 200 / logged-out 307.
-- [ ] `landing`: up next (after auth; guards and redirects depend on it).
+- [x] `landing`: public `/`, guarded `/dashboard`, and post-auth redirects.
 - [ ] `targets`
 - [ ] `templates`
 - [ ] `outreach`
