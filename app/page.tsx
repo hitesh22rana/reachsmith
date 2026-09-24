@@ -1,7 +1,11 @@
+import { headers } from "next/headers";
 import Link from "next/link";
 import { ArrowRight, Mail, Send, Users, type LucideIcon } from "lucide-react";
+import { auth } from "@/lib/auth";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { SignOutButton } from "@/components/sign-out-button";
+import { SystemStatus } from "@/components/system-status";
 import { cn } from "@/lib/utils";
 
 interface Section {
@@ -40,21 +44,42 @@ const SECTIONS: Section[] = [
   },
 ];
 
-export default function Home() {
+export default async function Home() {
+  const session = await auth.api.getSession({ headers: await headers() });
+
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-10 px-6 py-12">
-      <header className="animate-enter flex flex-col items-start gap-4">
-        <div className="space-y-2">
-          <h1 className="text-3xl font-semibold tracking-tight">ReachSmith</h1>
-          <p className="max-w-xl text-muted-foreground">
-            Organize targets, predict and verify emails, and track outreach. Add your first
-            target to get started.
-          </p>
+      <header className="animate-enter flex flex-col gap-4">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="space-y-2">
+            <h1 className="text-3xl font-semibold tracking-tight">ReachSmith</h1>
+            <p className="max-w-xl text-muted-foreground">
+              Organize targets, predict and verify emails, and track outreach.
+              {session ? ` Signed in as ${session.user.email}.` : " Log in to get started."}
+            </p>
+          </div>
+          {session ? (
+            <SignOutButton />
+          ) : (
+            <div className="flex items-center gap-2">
+              <Link href="/login" className={cn(buttonVariants({ variant: "ghost" }), "pressable")}>
+                Log in
+              </Link>
+              <Link href="/signup" className={cn(buttonVariants(), "pressable")}>
+                Create account
+              </Link>
+            </div>
+          )}
         </div>
-        <Link href="/targets" className={cn(buttonVariants(), "pressable")}>
-          Add your first target
-          <ArrowRight aria-hidden="true" />
-        </Link>
+        <div className="self-start">
+          <SystemStatus />
+        </div>
+        {session ? (
+          <Link href="/targets" className={cn(buttonVariants(), "pressable", "self-start")}>
+            Add your first target
+            <ArrowRight aria-hidden="true" />
+          </Link>
+        ) : null}
       </header>
       <section className="grid gap-4 sm:grid-cols-3">
         {SECTIONS.map((section, index) => (
