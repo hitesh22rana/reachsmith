@@ -109,15 +109,37 @@ export function OutreachView() {
       </div>
 
       {outreach.isPending ? (
-        <div className="overflow-hidden rounded-2xl border" aria-label="Loading outreach">
-          {[0, 1, 2].map((row) => (
-            <div key={row} className="flex items-center gap-4 border-b p-4 last:border-b-0">
-              <div className="h-5 w-1/4 animate-pulse rounded bg-muted" />
-              <div className="h-5 w-24 animate-pulse rounded bg-muted" />
-              <div className="h-8 w-32 animate-pulse rounded-lg bg-muted" />
-              <div className="ml-auto h-4 w-20 animate-pulse rounded bg-muted" />
-            </div>
-          ))}
+        <div className="overflow-x-auto rounded-2xl border bg-card" aria-label="Loading outreach">
+          <table className="w-full min-w-2xl text-left text-sm" aria-hidden="true">
+            <thead>
+              <tr className="border-b text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                <th scope="col" className="px-4 py-3">Target</th>
+                <th scope="col" className="px-4 py-3">Channel</th>
+                <th scope="col" className="px-4 py-3">Status</th>
+                <th scope="col" className="px-4 py-3">Updated</th>
+              </tr>
+            </thead>
+            <tbody>
+              {[0, 1, 2].map((row) => (
+                <tr key={row} className="border-b align-top last:border-b-0">
+                  <td className="max-w-64 px-4 py-3">
+                    <div className="h-5 w-2/3 animate-pulse rounded bg-muted" />
+                    <div className="mt-1 h-4 w-full animate-pulse rounded bg-muted" />
+                    <div className="mt-1 h-4 w-5/6 animate-pulse rounded bg-muted" />
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="h-5 w-24 animate-pulse rounded bg-muted" />
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="h-9 w-36 animate-pulse rounded-lg bg-muted" />
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="h-5 w-24 animate-pulse rounded bg-muted" />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       ) : null}
       {outreach.isError ? (
