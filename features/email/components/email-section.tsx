@@ -18,35 +18,7 @@ const TRIED_STYLES: Record<ApiEmailGuess["status"], string> = {
   accept_all: "text-orange-600 dark:text-orange-400",
 };
 
-function TriedList({
-  targetId,
-  guesses,
-  onVerify,
-}: {
-  targetId: string;
-  guesses: ApiEmailGuess[];
-  onVerify: () => void;
-}) {
-  const queryClient = useQueryClient();
-
-  const verify = useMutation({
-    mutationFn: async (email: string) => {
-      const response = await fetch(`/api/targets/${targetId}/guesses/verify`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
-      });
-      if (!response.ok) {
-        const body = (await response.json().catch(() => null)) as { message?: string } | null;
-        throw new Error(body?.message ?? `Failed to verify (${response.status})`);
-      }
-    },
-    onSuccess: () => {
-      onVerify();
-      void queryClient.invalidateQueries({ queryKey: ["guesses", targetId] });
-    },
-  });
-
+function TriedList({ guesses }: { guesses: ApiEmailGuess[] }) {
   return (
     <details className="text-sm">
       <summary className="cursor-pointer text-muted-foreground hover:text-foreground">
@@ -60,9 +32,6 @@ function TriedList({
               <th scope="col" className="px-3 py-2">Pattern</th>
               <th scope="col" className="px-3 py-2">Source</th>
               <th scope="col" className="px-3 py-2">Status</th>
-              <th scope="col" className="px-3 py-2">
-                <span className="sr-only">Actions</span>
-              </th>
             </tr>
           </thead>
           <tbody>
@@ -78,29 +47,11 @@ function TriedList({
                 >
                   {guess.status.replace("_", "-")}
                 </td>
-                <td className="px-3 py-2 text-right">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    disabled={
-                      verify.isPending || guess.status === "pending" || guess.status === "verifying"
-                    }
-                    onClick={() => verify.mutate(guess.email)}
-                  >
-                    Verify
-                  </Button>
-                </td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
-      {verify.isError ? (
-        <p role="alert" className="mt-1 text-xs text-destructive">
-          {verify.error instanceof Error ? verify.error.message : "Could not verify."}
-        </p>
-      ) : null}
     </details>
   );
 }
@@ -259,19 +210,10 @@ export function TargetEmailSection({
 }) {
   const queryClient = useQueryClient();
   const [copiedEmail, setCopiedEmail] = useState<string | null>(null);
-  // After a manual verify, keep polling past the settled state so the
-  // worker's verdict lands without a refresh.
-  const [watchUntil, setWatchUntil] = useState(0);
   const guesses = useQuery({
     queryKey: ["guesses", targetId],
     queryFn: () => fetchGuesses(targetId),
-    refetchInterval: (query) => {
-      const data = query.state.data;
-      if (!settled(data)) {
-        return 3000;
-      }
-      return Date.now() < watchUntil ? 3000 : false;
-    },
+    refetchInterval: (query) => (settled(query.state.data) ? false : 3000),
   });
 
   const running = guesses.isPending || (!!guesses.data && !settled(guesses.data));
@@ -307,11 +249,7 @@ export function TargetEmailSection({
         </p>
       ) : null}
       {guesses.data && guesses.data.length > 0 && settled(guesses.data) ? (
-        <TriedList
-          targetId={targetId}
-          guesses={guesses.data}
-          onVerify={() => setWatchUntil(Date.now() + 90_000)}
-        />
+        <TriedList guesses={guesses.data} />
       ) : null}
 
       <OverrideForm
