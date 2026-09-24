@@ -10,7 +10,7 @@
 - [x] `targets`: table + enums + migration, scoped CRUD APIs with Valibot validation, card grid/multi-step wizard/detail UI with full edit dialog; verified isolation (404s) plus doctor clean.
 - [x] `templates`: table + channel/audience enums + migration, `renderTemplate` + unit check, scoped CRUD APIs with Valibot validation, list/editor UI; verified CRUD, isolation (404s), and 400/401 cases.
 - [x] `outreach`: table + status enum + migration, `buildOutreachBody` on `renderTemplate`, scoped CRUD APIs with owned-target/template checks, compose flow (picker, edit, copy, mark sent) + per-target history + pipeline with filter/inline status; verified transitions, isolation (404s), and 400/401 cases.
-- [ ] `email-pipeline` v2 (ranked discovery): v1 shipped (guess table, patterns, queues, standalone workers, candidates + override UI). Now in spec: evidence-ranked candidates, notes extraction, backend SLM re-rank, top-10 budget, hidden candidate list, squashed migration.
+- [x] `email-pipeline`: v1 shipped earlier; v2 ranked discovery: evidence-ranked candidates (notes extraction, context cues, handle derivation, pattern inference), domain without website, backend grammar-enforced SLM re-rank, top-10 budget, hidden candidate list with processing/found/not-found states, squashed migration. Verified live resolution, isolation, forged-job drops. Needs `EMAIL_VERIFIER_API_KEY` for real `valid` verdicts.
 
 ## Features (build order)
 
