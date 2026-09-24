@@ -5,7 +5,6 @@ import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import * as v from "valibot";
 import { ArrowLeft, Send } from "lucide-react";
-import { buttonVariants } from "@/components/ui/button";
 import { EmptyState } from "@/components/empty-state";
 import { Label } from "@/components/ui/label";
 import {
@@ -16,7 +15,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { OutreachListSchema, OutreachStatusSchema, type ApiOutreach } from "../validation";
-import { cn } from "@/lib/utils";
 
 type StatusFilter = "all" | v.InferOutput<typeof OutreachStatusSchema>;
 
@@ -191,11 +189,6 @@ export function OutreachView() {
           Could not update the status. Try again.
         </p>
       ) : null}
-      <div className="animate-enter">
-        <Link href="/targets" className={cn(buttonVariants({ variant: "outline" }), "pressable")}>
-          Back to targets
-        </Link>
-      </div>
     </div>
   );
 }
