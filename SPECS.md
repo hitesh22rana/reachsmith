@@ -142,7 +142,7 @@ For a selected contact:
 - **Background jobs**: BullMQ + Redis (e.g., Upstash or any hosted Redis).
 - **Email verification**: External API (e.g., QuickEmailVerification or similar free-tier provider).
 - **Auth**: Better Auth with email/password.
-- **Validation**: Valibot with shared schemas for forms and API routes; forms via react-hook-form + Valibot resolver.
+- **Validation**: Valibot with feature-owned schemas shared between forms and API routes; forms via react-hook-form + Valibot resolver.
 - **Client data**: TanStack Query; server components fetch directly.
 
 ### 5.2 High-level components
@@ -532,14 +532,17 @@ Sections:
 - Language: TypeScript.
 - Directory layout (high-level):
 
-  - `app/` – Next.js app router pages and layouts.
-  - `app/api/` – API route handlers/server actions.
+  - `app/` – Next.js App Router entry points, layouts, route handlers, and global CSS. Route files connect URLs to features.
+  - `features/<name>/` – domain UI, schemas, and logic that change together. Existing features are `auth`, `landing`, `dashboard`, and `targets`; add others when implemented.
+  - `features/<name>/index.ts` – public UI entry point for routes and other features. Server-only code uses an explicit server entry point so client bundles cannot import database logic.
+  - `components/ui/` – domain-agnostic UI primitives; other shared components stay in `components/` only when used across features.
+  - `lib/` – shared framework setup and cross-feature helpers, including the common request body parser and Better Auth server setup.
   - `db/` – Drizzle schema (`db/schema.ts`) and client (`db/index.ts`); `drizzle/` – generated migrations.
-  - `lib/` – shared utilities (email pattern generation, template engine, etc.).
-  - `lib/queues/` – BullMQ queue definitions.
-  - `workers/` – worker entrypoints (email-guess, email-verify, etc.).
-  - `components/` – React components (forms, tables, layout).
-  - `styles/` – Tailwind and design tokens.
+  - `lib/queues/` – BullMQ queue definitions when the email pipeline is implemented.
+  - `workers/` – standalone worker entry points when the email pipeline is implemented.
+
+- Keep feature internals local. Other features import public entry points; shared UI and helpers never import feature code. Colocate feature-specific validation and TanStack Query hooks. Use server components for direct data reads, TanStack Query for client server state, and local React state for local UI state. Add global client state only when a real cross-feature need appears.
+- Prefer one clear owner for each behavior (DRY), small focused modules where behavior warrants it (SOLID), and no empty directories or speculative layers (YAGNI).
 
 - Config:
   - `.env` for database URL, Redis URL, and verifier API keys.

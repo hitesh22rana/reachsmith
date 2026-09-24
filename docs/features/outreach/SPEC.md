@@ -9,7 +9,7 @@ Foundation, targets, templates. If either missing: hardcode `target_id` / allow 
 ## Scope
 - `Outreach` model exactly per `SPECS.md` §6.4: `user_id, target_id, template_id?, channel, subject?, body_final, status, sent_at?, last_status_change_at, metadata Json?, created_at, updated_at`. Status enum verbatim.
 - `lib/outreach.ts`: `buildOutreachBody(template.body?, target, sender, {job_title?, job_link?})` reusing `renderTemplate` from templates (if templates missing, inline the 4-var substitution with a `// TODO(templates)` marker).
-- APIs: `POST /api/outreach` (creates `draft`, fills body via template or custom text), `PATCH /api/outreach/[id]` (status transitions set `sent_at` on first `sent` + always bump `last_status_change_at`), `GET /api/outreach?status=&targetId=` for pipeline + history. Validate bodies with `parseBody` (`lib/validators.ts`), 400 + message on failure; client fetching via TanStack Query.
+- APIs: `POST /api/outreach` (creates `draft`, fills body via template or custom text), `PATCH /api/outreach/[id]` (status transitions set `sent_at` on first `sent` + always bump `last_status_change_at`), `GET /api/outreach?status=&targetId=` for pipeline + history. Validate bodies with feature schemas and shared `parseBody` (`lib/validators.ts`), 400 + message on failure; client fetching via TanStack Query.
 - UI: "New Outreach" flow on `/targets/[id]` (purpose, channel, template picker, edit, copy-to-clipboard, mark `sent`); `/outreach` pipeline table with status filter + inline status change, sorted by `sent_at`/`last_status_change`.
 
 ## Security

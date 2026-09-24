@@ -8,7 +8,7 @@ None.
 
 ## Scope
 - Next.js App Router + TypeScript, Tailwind + shadcn/ui setup.
-- Valibot shared schemas (`lib/validators.ts`) for client + API validation with react-hook-form; TanStack Query provider for client fetching.
+- Valibot feature-owned schemas (`features/<name>/validation.ts`) for client + API validation with react-hook-form; TanStack Query provider for client fetching.
 - Drizzle + managed Postgres connection (`db/schema.ts` with no tables: tables belong to their features), Drizzle client singleton in `db/index.ts`.
 - `.env.example`: `DATABASE_URL`, `REDIS_URL`, `EMAIL_VERIFIER_API_KEY`, Better Auth secrets. Never commit real `.env`.
 - Base layout + placeholder dashboard at `/dashboard` with empty-state CTAs (`SPECS.md` §9.1). `/` is owned by the landing feature; `/targets`, `/templates`, `/outreach` placeholder pages (empty states only: real UI lives in targets/outreach/templates features).
