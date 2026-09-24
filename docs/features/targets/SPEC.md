@@ -7,7 +7,7 @@ Contact list + detail foundation (`SPECS.md` §3.1, §6.2, §9.2–9.4).
 Foundation (+ auth for `user_id`; if auth missing, hardcode a stub `user_id` constant with a `// TODO(auth)` marker).
 
 ## Scope
-- `Target` model exactly per `SPECS.md` §6.2: `user_id, full_name, first_name?, last_name?, company?, role_title?, primary_email?, profile_url?, source_type, enrichment_status, notes?, created_at, updated_at` (+ optional `location, company_website, github_url, linkedin_url, extra_enrichment Json?` only if trivial).
+- `Target` model per `SPECS.md` §6.2: `user_id, full_name, first_name?, last_name?, company?, role_title?, primary_email?, source_type, enrichment_status, notes?, location?, social_urls? (max 5 plain URLs), domain? (explicit email domain), company_website? (dumb contact link, no pipeline role), created_at, updated_at`.
 - APIs: `GET/POST /api/targets`, `GET/PATCH/DELETE /api/targets/[id]`. `POST` validates `full_name` required; sets `enrichment_status: not_started`. `DELETE` cascades to `Outreach` rows via FK (`EmailGuess` cascade lands with email-pipeline).
 - Validate `POST`/`PATCH` bodies with feature schemas and shared `parseBody` (`lib/validators.ts`), 400 + message on failure; client fetching via TanStack Query.
 - UI: `/targets` card grid (avatar, name, role at company, primary_email or "not set", latest outreach status or "No outreach yet"), 3-step add-target wizard with stepper (Basics, Contact, Notes plus review), `/targets/[id]` detail (header + edit-target dialog with every field, contact info/notes, email-candidates placeholder owned by email-pipeline, live outreach history owned by outreach).
