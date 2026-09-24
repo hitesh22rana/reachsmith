@@ -1,5 +1,5 @@
 export type TemplateVars = Partial<
-  Record<"first_name" | "company" | "job_title" | "job_link", string>
+  Record<"first_name" | "company" | "job_title" | "job_link", string | undefined>
 >;
 
 const VAR_PATTERN = /\{\{(first_name|company|job_title|job_link)\}\}/g;
