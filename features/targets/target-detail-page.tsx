@@ -5,6 +5,7 @@ import { getDb } from "@/db";
 import { targets } from "@/db/schema";
 import { requireUserId } from "@/lib/auth";
 import { NotesForm } from "./components/notes-form";
+import { TargetOutreachSection } from "@/features/outreach";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -82,10 +83,14 @@ export default async function TargetDetailPage({
       </section>
 
       <section aria-label="Outreach history" className="animate-enter rounded-2xl border bg-card p-6">
-        <p className="text-base font-semibold tracking-tight">Outreach history</p>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Messages and statuses arrive with the outreach feature.
-        </p>
+        <TargetOutreachSection
+          target={{
+            id: target.id,
+            firstName: target.firstName,
+            company: target.company,
+            roleTitle: target.roleTitle,
+          }}
+        />
       </section>
     </div>
   );
