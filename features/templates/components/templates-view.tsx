@@ -1,13 +1,12 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import * as v from "valibot";
 import { ArrowLeft, Mail } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/empty-state";
+import { DeleteDialog } from "@/components/delete-dialog";
 import { TemplateDialog } from "./template-dialog";
 import { TemplateListSchema, type ApiTemplate } from "../validation";
 
@@ -66,14 +65,12 @@ function SkeletonCard() {
 
 export function TemplatesView() {
   const queryClient = useQueryClient();
-  const [confirmId, setConfirmId] = useState<string | null>(null);
   const templates = useQuery({ queryKey: ["templates"], queryFn: fetchTemplates });
 
   const remove = useMutation({
     mutationFn: deleteTemplate,
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["templates"] });
-      setConfirmId(null);
     },
   });
 
@@ -140,28 +137,12 @@ export function TemplatesView() {
                 </span>
                 <div className="flex items-center gap-1">
                   <TemplateDialog template={template} />
-                  {confirmId === template.id ? (
-                    <>
-                      <Button variant="ghost" size="sm" onClick={() => setConfirmId(null)}>Cancel</Button>
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        disabled={remove.isPending}
-                        onClick={() => remove.mutate(template.id)}
-                      >
-                        Delete
-                      </Button>
-                    </>
-                  ) : (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setConfirmId(template.id)}
-                      aria-label={`Delete ${template.name}`}
-                    >
-                      Delete
-                    </Button>
-                  )}
+                  <DeleteDialog
+                    itemName={template.name}
+                    description="This permanently deletes the template. Outreach messages already made from it keep their text but lose the template link. This cannot be undone."
+                    onConfirm={() => remove.mutate(template.id)}
+                    pending={remove.isPending}
+                  />
                 </div>
               </CardFooter>
             </Card>
