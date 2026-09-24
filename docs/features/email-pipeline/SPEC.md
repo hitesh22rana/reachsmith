@@ -12,7 +12,7 @@ Foundation, targets. Trigger is `POST /api/targets`; if targets missing, drive w
 - `lib/queues/`: `email-guess { targetId }`, `email-verify { candidateId }` BullMQ definitions; `POST /api/targets` enqueues guess (wire into targets hook point). Queue payloads carry IDs only: workers re-load and re-verify ownership.
 - `workers/email-guess.ts`: load target → derive domain (`company_website` field, else manual domain on target, else skip with no rows: no company-name→domain lookup, §7.2) → generate → insert `pending` rows → enqueue one verify job each.
 - `workers/email-verify.ts`: standalone Node process: `pending → verifying` → MX check (no MX → `invalid`, early exit) → verifier API → map to `valid|invalid|unknown|accept_all` per §7.4, store raw response in `verification_meta` → recompute `target.primary_email` per §7.5 (prefer `valid` by pattern frequency `first.last` first; catch-all flagged risky; none valid → leave null). Concurrency 5–10, rate-limit, exponential-backoff retries.
-- UI (in `/targets/[id]` email section): "Finding email…" pending state, final `primary_email` + confidence, candidate list with statuses, manual override to set `primary_email`.
+- UI (in `/targets/[id]` email section): "Finding email…" pending state, final `primary_email` + confidence, candidate list with statuses, manual override to set `primary_email` (override validated with `parseBody`; candidate fetching via TanStack Query).
 
 ## Security
 - Workers never trust job payloads: reload `target`/`EmailGuess` from DB and confirm `user_id` chain (`EmailGuess.target.user_id`) before any read/write; mismatched or missing ownership → drop the job, write nothing.

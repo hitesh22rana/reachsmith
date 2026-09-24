@@ -141,7 +141,9 @@ For a selected contact:
 - **Styling/UI**: Tailwind CSS + shadcn/ui components.
 - **Background jobs**: BullMQ + Redis (e.g., Upstash or any hosted Redis).
 - **Email verification**: External API (e.g., QuickEmailVerification or similar free-tier provider).
-- **Auth**: NextAuth/Auth.js or provider built into managed stack (e.g., Supabase Auth).
+- **Auth**: Better Auth with email/password.
+- **Validation**: Valibot with shared schemas for forms and API routes; forms via react-hook-form + Valibot resolver.
+- **Client data**: TanStack Query; server components fetch directly.
 
 ### 5.2 High-level components
 
