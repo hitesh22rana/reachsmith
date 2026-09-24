@@ -145,3 +145,39 @@ export const targets = pgTable(
 
 export type Target = typeof targets.$inferSelect;
 export type NewTarget = typeof targets.$inferInsert;
+
+export const channelEnum = pgEnum("channel", ["email", "linkedin_dm", "other"]);
+
+export const audienceTypeEnum = pgEnum("audience_type", [
+  "hr",
+  "recruiter",
+  "engineer",
+  "founder",
+  "generic",
+]);
+
+export const templates = pgTable(
+  "templates",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    channel: channelEnum("channel").notNull().default("email"),
+    audienceType: audienceTypeEnum("audience_type").notNull().default("generic"),
+    purpose: text("purpose"),
+    body: text("body").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at")
+      .defaultNow()
+      .$onUpdate(() => /* @__PURE__ */ new Date())
+      .notNull(),
+  },
+  (table) => [index("templates_user_id_idx").on(table.userId)],
+);
+
+export type Template = typeof templates.$inferSelect;
+export type NewTemplate = typeof templates.$inferInsert;
