@@ -10,6 +10,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { EmptyState } from "@/components/empty-state";
 import { TemplateDialog } from "./template-dialog";
 import { TemplateListSchema, type ApiTemplate } from "../validation";
+import { cn } from "@/lib/utils";
 
 async function fetchTemplates(): Promise<ApiTemplate[]> {
   const response = await fetch("/api/templates");
@@ -41,19 +42,24 @@ const AUDIENCE_LABELS = {
   generic: "Generic",
 } as const;
 
-function SkeletonCard() {
+function SkeletonCard({ hidden = false }: { hidden?: boolean }) {
   return (
-    <Card aria-hidden="true" className="min-h-48 min-w-0 gap-4">
-      <CardHeader className="gap-2">
-        <div className="h-5 w-2/3 animate-pulse rounded bg-muted" />
-        <div className="h-4 w-1/3 animate-pulse rounded bg-muted" />
+    <Card aria-hidden="true" className={cn("min-h-48 min-w-0 gap-4", hidden && "invisible")}>
+      <CardHeader className="gap-1">
+        <div className="h-6 w-2/3 animate-pulse rounded bg-muted" />
+        <div className="h-5 w-1/2 animate-pulse rounded bg-muted" />
       </CardHeader>
-      <CardContent>
-        <div className="h-4 w-full animate-pulse rounded bg-muted" />
+      <CardContent className="flex flex-col gap-1 text-sm">
+        <div className="h-5 w-full animate-pulse rounded bg-muted" />
+        <div className="h-5 w-11/12 animate-pulse rounded bg-muted" />
+        <div className="h-5 w-2/3 animate-pulse rounded bg-muted" />
       </CardContent>
       <CardFooter className="justify-between gap-2 bg-transparent py-3">
-        <div className="h-4 w-20 animate-pulse rounded bg-muted" />
-        <div className="h-7 w-24 animate-pulse rounded-lg bg-muted" />
+        <div className="h-4 w-24 animate-pulse rounded bg-muted" />
+        <div className="flex items-center gap-1">
+          <div className="h-8 w-14 animate-pulse rounded-lg bg-muted" />
+          <div className="h-8 w-16 animate-pulse rounded-lg bg-muted" />
+        </div>
       </CardFooter>
     </Card>
   );
@@ -160,6 +166,9 @@ export function TemplatesView() {
                 </div>
               </CardFooter>
             </Card>
+          ))}
+          {Array.from({ length: Math.max(0, 3 - templates.data.length) }, (_, index) => (
+            <SkeletonCard key={`reserved-${index}`} hidden />
           ))}
         </div>
       ) : null}
