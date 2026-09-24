@@ -11,16 +11,20 @@
     "typecheck": "next typegen && tsc --noEmit",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
-    "db:seed": "node --experimental-strip-types --no-warnings scripts/seed.ts"
+    "db:seed": "node --experimental-strip-types --no-warnings scripts/seed.ts",
+    "worker:email-guess": "node --experimental-strip-types --no-warnings workers/email-guess.ts",
+    "worker:email-verify": "node --experimental-strip-types --no-warnings workers/email-verify.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.8.0",
     "@hookform/resolvers": "^5.9.1",
     "@tanstack/react-query": "^5.103.2",
     "better-auth": "^1.7.5",
+    "bullmq": "^6.3.8",
     "class-variance-authority": "^0.7.1",
     "cn": "^0.4.0",
     "drizzle-orm": "^0.45.3",
+    "ioredis": "^6.0.0",
     "lucide-react": "^1.48.0",
     "next": "16.3.6",
     "next-themes": "^0.4.6",

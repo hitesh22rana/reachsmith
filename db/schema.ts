@@ -224,3 +224,40 @@ export const outreaches = pgTable(
 
 export type Outreach = typeof outreaches.$inferSelect;
 export type NewOutreach = typeof outreaches.$inferInsert;
+
+export const emailGuessStatusEnum = pgEnum("email_guess_status", [
+  "pending",
+  "verifying",
+  "valid",
+  "invalid",
+  "unknown",
+  "accept_all",
+]);
+
+export const emailGuesses = pgTable(
+  "email_guesses",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    targetId: text("target_id")
+      .notNull()
+      .references(() => targets.id, { onDelete: "cascade" }),
+    email: text("email").notNull(),
+    patternUsed: text("pattern_used").notNull(),
+    status: emailGuessStatusEnum("status").notNull().default("pending"),
+    verificationMeta: jsonb("verification_meta"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at")
+      .defaultNow()
+      .$onUpdate(() => /* @__PURE__ */ new Date())
+      .notNull(),
+  },
+  (table) => [index("email_guesses_target_id_idx").on(table.targetId)],
+);
+
+export type EmailGuess = typeof emailGuesses.$inferSelect;
+export type NewEmailGuess = typeof emailGuesses.$inferInsert;

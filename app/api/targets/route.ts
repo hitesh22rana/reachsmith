@@ -3,6 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { getDb } from "@/db";
 import { targets } from "@/db/schema";
 import { getUserId } from "@/lib/auth";
+import { enqueueEmailGuess } from "@/lib/queues/email";
 import { toTargetInsert, toTargetJson } from "@/features/targets/server";
 import { parseBody } from "@/lib/validators";
 import { TargetCreateSchema } from "@/features/targets/validation";
@@ -36,6 +37,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   if (!target) {
     return NextResponse.json({ message: "Failed to create target" }, { status: 500 });
   }
-  // TODO(email-pipeline): enqueue email-guess { targetId: target.id }
+  // Best effort: a downed queue must not fail target creation.
+  try {
+    await enqueueEmailGuess(target.id);
+  } catch (error) {
+    console.error("Failed to enqueue email-guess", error);
+  }
   return NextResponse.json({ target: toTargetJson(target) }, { status: 201 });
 }
