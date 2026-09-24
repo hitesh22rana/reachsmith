@@ -1,0 +1,49 @@
+import { and, eq } from "drizzle-orm";
+import { NextResponse, type NextRequest } from "next/server";
+import { getDb } from "@/db";
+import { outreaches, targets } from "@/db/schema";
+import { getUserId } from "@/lib/auth";
+import { toOutreachJson } from "@/features/outreach/server";
+import { parseBody } from "@/lib/validators";
+import { OutreachPatchSchema } from "@/features/outreach/validation";
+
+interface RouteContext {
+  params: Promise<{ id: string }>;
+}
+
+export async function PATCH(request: NextRequest, context: RouteContext): Promise<NextResponse> {
+  const userId = await getUserId();
+  if (!userId) {
+    return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+  }
+  const parsed = parseBody(OutreachPatchSchema, await request.json().catch(() => null));
+  if (!parsed.ok) {
+    return NextResponse.json({ message: parsed.message }, { status: 400 });
+  }
+  const [row] = await getDb()
+    .select({ outreach: outreaches, fullName: targets.fullName, company: targets.company })
+    .from(outreaches)
+    .innerJoin(targets, eq(outreaches.targetId, targets.id))
+    .where(and(eq(outreaches.id, (await context.params).id), eq(outreaches.userId, userId)))
+    .limit(1);
+  if (!row) {
+    return NextResponse.json({ message: "Not found" }, { status: 404 });
+  }
+  const now = new Date();
+  const [updated] = await getDb()
+    .update(outreaches)
+    .set({
+      status: parsed.data.status,
+      sentAt: parsed.data.status === "sent" && !row.outreach.sentAt ? now : row.outreach.sentAt,
+      lastStatusChangeAt: now,
+      updatedAt: now,
+    })
+    .where(eq(outreaches.id, row.outreach.id))
+    .returning();
+  if (!updated) {
+    return NextResponse.json({ message: "Not found" }, { status: 404 });
+  }
+  return NextResponse.json({
+    outreach: toOutreachJson(updated, { fullName: row.fullName, company: row.company }),
+  });
+}

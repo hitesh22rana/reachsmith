@@ -181,3 +181,46 @@ export const templates = pgTable(
 
 export type Template = typeof templates.$inferSelect;
 export type NewTemplate = typeof templates.$inferInsert;
+
+export const outreachStatusEnum = pgEnum("outreach_status", [
+  "draft",
+  "sent",
+  "replied",
+  "rejected",
+  "no_response",
+  "success",
+]);
+
+export const outreaches = pgTable(
+  "outreaches",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    targetId: text("target_id")
+      .notNull()
+      .references(() => targets.id, { onDelete: "cascade" }),
+    templateId: text("template_id").references(() => templates.id, {
+      onDelete: "set null",
+    }),
+    channel: channelEnum("channel").notNull().default("email"),
+    subject: text("subject"),
+    bodyFinal: text("body_final").notNull(),
+    status: outreachStatusEnum("status").notNull().default("draft"),
+    sentAt: timestamp("sent_at"),
+    lastStatusChangeAt: timestamp("last_status_change_at").defaultNow().notNull(),
+    metadata: jsonb("metadata"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at")
+      .defaultNow()
+      .$onUpdate(() => /* @__PURE__ */ new Date())
+      .notNull(),
+  },
+  (table) => [index("outreaches_user_id_idx").on(table.userId)],
+);
+
+export type Outreach = typeof outreaches.$inferSelect;
+export type NewOutreach = typeof outreaches.$inferInsert;
