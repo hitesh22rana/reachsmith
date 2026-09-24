@@ -2,9 +2,11 @@ import { and, eq } from "drizzle-orm";
 import { getWorkerDb } from "./db.ts";
 import { emailGuesses, targets } from "../db/schema.ts";
 
-// §7.5 preference order: most frequent pattern first.
+// §7.5 preference order: most frequent pattern first; observed social
+// handles outrank derived patterns below first.last.
 export const PATTERN_PRIORITY = [
   "first.last",
+  "handle",
   "f.last",
   "first",
   "first_last",

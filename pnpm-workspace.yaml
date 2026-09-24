@@ -1,6 +1,9 @@
 allowBuilds:
   esbuild: true
   msgpackr-extract: true
+  node-llama-cpp: true
+  onnxruntime-node: true
+  protobufjs: true
   unrs-resolver: true
 minimumReleaseAge: 1440
 minimumReleaseAgeExclude:
