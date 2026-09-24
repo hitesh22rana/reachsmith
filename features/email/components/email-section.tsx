@@ -148,6 +148,44 @@ function OverrideForm({
   );
 }
 
+function confidenceFor(primaryEmail: string, guesses: ApiEmailGuess[] | undefined): string | null {
+  const match = guesses?.find((guess) => guess.email === primaryEmail);
+  if (match?.status === "valid") {
+    return `Verified · pattern ${match.patternUsed}`;
+  }
+  if (match?.status === "accept_all") {
+    return "Catch-all domain · risky";
+  }
+  if (match?.source === "notes") {
+    return "From your notes · unverified";
+  }
+  return "Set manually";
+}
+
+function StatusHeader({
+  running,
+  empty,
+}: {
+  running: boolean;
+  empty: boolean;
+}) {
+  return (
+    <div>
+      <p className="text-base font-semibold tracking-tight">Email candidates</p>
+      {running ? (
+        <p className="mt-1 text-sm text-muted-foreground" role="status">
+          Finding email…
+        </p>
+      ) : null}
+      {empty ? (
+        <p className="mt-1 text-sm text-muted-foreground">
+          Email not found – try manual entry or LinkedIn DM.
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
 export function TargetEmailSection({
   targetId,
   primaryEmail,
@@ -164,14 +202,8 @@ export function TargetEmailSection({
   });
 
   const running = !!guesses.data && !settled(guesses.data);
-  const match = guesses.data?.find((guess) => guess.email === primaryEmail);
-  const confidence = !primaryEmail
-    ? null
-    : match?.status === "valid"
-      ? `Verified · pattern ${match.patternUsed}`
-      : match?.status === "accept_all"
-        ? "Catch-all domain · risky"
-        : "Set manually";
+  const empty =
+    !running && !!guesses.data && guesses.data.length === 0 && !primaryEmail;
 
   async function copyEmail() {
     if (!primaryEmail) {
@@ -183,24 +215,12 @@ export function TargetEmailSection({
 
   return (
     <div className="flex flex-col gap-4">
-      <div>
-        <p className="text-base font-semibold tracking-tight">Email candidates</p>
-        {running ? (
-          <p className="mt-1 text-sm text-muted-foreground" role="status">
-            Finding email…
-          </p>
-        ) : null}
-        {!running && guesses.data && guesses.data.length === 0 && !primaryEmail ? (
-          <p className="mt-1 text-sm text-muted-foreground">
-            Email not found – try manual entry or LinkedIn DM.
-          </p>
-        ) : null}
-      </div>
+      <StatusHeader running={running} empty={empty} />
 
       {primaryEmail ? (
         <ResultCard
           primaryEmail={primaryEmail}
-          confidence={confidence}
+          confidence={confidenceFor(primaryEmail, guesses.data)}
           copiedEmail={copiedEmail}
           onCopy={() => void copyEmail()}
         />
@@ -210,9 +230,6 @@ export function TargetEmailSection({
         <p role="alert" className="text-sm text-destructive">
           Could not load candidates. Check the connection and try again.
         </p>
-      ) : null}
-      {guesses.data && guesses.data.length > 0 ? (
-        <CandidateList guesses={guesses.data} />
       ) : null}
 
       <OverrideForm

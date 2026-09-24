@@ -72,9 +72,28 @@ export default async function TargetDetailPage({
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Email" value={target.primaryEmail ?? "Finding email"} />
           <Field label="Source" value={target.sourceType} />
-          <Field label="Profile" value={target.profileUrl} href={target.profileUrl} />
+          <Field label="Email domain" value={target.domain} />
           <Field label="Company site" value={target.companyWebsite} href={target.companyWebsite} />
         </div>
+        {target.socialUrls && target.socialUrls.length > 0 ? (
+          <div className="mt-4 space-y-1">
+            <p className="text-sm font-medium text-muted-foreground">Social URLs</p>
+            <ul className="space-y-1">
+              {target.socialUrls.map((url) => (
+                <li key={url}>
+                  <Link
+                    href={url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-sm text-primary break-all hover:underline"
+                  >
+                    {url}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
       </section>
 
       <section aria-label="Notes" className="animate-enter rounded-2xl border bg-card p-6">

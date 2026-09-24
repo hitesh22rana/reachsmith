@@ -87,13 +87,12 @@ export function EditTargetDialog({ target }: { target: ApiTarget }) {
       company: target.company ?? "",
       role_title: target.roleTitle ?? "",
       primary_email: target.primaryEmail ?? "",
-      profile_url: target.profileUrl ?? "",
+      domain: target.domain ?? "",
       source_type: target.sourceType,
       notes: target.notes ?? "",
       location: target.location ?? "",
       company_website: target.companyWebsite ?? "",
-      github_url: target.githubUrl ?? "",
-      linkedin_url: target.linkedinUrl ?? "",
+      social_urls: (target.socialUrls ?? []).join("\n"),
     },
   });
 
@@ -183,9 +182,9 @@ export function EditTargetDialog({ target }: { target: ApiTarget }) {
             </div>
           </div>
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="edit-profile">Profile URL</Label>
-            <Input id="edit-profile" type="url" autoComplete="off" placeholder="https://" {...register("profile_url")} />
-            <FieldError message={errors.profile_url?.message} />
+            <Label htmlFor="edit-domain">Email domain (if known)</Label>
+            <Input id="edit-domain" autoComplete="off" placeholder="company.com" {...register("domain")} />
+            <FieldError message={errors.domain?.message} />
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div className="flex flex-col gap-1.5">
@@ -199,17 +198,16 @@ export function EditTargetDialog({ target }: { target: ApiTarget }) {
               <FieldError message={errors.company_website?.message} />
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="edit-github">GitHub URL</Label>
-              <Input id="edit-github" type="url" autoComplete="off" placeholder="https://" {...register("github_url")} />
-              <FieldError message={errors.github_url?.message} />
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="edit-linkedin">LinkedIn URL</Label>
-              <Input id="edit-linkedin" type="url" autoComplete="off" placeholder="https://" {...register("linkedin_url")} />
-              <FieldError message={errors.linkedin_url?.message} />
-            </div>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="edit-social">Social URLs (one per line, up to 5)</Label>
+            <Textarea
+              id="edit-social"
+              rows={3}
+              autoComplete="off"
+              placeholder={"https://linkedin.com/in/…\nhttps://github.com/…"}
+              {...register("social_urls")}
+            />
+            <FieldError message={errors.social_urls?.message} />
           </div>
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="edit-notes">Notes</Label>

@@ -41,6 +41,52 @@ export const OptionalEmailSchema = v.optional(
   ),
 );
 
+export const DomainSchema = v.optional(
+  v.union(
+    [
+      v.literal(""),
+      v.pipe(
+        v.string(),
+        v.trim(),
+        v.maxLength(253, "Must be 253 characters or fewer"),
+        v.regex(
+          /^[a-z0-9.-]+\.[a-z]{2,}$/i,
+          "Enter a domain like company.com",
+        ),
+      ),
+    ],
+    "Enter a domain like company.com",
+  ),
+);
+
+// One URL per line, at most 5. Stays raw text through the form; the
+// server mapper splits it into the stored array.
+function socialUrlLines(raw: string): string[] {
+  return raw
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line !== "");
+}
+
+function linesAreUrls(raw: string): boolean {
+  return socialUrlLines(raw).every((line) => {
+    try {
+      const url = new URL(line);
+      return url.protocol === "https:" || url.protocol === "http:";
+    } catch {
+      return false;
+    }
+  });
+}
+
+export const SocialUrlsSchema = v.optional(
+  v.pipe(
+    v.string(),
+    v.check((raw) => socialUrlLines(raw).length <= 5, "At most 5 URLs"),
+    v.check(linesAreUrls, "Each line must be a valid URL starting with https://"),
+  ),
+);
+
 export const TargetCreateSchema = v.object({
   full_name: v.pipe(
     v.string(),
@@ -53,13 +99,12 @@ export const TargetCreateSchema = v.object({
   company: OptionalTextSchema(100),
   role_title: OptionalTextSchema(100),
   primary_email: OptionalEmailSchema,
-  profile_url: OptionalUrlSchema,
   source_type: v.optional(SourceTypeSchema, "manual"),
   notes: OptionalTextSchema(2000),
   location: OptionalTextSchema(100),
   company_website: OptionalUrlSchema,
-  github_url: OptionalUrlSchema,
-  linkedin_url: OptionalUrlSchema,
+  domain: DomainSchema,
+  social_urls: SocialUrlsSchema,
 });
 
 export const TargetPatchSchema = v.partial(TargetCreateSchema);
@@ -77,14 +122,13 @@ export const TargetJsonSchema = v.object({
   company: v.nullable(v.string()),
   roleTitle: v.nullable(v.string()),
   primaryEmail: v.nullable(v.string()),
-  profileUrl: v.nullable(v.string()),
   sourceType: SourceTypeSchema,
   enrichmentStatus: v.picklist(["not_started", "pending", "success", "failed"]),
   notes: v.nullable(v.string()),
   location: v.nullable(v.string()),
   companyWebsite: v.nullable(v.string()),
-  githubUrl: v.nullable(v.string()),
-  linkedinUrl: v.nullable(v.string()),
+  domain: v.nullable(v.string()),
+  socialUrls: v.nullable(v.array(v.string())),
   extraEnrichment: v.unknown(),
   createdAt: v.pipe(v.string(), v.isoTimestamp()),
   updatedAt: v.pipe(v.string(), v.isoTimestamp()),
