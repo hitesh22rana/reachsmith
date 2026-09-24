@@ -405,23 +405,22 @@ Later (optional):
 - Post-login redirect to `/dashboard`:
   - A minimal dashboard showing:
     - “Add your first target” CTA.
+    - Live per-section counts (targets, templates, outreach).
     - Empty states for targets and outreach.
 
 ### 9.2 Target list
 
-- Table view with:
-  - Name.
-  - Company.
-  - Role.
-  - Primary email (if found).
-  - Latest outreach status or “No outreach yet”.
+- Card grid with:
+  - Avatar, name, role at company.
+  - Primary email (“not set” if missing).
+  - Source label; latest outreach status or “No outreach yet”.
 - Actions:
-  - Add new target (opens modal).
-  - Click row to open target detail.
+  - Add new target (opens the wizard dialog).
+  - Title link or Open button to reach target detail; inline delete with confirm.
 
 ### 9.3 Add target modal
 
-Fields:
+Three-step wizard (Basics, Contact, Notes plus review) with a stepper. Fields:
 
 - Full name (required).
 - Company (optional but recommended).
@@ -445,15 +444,16 @@ Sections:
 
 - Header:
   - Name, role, company, primary_email or “Finding email…”.
+  - “Edit target” dialog covering every field.
 - Contact info:
   - Profile links, notes, enrichment info.
 - Email guessing section:
   - Show candidates and statuses (optional advanced view).
   - Allow user to override and pick “correct” email if necessary.
-- Outreach history:
-  - List of Outreach records with status, sent date, and quick filters.
+- Outreach history (live):
+  - List of Outreach records with status, sent date, copy button, and inline status change.
 - “New Outreach” button:
-  - Opens a flow to select template, channel, and purpose, then preview and save outreach.
+  - Opens a flow to select template and channel, fill job title/link, edit, copy-to-clipboard, then save draft or save and mark `sent`.
 
 ### 9.5 Template management
 
