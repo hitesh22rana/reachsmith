@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useRouter } from "next/navigation";
 import * as v from "valibot";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -100,6 +101,7 @@ function OverrideForm({
   onSaved: () => void;
 }) {
   const queryClient = useQueryClient();
+  const router = useRouter();
   const [override, setOverride] = useState("");
 
   const save = useMutation({
@@ -108,6 +110,7 @@ function OverrideForm({
       setOverride("");
       onSaved();
       void queryClient.invalidateQueries({ queryKey: ["targets"] });
+      router.refresh();
     },
     onError: () => undefined,
   });
