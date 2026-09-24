@@ -1,4 +1,4 @@
-# Templates — SPEC
+# Templates: SPEC
 
 ## Goal
 Reusable message templates with variable substitution (`SPECS.md` §3.4, §6.3, §9.5).
@@ -14,7 +14,7 @@ Foundation (+ auth for `user_id`, same stub rule as targets). Independent of tar
 
 ## Security
 - Same ownership rule as targets: every query filters by session `user_id`; `:id` routes 404 on owner mismatch; no client-supplied `user_id`.
-- Preview renders server-side or with the user's own rows only — never fetch another user's templates by ID.
+- Preview renders server-side or with the user's own rows only: never fetch another user's templates by ID.
 
 ## Tasks
 1. Prisma model + migration.

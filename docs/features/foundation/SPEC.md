@@ -1,4 +1,4 @@
-# Foundation — SPEC
+# Foundation: SPEC
 
 ## Goal
 Empty runnable skeleton every other feature builds on (`SPECS.md` §5, §12).
@@ -8,14 +8,14 @@ None.
 
 ## Scope
 - Next.js App Router + TypeScript, Tailwind + shadcn/ui setup.
-- Prisma + managed Postgres connection (`prisma/schema.prisma` with datasource only, no models — models belong to their features), Prisma client singleton in `lib/db.ts`.
+- Prisma + managed Postgres connection (`prisma/schema.prisma` with datasource only, no models: models belong to their features), Prisma client singleton in `lib/db.ts`.
 - `.env.example`: `DATABASE_URL`, `REDIS_URL`, `EMAIL_VERIFIER_API_KEY`, Better Auth secrets. Never commit real `.env`.
-- Base layout + `/` placeholder dashboard with empty-state CTAs (`SPECS.md` §9.1). `/targets`, `/templates`, `/outreach` placeholder pages (empty states only — real UI lives in targets/outreach/templates features).
+- Base layout + `/` placeholder dashboard with empty-state CTAs (`SPECS.md` §9.1). `/targets`, `/templates`, `/outreach` placeholder pages (empty states only: real UI lives in targets/outreach/templates features).
 - `README.md` quickstart: install, `prisma migrate dev`, `npm run dev`.
 
 ## Security
 - No auth logic here, but scaffold the guard helper import point so `auth` can enforce it without refactoring pages/APIs.
-- `.env.example` lists secret names only — no real values, ever.
+- `.env.example` lists secret names only: no real values, ever.
 
 ## Tasks
 1. Scaffold app per `SPECS.md` §12 layout (`app/`, `app/api/`, `prisma/`, `lib/`, `lib/queues/`, `workers/`, `components/`).
