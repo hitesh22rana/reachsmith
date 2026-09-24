@@ -1,5 +1,5 @@
 import { relations } from "drizzle-orm";
-import { pgTable, text, timestamp, boolean, index, jsonb, pgEnum } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, boolean, index, integer, jsonb, pgEnum } from "drizzle-orm/pg-core";
 
 // Convention: table names and their consts are always plural.
 // Better Auth models map to these tables explicitly in lib/auth.ts.
@@ -123,7 +123,6 @@ export const targets = pgTable(
     company: text("company"),
     roleTitle: text("role_title"),
     primaryEmail: text("primary_email"),
-    profileUrl: text("profile_url"),
     sourceType: sourceTypeEnum("source_type").notNull().default("manual"),
     enrichmentStatus: enrichmentStatusEnum("enrichment_status")
       .notNull()
@@ -131,8 +130,8 @@ export const targets = pgTable(
     notes: text("notes"),
     location: text("location"),
     companyWebsite: text("company_website"),
-    githubUrl: text("github_url"),
-    linkedinUrl: text("linkedin_url"),
+    domain: text("domain"),
+    socialUrls: text("social_urls").array(),
     extraEnrichment: jsonb("extra_enrichment"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at")
@@ -248,6 +247,9 @@ export const emailGuesses = pgTable(
       .references(() => targets.id, { onDelete: "cascade" }),
     email: text("email").notNull(),
     patternUsed: text("pattern_used").notNull(),
+    source: text("source").notNull().default("pattern"),
+    score: integer("score").notNull().default(0),
+    context: text("context"),
     status: emailGuessStatusEnum("status").notNull().default("pending"),
     verificationMeta: jsonb("verification_meta"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
