@@ -10,7 +10,8 @@
     "lint": "eslint",
     "typecheck": "next typegen && tsc --noEmit",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "drizzle-kit migrate"
+    "db:migrate": "drizzle-kit migrate",
+    "db:seed": "node --experimental-strip-types --no-warnings scripts/seed.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.8.0",
