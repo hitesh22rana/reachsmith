@@ -8,7 +8,7 @@
 - [x] `auth`: Better Auth email/password, Drizzle tables + migration, login/signup UI, guards on `/targets` `/templates` `/outreach`; verified signup → session → guarded 200 / logged-out 307.
 - [x] `landing`: public `/`, guarded `/dashboard`, and post-auth redirects.
 - [x] `targets`: table + enums + migration, scoped CRUD APIs with Valibot validation, card grid/multi-step wizard/detail UI; verified isolation (404s) plus doctor clean.
-- [ ] `templates`
+- [x] `templates`: table + channel/audience enums + migration, `renderTemplate` + unit check, scoped CRUD APIs with Valibot validation, list/editor/live-preview UI; verified CRUD, isolation (404s), and 400/401 cases.
 - [ ] `outreach`
 - [ ] `email-pipeline`
 
