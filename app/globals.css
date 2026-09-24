@@ -149,13 +149,10 @@
   .pressable {
     transition: transform 150ms var(--ease-out-strong);
   }
-  .pressable:active {
-    transform: scale(0.97);
-  }
-  /* shadcn buttons already shift 1px on press; add the scale so every
-     button confirms the press. `translate` and `transform` compose. */
+  .pressable:active,
   [data-slot="button"]:active:not(:disabled) {
-    transform: scale(0.98);
+    transform: scale(0.97);
+    transition-duration: 100ms;
   }
 }
 
