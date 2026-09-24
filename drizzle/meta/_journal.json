@@ -15,6 +15,13 @@
       "when": 1790265000000,
       "tag": "0001_pluralize_auth_tables",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1790269474695,
+      "tag": "0002_majestic_iron_lad",
+      "breakpoints": true
     }
   ]
 }
