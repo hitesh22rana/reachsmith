@@ -8,7 +8,7 @@ import { NotesForm } from "./components/notes-form";
 import { EditTargetDialog } from "./components/edit-target-dialog";
 import { TargetOutreachSection } from "@/features/outreach";
 import { toTargetJson } from "./server";
-import { buttonVariants } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button-variants";
 import { cn } from "@/lib/utils";
 
 function Field({ label, value, href }: { label: string; value: string | null; href?: string | null }) {

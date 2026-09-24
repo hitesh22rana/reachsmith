@@ -5,7 +5,7 @@ import { ArrowRight, Mail, Send, Users, type LucideIcon } from "lucide-react";
 import { getDb } from "@/db";
 import { outreaches, targets, templates } from "@/db/schema";
 import { auth, requireUserId } from "@/lib/auth";
-import { buttonVariants } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button-variants";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ProfileMenu } from "@/features/auth";
 import { ModeToggle } from "@/components/mode-toggle";
