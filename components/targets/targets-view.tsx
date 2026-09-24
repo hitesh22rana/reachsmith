@@ -37,36 +37,40 @@ const SOURCE_LABELS = {
   other: "Other source",
 } as const;
 
+function SkeletonCard({ hidden = false }: { hidden?: boolean }) {
+  return (
+    <Card aria-hidden="true" className={cn("min-h-56 min-w-0 gap-5", hidden && "invisible")}>
+      <CardHeader className="gap-4">
+        <div className="flex items-start gap-4">
+          <div className="size-12 shrink-0 animate-pulse rounded-xl bg-muted" />
+          <div className="flex min-w-0 flex-1 flex-col">
+            <div className="mb-1 h-4 w-24 animate-pulse rounded bg-muted" />
+            <div className="h-6 w-2/3 animate-pulse rounded bg-muted" />
+            <div className="mt-1 h-5 w-1/2 animate-pulse rounded bg-muted" />
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="flex flex-1 flex-col gap-3 text-sm">
+        <div className="flex items-center gap-2">
+          <div className="size-4 shrink-0 animate-pulse rounded bg-muted" />
+          <div className="h-5 w-3/5 animate-pulse rounded bg-muted" />
+        </div>
+      </CardContent>
+      <CardFooter className="justify-between gap-2 bg-transparent py-3">
+        <div className="h-4 w-24 animate-pulse rounded bg-muted" />
+        <div className="flex items-center gap-1">
+          <div className="h-7 w-16 animate-pulse rounded-lg bg-muted" />
+          <div className="h-7 w-16 animate-pulse rounded-lg bg-muted" />
+        </div>
+      </CardFooter>
+    </Card>
+  );
+}
+
 function SkeletonCards() {
   return (
     <div className="grid gap-4 md:grid-cols-2" aria-label="Loading targets">
-      {[0, 1, 2].map((card) => (
-        <Card key={card} aria-hidden="true" className="min-w-0 gap-5">
-          <CardHeader className="gap-4">
-            <div className="flex items-start gap-4">
-              <div className="size-12 shrink-0 animate-pulse rounded-xl bg-muted" />
-              <div className="flex min-w-0 flex-1 flex-col">
-                <div className="mb-1 h-4 w-24 animate-pulse rounded bg-muted" />
-                <div className="h-6 w-2/3 animate-pulse rounded bg-muted" />
-                <div className="mt-1 h-5 w-1/2 animate-pulse rounded bg-muted" />
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent className="flex flex-1 flex-col gap-3 text-sm">
-            <div className="flex items-center gap-2">
-              <div className="size-4 shrink-0 animate-pulse rounded bg-muted" />
-              <div className="h-5 w-3/5 animate-pulse rounded bg-muted" />
-            </div>
-          </CardContent>
-          <CardFooter className="justify-between gap-2 bg-transparent py-3">
-            <div className="h-4 w-24 animate-pulse rounded bg-muted" />
-            <div className="flex items-center gap-1">
-              <div className="h-7 w-16 animate-pulse rounded-lg bg-muted" />
-              <div className="h-7 w-16 animate-pulse rounded-lg bg-muted" />
-            </div>
-          </CardFooter>
-        </Card>
-      ))}
+      {[0, 1, 2].map((card) => <SkeletonCard key={card} />)}
     </div>
   );
 }
@@ -120,11 +124,10 @@ export function TargetsView() {
       ) : null}
       {targets.data && targets.data.length > 0 ? (
         <div className="grid gap-4 md:grid-cols-2">
-          {targets.data.map((target, index) => (
+          {targets.data.map((target) => (
             <Card
               key={target.id}
-              className="animate-enter min-w-0 gap-5 transition-shadow duration-200 hover:ring-foreground/20"
-              style={{ animationDelay: `${Math.min(index, 3) * 50}ms` }}
+              className="min-h-56 min-w-0 gap-5 transition-shadow duration-200 hover:ring-foreground/20"
             >
               <CardHeader className="gap-4">
                 <div className="flex items-start gap-4">
@@ -186,6 +189,9 @@ export function TargetsView() {
                 </div>
               </CardFooter>
             </Card>
+          ))}
+          {Array.from({ length: Math.max(0, 3 - targets.data.length) }, (_, index) => (
+            <SkeletonCard key={`reserved-${index}`} hidden />
           ))}
         </div>
       ) : null}
