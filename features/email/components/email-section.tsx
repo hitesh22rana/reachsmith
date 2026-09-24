@@ -9,6 +9,35 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { GuessListSchema, PrimaryEmailSchema, type ApiEmailGuess } from "../validation";
 
+const TRIED_STYLES: Record<ApiEmailGuess["status"], string> = {
+  pending: "text-amber-600 dark:text-amber-400",
+  verifying: "text-amber-600 dark:text-amber-400",
+  valid: "text-green-600 dark:text-green-400",
+  invalid: "text-red-600 dark:text-red-400",
+  unknown: "text-muted-foreground",
+  accept_all: "text-orange-600 dark:text-orange-400",
+};
+
+function TriedList({ guesses }: { guesses: ApiEmailGuess[] }) {
+  return (
+    <details className="text-sm">
+      <summary className="cursor-pointer text-muted-foreground hover:text-foreground">
+        What was tried ({guesses.length})
+      </summary>
+      <ul className="mt-2 flex flex-col gap-1">
+        {guesses.map((guess) => (
+          <li key={guess.email} className="flex items-center justify-between gap-2">
+            <span className="min-w-0 truncate text-muted-foreground">{guess.email}</span>
+            <span className={`shrink-0 text-xs font-medium ${TRIED_STYLES[guess.status]}`}>
+              {guess.status.replace("_", "-")}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </details>
+  );
+}
+
 async function fetchGuesses(targetId: string): Promise<ApiEmailGuess[]> {
   const response = await fetch(`/api/targets/${targetId}/guesses`);
   if (!response.ok) {
@@ -200,6 +229,9 @@ export function TargetEmailSection({
         <p role="alert" className="text-sm text-destructive">
           Could not load candidates. Check the connection and try again.
         </p>
+      ) : null}
+      {guesses.data && guesses.data.length > 0 && settled(guesses.data) ? (
+        <TriedList guesses={guesses.data} />
       ) : null}
 
       <OverrideForm
