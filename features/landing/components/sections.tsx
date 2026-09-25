@@ -9,7 +9,7 @@ function SectionHeading({ id, eyebrow, title, sub }: { id: string; eyebrow: stri
   return (
     <div className="mx-auto max-w-[680px] space-y-3 text-center">
       <Eyebrow>{eyebrow}</Eyebrow>
-      <h2 id={id} className="text-3xl font-semibold tracking-tight text-balance sm:text-4xl">
+      <h2 id={id} className="text-2xl font-semibold tracking-tight text-balance sm:text-3xl">
         {title}
       </h2>
       <p className="text-lg text-pretty text-muted-foreground">{sub}</p>
@@ -19,13 +19,13 @@ function SectionHeading({ id, eyebrow, title, sub }: { id: string; eyebrow: stri
 
 export function Problem() {
   return (
-    <section aria-labelledby="problem-heading" className="mx-auto w-full max-w-5xl px-6 py-16 sm:py-24">
+    <section aria-labelledby="problem-heading" className="mx-auto w-full max-w-5xl px-6 py-12 sm:py-16">
       <Reveal>
         <SectionHeading
           id="problem-heading"
           eyebrow="The problem"
           title="Referrals should not live in a spreadsheet"
-          sub="Someone agrees to refer you. Then the thread goes quiet, the job link expires, and nobody remembers who promised what. Spreadsheets go stale the day you stop updating them. ReachSmith gives every contact a home: their role, your messages, and what happens next."
+          sub="Someone agrees to refer you. The thread goes quiet, the link expires, and nobody remembers who promised what. ReachSmith gives every contact a home: their role, your messages, and what happens next."
         />
       </Reveal>
     </section>
@@ -42,7 +42,7 @@ const BENEFITS: Benefit[] = [
   {
     icon: Inbox,
     title: "One pipeline from first hello to hired",
-    body: "Drafts, sent mail, replies, and outcomes in a single view, so nothing slips.",
+    body: "Drafts, sent mail, replies, and outcomes in a single view.",
   },
   {
     icon: PenLine,
@@ -63,16 +63,16 @@ const BENEFITS: Benefit[] = [
 
 export function Benefits() {
   return (
-    <section aria-labelledby="features-heading" id="features" className="mx-auto w-full max-w-5xl scroll-mt-24 px-6 py-16 sm:py-24">
+    <section aria-labelledby="features-heading" id="features" className="mx-auto w-full max-w-5xl scroll-mt-24 px-6 py-12 sm:py-16">
       <Reveal>
         <SectionHeading
           id="features-heading"
           eyebrow="Features"
           title="Everything between hello and hired"
-          sub="Four pieces that cover the whole outreach loop, built for one person running many conversations."
+          sub="Four pieces that cover the whole loop, built for one person running many conversations."
         />
       </Reveal>
-      <div className="mt-12 grid gap-4 sm:grid-cols-2">
+      <div className="mt-8 grid gap-4 sm:grid-cols-2">
         {BENEFITS.map((benefit, index) => (
           <Reveal key={benefit.title} delay={(index % 2) * 80}>
             <article className="flex h-full flex-col gap-3 rounded-2xl border bg-card p-6">
@@ -107,16 +107,16 @@ const STEPS = [
 
 export function HowItWorks() {
   return (
-    <section aria-labelledby="how-heading" id="how" className="mx-auto w-full max-w-5xl scroll-mt-24 px-6 py-16 sm:py-24">
+    <section aria-labelledby="how-heading" id="how" className="mx-auto w-full max-w-5xl scroll-mt-24 px-6 py-12 sm:py-16">
       <Reveal>
         <SectionHeading
           id="how-heading"
           eyebrow="How it works"
           title="Three steps to your first reply"
-          sub="No onboarding call, no settings maze. The empty states walk you through each step."
+          sub="No onboarding call. The empty states walk you through each step."
         />
       </Reveal>
-      <ol className="mt-12 grid gap-4 sm:grid-cols-3">
+      <ol className="mt-8 grid gap-4 sm:grid-cols-3">
         {STEPS.map((step, index) => (
           <Reveal key={step.title} delay={index * 80}>
             <li className="flex h-full flex-col gap-3 rounded-2xl border bg-card p-6">
@@ -138,7 +138,7 @@ const CHECKS = [
   {
     icon: ListChecks,
     title: "A short list, not a shot in the dark",
-    body: "Common address patterns produce a handful of candidates. Nothing more to review than that.",
+    body: "Common address patterns produce a handful of candidates. Nothing more to review.",
   },
   {
     icon: ShieldCheck,
@@ -154,16 +154,16 @@ const CHECKS = [
 
 export function Accuracy() {
   return (
-    <section aria-labelledby="accuracy-heading" className="mx-auto w-full max-w-5xl px-6 py-16 sm:py-24">
+    <section aria-labelledby="accuracy-heading" className="mx-auto w-full max-w-5xl px-6 py-12 sm:py-16">
       <Reveal>
         <SectionHeading
           id="accuracy-heading"
           eyebrow="Email accuracy"
           title="Guessed, then proven"
-          sub="A predicted address is only a starting point. Nothing gets recommended until it passes every check, and you can set any address by hand."
+          sub="A predicted address means nothing until it passes every check. Set any address by hand when you prefer."
         />
       </Reveal>
-      <div className="mt-12 grid gap-4 sm:grid-cols-3">
+      <div className="mt-8 grid gap-4 sm:grid-cols-3">
         {CHECKS.map((check, index) => (
           <Reveal key={check.title} delay={index * 80}>
             <article className="flex h-full flex-col gap-3 rounded-2xl border bg-card p-6">

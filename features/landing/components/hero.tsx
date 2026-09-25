@@ -61,11 +61,11 @@ function DashboardMock() {
 
 export function Hero() {
   return (
-    <section aria-labelledby="hero-heading" className="mx-auto w-full max-w-5xl px-6 pt-16 pb-8 text-center sm:pt-24">
+    <section aria-labelledby="hero-heading" className="mx-auto w-full max-w-5xl px-6 pt-12 pb-8 text-center sm:pt-16">
       <Reveal>
         <h1
           id="hero-heading"
-          className="mx-auto max-w-170 bg-linear-to-r from-black to-[#666666] bg-clip-text text-5xl font-semibold tracking-tight text-balance text-transparent sm:text-6xl dark:from-white dark:to-[#9B9B9B]"
+          className="mx-auto max-w-170 bg-linear-to-r from-black to-[#666666] bg-clip-text text-4xl font-semibold tracking-tight text-balance text-transparent sm:text-5xl dark:from-white dark:to-[#9B9B9B]"
         >
           Land more referrals
           <br />
@@ -74,13 +74,12 @@ export function Hero() {
       </Reveal>
       <Reveal delay={120}>
         <p className="mx-auto mt-6 max-w-170 text-lg text-pretty text-muted-foreground">
-          Run your referral outreach without the spreadsheet: every recruiter and employee
-          contact in one place, every email checked before you write, and every
-          conversation tracked to its outcome.
+          Referral outreach without the spreadsheet: every contact in one place, every
+          email verified, every conversation tracked.
         </p>
       </Reveal>
       <Reveal delay={200}>
-        <div className="mt-8 flex flex-col items-center gap-3">
+        <div className="mt-6 flex flex-col items-center gap-3">
           <Link
             href="/signup"
             className={cn(buttonVariants(), "pressable h-auto px-3 py-2 text-base font-semibold")}
@@ -93,7 +92,7 @@ export function Hero() {
           </p>
         </div>
       </Reveal>
-      <Reveal delay={280} className="mt-12">
+      <Reveal delay={280} className="mt-10">
         <DashboardMock />
       </Reveal>
     </section>

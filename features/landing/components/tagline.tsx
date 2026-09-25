@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 
 const SENTENCE =
-  "Every conversation tracked. Every follow up kept. Nothing lost to a messy spreadsheet.";
+  "Every conversation tracked, every follow up kept, nothing lost to a messy spreadsheet.";
 
 const WORDS: { id: string; text: string }[] = (() => {
   const seen = new Map<string, number>();
@@ -56,8 +56,8 @@ function Word({ children }: { children: string }) {
 
 export function Tagline() {
   return (
-    <section aria-label="Why ReachSmith" className="mx-auto w-full max-w-5xl px-6 py-16 sm:py-24">
-      <p className="mx-auto max-w-[680px] text-center text-4xl font-semibold tracking-tight text-balance sm:text-5xl">
+    <section aria-label="Why ReachSmith" className="mx-auto w-full max-w-5xl px-6 py-12 sm:py-16">
+      <p className="mx-auto max-w-[680px] text-center text-3xl font-semibold tracking-tight text-balance sm:text-4xl">
         {WORDS.map((word) => (
           <Word key={word.id}>{word.text}</Word>
         ))}
