@@ -75,11 +75,11 @@ export function Benefits() {
       <div className="mt-12 grid gap-4 sm:grid-cols-2">
         {BENEFITS.map((benefit, index) => (
           <Reveal key={benefit.title} delay={(index % 2) * 80}>
-            <div className="flex h-full flex-col gap-3 rounded-2xl border bg-card p-6">
+            <article className="flex h-full flex-col gap-3 rounded-2xl border bg-card p-6">
               <benefit.icon className="size-5 text-muted-foreground" aria-hidden="true" />
               <p className="text-base font-semibold tracking-tight">{benefit.title}</p>
               <p className="text-sm text-pretty text-muted-foreground">{benefit.body}</p>
-            </div>
+            </article>
           </Reveal>
         ))}
       </div>
@@ -166,11 +166,11 @@ export function Accuracy() {
       <div className="mt-12 grid gap-4 sm:grid-cols-3">
         {CHECKS.map((check, index) => (
           <Reveal key={check.title} delay={index * 80}>
-            <div className="flex h-full flex-col gap-3 rounded-2xl border bg-card p-6">
+            <article className="flex h-full flex-col gap-3 rounded-2xl border bg-card p-6">
               <check.icon className="size-5 text-muted-foreground" aria-hidden="true" />
               <p className="text-base font-semibold tracking-tight">{check.title}</p>
               <p className="text-sm text-pretty text-muted-foreground">{check.body}</p>
-            </div>
+            </article>
           </Reveal>
         ))}
       </div>
