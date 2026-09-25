@@ -16,6 +16,7 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "ReachSmith",
   description: "Organize targets, predict and verify emails, and track outreach.",
+  icons: { icon: "/reachsmith-mascot.svg" },
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
