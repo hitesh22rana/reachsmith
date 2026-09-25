@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
+import { Settings } from "lucide-react";
 import { authClient } from "@/features/auth/client";
 import { Button } from "@/components/ui/button";
 import { BlobatarAvatar } from "@/components/blobatar-avatar";
@@ -44,13 +45,15 @@ export function ProfileMenu({ name, email }: { name: string; email: string }) {
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger
         render={
-          <button
+          <Button
             type="button"
+            variant="ghost"
+            size="icon"
             aria-label={`Open profile menu for ${name}`}
-            className="pressable rounded-full outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+            className="pressable"
           >
-            <BlobatarAvatar name={email} size={32} className="ring-1 ring-foreground/10" />
-          </button>
+            <Settings aria-hidden="true" />
+          </Button>
         }
       />
       <DialogContent>
