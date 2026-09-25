@@ -30,9 +30,9 @@ function DashboardMock() {
         className="overflow-hidden text-left"
       >
         <div className="flex items-center gap-1.5 border-b px-4 py-3" aria-hidden="true">
-          <span className="size-2.5 rounded-full bg-muted-foreground/30" />
-          <span className="size-2.5 rounded-full bg-muted-foreground/30" />
-          <span className="size-2.5 rounded-full bg-muted-foreground/30" />
+          <span className="size-2.5 rounded-full bg-red-400" />
+          <span className="size-2.5 rounded-full bg-yellow-400" />
+          <span className="size-2.5 rounded-full bg-green-400" />
         </div>
         <div className="grid grid-cols-[1fr_auto] items-center gap-x-4 gap-y-3 p-4 sm:grid-cols-[1fr_1fr_1fr_auto]">
           <p className="col-span-2 text-xs font-medium text-muted-foreground sm:col-span-4">

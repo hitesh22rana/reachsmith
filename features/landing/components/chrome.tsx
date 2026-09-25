@@ -17,7 +17,7 @@ export function SiteHeader() {
   const [open, setOpen] = useState(false);
 
   return (
-    <header className="sticky top-6 z-40 mx-auto w-max max-w-[calc(100%-2rem)]">
+    <header className="relative z-40 mx-auto mt-6 w-max max-w-[calc(100%-2rem)] md:sticky md:top-6 md:mt-0">
       <nav
         aria-label="Primary"
         className="flex w-max max-w-full items-center gap-2 rounded-full border bg-background/80 py-2 pr-2 pl-5 shadow-sm backdrop-blur-xl"
@@ -74,11 +74,11 @@ export function SiteHeader() {
       </nav>
       <div
         className={cn(
-          "overflow-hidden transition-[transform,opacity] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] md:hidden",
+          "absolute top-full right-0 mt-2 overflow-hidden transition-[transform,opacity] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] md:hidden",
           open ? "translate-y-0 opacity-100" : "pointer-events-none -translate-y-2 opacity-0",
         )}
       >
-        <div className="mt-2 flex w-64 flex-col gap-1 rounded-2xl border bg-background/95 p-2 shadow-lg backdrop-blur-xl">
+        <div className="mt-2 flex w-64 max-w-[calc(100vw-2rem)] flex-col gap-1 rounded-2xl border bg-background/95 p-2 shadow-lg backdrop-blur-xl">
           {LINKS.map((link, index) => (
             <Link
               key={link.href}
