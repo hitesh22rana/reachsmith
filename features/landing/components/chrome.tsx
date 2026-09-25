@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { ModeToggle } from "@/components/mode-toggle";
@@ -21,7 +22,8 @@ export function SiteHeader() {
         aria-label="Primary"
         className="flex w-max max-w-full items-center gap-2 rounded-full border bg-background/80 py-2 pr-2 pl-5 shadow-sm backdrop-blur-xl"
       >
-        <Link href="/" className="text-base font-semibold tracking-tight" aria-current="page">
+        <Link href="/" className="flex items-center gap-2 text-base font-semibold tracking-tight" aria-current="page">
+          <Image src="/reachsmith-mascot.svg" alt="" width={28} height={28} aria-hidden="true" />
           ReachSmith
         </Link>
         <div className="hidden items-center gap-1 md:flex">
@@ -118,7 +120,10 @@ export function SiteFooter() {
     <footer className="border-t">
       <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-6 py-10 sm:flex-row sm:items-center sm:justify-between">
         <div className="space-y-1">
-          <p className="text-base font-semibold tracking-tight">ReachSmith</p>
+          <p className="flex items-center gap-2 text-base font-semibold tracking-tight">
+            <Image src="/reachsmith-mascot.svg" alt="" width={28} height={28} aria-hidden="true" />
+            ReachSmith
+          </p>
           <p className="text-sm text-muted-foreground">
             Referral outreach without the spreadsheet.
           </p>
