@@ -1,7 +1,14 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { cn } from "@/lib/utils";
+
+export const metadata: Metadata = {
+  title: "Page not found",
+  description: "This ReachSmith page does not exist.",
+  robots: { index: false, follow: false },
+};
 
 export default function NotFound() {
   return (
