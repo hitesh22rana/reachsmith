@@ -35,7 +35,7 @@ export function PipelineCard({
             alt="ReachSmith logo"
             width={44}
             height={44}
-            className="size-11 shrink-0 rounded-xl bg-white ring-1 ring-foreground/10"
+            className="size-11 shrink-0"
           />
         </div>
       </CardHeader>
