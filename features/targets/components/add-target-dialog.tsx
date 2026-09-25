@@ -243,8 +243,22 @@ function ReviewList({ values }: { values: TargetFormInput }) {
     <dl className="flex flex-col gap-2 rounded-xl border bg-muted/50 p-4">
       {entries.map(([key, value]) => (
         <div key={key} className="flex items-baseline justify-between gap-4 text-sm">
-          <dt className="font-medium text-muted-foreground">{key.replaceAll("_", " ")}</dt>
-          <dd className="min-w-0 truncate text-right">{value}</dd>
+          <dt className="shrink-0 font-medium text-muted-foreground">{key.replaceAll("_", " ")}</dt>
+          {value.includes("\n") ? (
+            <dd className="flex min-w-0 flex-col items-end gap-0.5">
+              {value
+                .split("\n")
+                .map((line) => line.trim())
+                .filter((line) => line !== "")
+                .map((line, index) => (
+                  <span key={`${index}-${line}`} className="max-w-full truncate">
+                    {line}
+                  </span>
+                ))}
+            </dd>
+          ) : (
+            <dd className="min-w-0 truncate text-right">{value}</dd>
+          )}
         </div>
       ))}
     </dl>
