@@ -23,7 +23,7 @@ export function SiteHeader() {
         className="flex w-max max-w-full items-center gap-2 rounded-full border bg-background/80 py-2 pr-2 pl-5 shadow-sm backdrop-blur-xl"
       >
         <Link href="/" className="flex items-center gap-2 text-base font-semibold tracking-tight" aria-current="page">
-          <Image src="/reachsmith-mascot.svg" alt="" width={28} height={28} aria-hidden="true" />
+          <Image src="/reachsmith-mascot.svg" alt="ReachSmith" width={28} height={28} />
           ReachSmith
         </Link>
         <div className="hidden items-center gap-1 md:flex">
@@ -53,7 +53,7 @@ export function SiteHeader() {
             onClick={() => setOpen((value) => !value)}
             aria-expanded={open}
             aria-label={open ? "Close menu" : "Open menu"}
-            className="relative flex size-9 items-center justify-center rounded-full transition-colors hover:bg-muted"
+            className="relative flex size-12 items-center justify-center rounded-full transition-colors hover:bg-muted"
           >
             <span
               aria-hidden="true"
@@ -121,7 +121,7 @@ export function SiteFooter() {
       <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-6 py-10 sm:flex-row sm:items-center sm:justify-between">
         <div className="space-y-1">
           <p className="flex items-center gap-2 text-base font-semibold tracking-tight">
-            <Image src="/reachsmith-mascot.svg" alt="" width={28} height={28} aria-hidden="true" />
+            <Image src="/reachsmith-mascot.svg" alt="ReachSmith" width={28} height={28} />
             ReachSmith
           </p>
           <p className="text-sm text-muted-foreground">
