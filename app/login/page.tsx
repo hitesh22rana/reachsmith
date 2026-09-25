@@ -1,4 +1,11 @@
+import type { Metadata } from "next";
 import { AuthForm } from "@/features/auth";
+
+export const metadata: Metadata = {
+  title: "Log in",
+  description: "Log in to your ReachSmith account.",
+  robots: { index: false, follow: false },
+};
 
 export default async function LoginPage({
   searchParams,
