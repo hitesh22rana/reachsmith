@@ -74,8 +74,8 @@ export function Hero() {
       </Reveal>
       <Reveal delay={120}>
         <p className="mx-auto mt-6 max-w-170 text-lg text-pretty text-muted-foreground">
-          Referral outreach without the spreadsheet: every contact in one place, every
-          email verified, every conversation tracked.
+          Referral outreach with every contact in one place, every email verified,
+          every conversation tracked.
         </p>
       </Reveal>
       <Reveal delay={200}>

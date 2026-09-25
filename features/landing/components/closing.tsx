@@ -7,7 +7,7 @@ import { FAQS } from "../faqs";
 
 export function Faq() {
   return (
-    <section aria-labelledby="faq-heading" id="faq" className="mx-auto w-full max-w-5xl scroll-mt-24 px-6 py-12 sm:py-16">
+    <section aria-labelledby="faq-heading" id="faq" className="mx-auto w-full max-w-5xl scroll-mt-24 px-6 py-8 sm:py-12">
       <Reveal>
         <div className="mx-auto max-w-[680px] space-y-3 text-center">
           <p className="text-sm font-semibold text-muted-foreground">FAQ</p>
@@ -41,7 +41,7 @@ export function Faq() {
 
 export function FinalCta() {
   return (
-    <section aria-labelledby="final-heading" className="mx-auto w-full max-w-5xl px-6 py-12 text-center sm:py-16">
+    <section aria-labelledby="final-heading" className="mx-auto w-full max-w-5xl px-6 py-8 text-center sm:py-12">
       <Reveal>
         <h2
           id="final-heading"
@@ -50,7 +50,7 @@ export function FinalCta() {
           Your next referral is one pipeline away
         </h2>
         <p className="mx-auto mt-4 max-w-[680px] text-lg text-pretty text-muted-foreground">
-          Create an account, add three contacts, and send the first message today.
+          Create an account, add your first contact, and send the first message today.
         </p>
         <div className="mt-6">
           <Link

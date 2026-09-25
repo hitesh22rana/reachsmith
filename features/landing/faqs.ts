@@ -2,7 +2,7 @@ export const FAQS = [
   {
     question: "How accurate are the predicted emails?",
     answer:
-      "Predictions are educated guesses until verified. Each candidate passes mailbox checks and a verification service, and only valid ones get recommended. Domains that accept all mail get flagged as risky, and you can set any address by hand.",
+      "Predictions are educated guesses until verified. Each candidate passes mailbox checks and a verification service. Only valid ones get recommended. Domains that accept all mail get flagged as risky, and you can set any address by hand.",
   },
   {
     question: "Does ReachSmith send email for me?",
@@ -27,7 +27,7 @@ export const FAQS = [
   {
     question: "Who is ReachSmith for?",
     answer:
-      "Job seekers asking employees for referrals and following up with recruiters, running many conversations at once.",
+      "Job seekers asking employees for referrals and following up with recruiters.",
   },
   {
     question: "What happens after I create an account?",
