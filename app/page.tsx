@@ -3,8 +3,7 @@ import { redirect } from "next/navigation";
 import { getUserId } from "@/lib/auth";
 import { SiteFooter, SiteHeader } from "@/features/landing";
 import { FAQS, Hero } from "@/features/landing";
-import { Tagline } from "@/features/landing";
-import { Accuracy, Benefits, HowItWorks, Problem } from "@/features/landing";
+import { Benefits, HowItWorks } from "@/features/landing";
 import { Faq, FinalCta } from "@/features/landing";
 
 export const metadata: Metadata = {
@@ -54,11 +53,8 @@ export default async function Home() {
       <SiteHeader />
       <main id="main" className="flex flex-1 flex-col">
         <Hero />
-        <Tagline />
-        <Problem />
         <Benefits />
         <HowItWorks />
-        <Accuracy />
         <Faq />
         <FinalCta />
       </main>
