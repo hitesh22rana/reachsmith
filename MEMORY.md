@@ -8,3 +8,4 @@ Durable user preferences. `AGENTS.md` points here: always follow this file.
 - For any UI or design work, always load and follow the Emil Kowalski design skills via the skill tool before building: emil-design-eng (main design/animation guidance), animate, review-animations, improve-animations, find-animation-opportunities, prototype, animation-vocabulary, apple-design, pick-ui-library.
 - When working with TypeScript, always load and follow mastering-typescript-skill (https://github.com/SpillwaveSolutions/mastering-typescript-skill) via the skill tool.
 - Before pushing frontend-related changes, always run `npx react-doctor@latest` and fix the reported issues first.
+- For any SEO work, always load and follow the `nextjs-seo-audit` skill at `.agents/skills/nextjs-seo-audit` before auditing or changing metadata, schema, robots, sitemap, or viewport.

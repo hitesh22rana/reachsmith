@@ -12,6 +12,7 @@
 - [x] `outreach`: table + status enum + migration, `buildOutreachBody` on `renderTemplate`, scoped CRUD APIs with owned-target/template checks, compose flow (picker, subject, edit, copy, mark sent) + per-target history + pipeline with filter/inline status; verified transitions, isolation (404s), and 400/401 cases.
 - [x] `email-pipeline`: v1 shipped earlier; v2 ranked discovery: evidence-ranked candidates (notes extraction, context cues, handle derivation, pattern inference), domain without website, backend grammar-enforced SLM re-rank, top-10 budget, hidden candidate list with processing/found/not-found states, squashed migration. Verified live resolution, isolation, forged-job drops. Needs `EMAIL_VERIFIER_API_KEY` for real `valid` verdicts.
 - [x] `docker`: single multi-stage `Dockerfile` (`web`, `worker`, `builder`-as-migrator), rank model baked at build (pinned revision), prod profile in `compose.yaml` (Postgres 18.0, Redis 8.2.1, healthchecks, non-root, pruned prod deps). Verified `runner-web` + `runner-worker` images build.
+- [x] `seo`: indexable `/` (metadata, canonical, FAQPage schema from exported `FAQS`), Organization + WebSite JSON-LD, `robots`/`sitemap`/`manifest`/`opengraph-image`, `noindex` on private/auth routes, viewport + themeColor, logo alt text, 48px menu target, font swap + `optimizePackageImports`. Verified `typecheck`, `lint`, `build` plus crawler routes resolve.
 
 ## Features (build order)
 
@@ -22,6 +23,7 @@
 5. `templates`: needs foundation (+ auth for ownership). Independent of targets.
 6. `outreach`: needs foundation, targets, templates. If missing: hardcoded `target_id` / nullable `template_id` (custom message path).
 7. `email-pipeline`: needs foundation, targets. Enqueues from `POST /api/targets`; if targets missing, trigger via script with a raw `targetId`.
+8. `seo`: needs foundation + landing. Parallel-safe with any feature after landing.
 
 Parallel-safe pairs: targets + templates, then outreach + email-pipeline.
 
