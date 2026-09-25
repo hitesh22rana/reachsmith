@@ -151,9 +151,6 @@ export default async function DashboardPage() {
               />
             ) : null}
             <div className="min-w-0 space-y-1.5">
-              <p className="text-xs font-medium tracking-widest text-muted-foreground uppercase">
-                ReachSmith
-              </p>
               <h1 className="truncate text-2xl font-semibold tracking-tight sm:text-3xl">
                 {session ? `${greeting}, ${firstName}` : "ReachSmith"}
               </h1>
