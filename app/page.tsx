@@ -7,20 +7,21 @@ import { Benefits, HowItWorks } from "@/features/landing";
 import { Faq, FinalCta } from "@/features/landing";
 
 export const metadata: Metadata = {
-  title: "ReachSmith — Referral outreach without the spreadsheet",
+  title: "ReachSmith | Referral outreach without the spreadsheet",
   description:
     "Referral outreach without the spreadsheet. Keep every contact in one place, verify each email, and track every conversation to its outcome.",
   alternates: { canonical: "/" },
   openGraph: {
     type: "website",
+    siteName: "ReachSmith",
     url: "/",
-    title: "ReachSmith — Referral outreach without the spreadsheet",
+    title: "ReachSmith | Referral outreach without the spreadsheet",
     description:
       "Referral outreach without the spreadsheet. Keep every contact in one place, verify each email, and track every conversation to its outcome.",
   },
   twitter: {
     card: "summary_large_image",
-    title: "ReachSmith — Referral outreach without the spreadsheet",
+    title: "ReachSmith | Referral outreach without the spreadsheet",
     description:
       "Referral outreach without the spreadsheet. Keep every contact in one place, verify each email, and track every conversation to its outcome.",
   },
