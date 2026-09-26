@@ -11,7 +11,8 @@ Foundation (root layout, metadata API) + landing (public `/` content, FAQ source
 - `/`: indexable metadata + canonical + FAQPage JSON-LD built from the exported `FAQS` array (single source, no duplicated copy).
 - Crawler files: `app/robots.ts` (allow `/`, disallow `/api/` and app routes), `app/sitemap.ts` (`/` weekly), `app/manifest.ts`, `app/opengraph-image.tsx` (1200x630).
 - Private and auth routes (`dashboard`, `targets`, `targets/[id]`, `templates`, `outreach`, `login`, `signup`, `not-found`): title + description + `noindex, nofollow`.
-- Landing chrome: brand logo `alt` text, 48px mobile menu target.
+- Landing chrome: brand logo `alt` text, 48px mobile menu target, static header with floating menu panel on mobile.
+- Brand favicons generated from the mascot: `app/icon.svg`, multi-size `app/favicon.ico` (16/32/48), white-flattened 180px `app/apple-icon.png`; wired via file convention plus explicit manifest entries. Titles use `|` separators, never em dashes (repo rule).
 - Keyword is `referral outreach` (title, description, hero sub, footer tagline). Density stays below 1%: the page is short and repeating the phrase to hit the range would be stuffing, so that WARN is accepted.
 
 ## Security
