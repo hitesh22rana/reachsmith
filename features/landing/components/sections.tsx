@@ -1,5 +1,6 @@
-import { Eye, Inbox, PenLine, Send, ShieldCheck, UserPlus, type LucideIcon } from "lucide-react";
+import { Inbox, PenLine, Send, ShieldCheck, type LucideIcon } from "lucide-react";
 import { Reveal } from "./reveal";
+import { HowSteps } from "./how-steps";
 
 function Eyebrow({ children }: { children: string }) {
   return <p className="text-sm font-semibold text-muted-foreground">{children}</p>;
@@ -7,7 +8,7 @@ function Eyebrow({ children }: { children: string }) {
 
 function SectionHeading({ id, eyebrow, title, sub }: { id: string; eyebrow: string; title: string; sub?: string }) {
   return (
-    <div className="mx-auto max-w-[680px] space-y-3 text-center">
+    <div className="mx-auto max-w-170 space-y-3 text-center">
       <Eyebrow>{eyebrow}</Eyebrow>
       <h2 id={id} className="text-2xl font-semibold tracking-tight text-balance sm:text-3xl">
         {title}
@@ -71,24 +72,6 @@ export function Benefits() {
   );
 }
 
-const STEPS = [
-  {
-    icon: UserPlus,
-    title: "Add your contacts",
-    body: "Name, company, and profile link. That is all it takes to start.",
-  },
-  {
-    icon: Eye,
-    title: "Preview the message",
-    body: "Pick a template and see the personal version before you copy it.",
-  },
-  {
-    icon: Send,
-    title: "Verify, send, track",
-    body: "Confirm the address, send from your own inbox, and log replies and referrals.",
-  },
-];
-
 export function HowItWorks() {
   return (
     <section aria-labelledby="how-heading" id="how" className="mx-auto w-full max-w-5xl scroll-mt-24 px-6 py-8 sm:py-12">
@@ -100,20 +83,7 @@ export function HowItWorks() {
           sub="No onboarding call. The empty states walk you through each step."
         />
       </Reveal>
-      <ol className="mt-8 grid gap-4 sm:grid-cols-3">
-        {STEPS.map((step, index) => (
-          <Reveal key={step.title} delay={index * 80}>
-            <li className="flex h-full flex-col gap-3 rounded-2xl border bg-card p-6">
-              <div className="flex items-center justify-between">
-                <step.icon className="size-5 text-muted-foreground" aria-hidden="true" />
-                <span className="text-sm font-semibold text-muted-foreground">{index + 1}</span>
-              </div>
-              <p className="text-base font-semibold tracking-tight">{step.title}</p>
-              <p className="text-sm text-pretty text-muted-foreground">{step.body}</p>
-            </li>
-          </Reveal>
-        ))}
-      </ol>
+      <HowSteps />
     </section>
   );
 }
