@@ -39,7 +39,7 @@ export const viewport: Viewport = {
 export const metadata: Metadata = {
   metadataBase: resolveBaseUrl(),
   title: {
-    default: "ReachSmith — Referral outreach without the spreadsheet",
+    default: "ReachSmith | Referral outreach without the spreadsheet",
     template: "%s | ReachSmith",
   },
   description:
@@ -53,17 +53,16 @@ export const metadata: Metadata = {
     type: "website",
     siteName: "ReachSmith",
     url: "/",
-    title: "ReachSmith — Referral outreach without the spreadsheet",
+    title: "ReachSmith | Referral outreach without the spreadsheet",
     description:
       "Keep every contact in one place, verify each email before you write, and track every conversation to its outcome.",
   },
   twitter: {
     card: "summary_large_image",
-    title: "ReachSmith — Referral outreach without the spreadsheet",
+    title: "ReachSmith | Referral outreach without the spreadsheet",
     description:
       "Keep every contact in one place, verify each email before you write, and track every conversation to its outcome.",
   },
-  icons: { icon: [{ url: "/reachsmith-mascot.svg", type: "image/svg+xml" }, "/favicon.ico"] },
   manifest: "/manifest.webmanifest",
 };
 
