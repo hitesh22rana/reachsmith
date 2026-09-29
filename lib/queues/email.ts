@@ -17,11 +17,6 @@ interface VerifyJob {
   userId: string;
 }
 
-// Lazy: importing this module never connects, so pages render without env
-// and routes can decide how to handle a missing REDIS_URL.
-let guessQueue: Queue<GuessJob> | null = null;
-let verifyQueue: Queue<VerifyJob> | null = null;
-
 function connection() {
   const url = process.env.REDIS_URL;
   if (!url) {
@@ -30,26 +25,22 @@ function connection() {
   return { url, maxRetriesPerRequest: null as unknown as number };
 }
 
-function getGuessQueue(): Queue<GuessJob> {
-  if (!guessQueue) {
-    guessQueue = new Queue<GuessJob>("email-guess", { connection: connection() });
-  }
-  return guessQueue;
+// Lazy: importing this module never connects, so pages render without env
+// and routes can decide how to handle a missing REDIS_URL.
+function lazyQueue<T>(name: string): () => Queue<T> {
+  let queue: Queue<T> | null = null;
+  return () => (queue ??= new Queue<T>(name, { connection: connection() }));
 }
 
-function getVerifyQueue(): Queue<VerifyJob> {
-  if (!verifyQueue) {
-    verifyQueue = new Queue<VerifyJob>("email-verify", { connection: connection() });
-  }
-  return verifyQueue;
-}
+const guessQueue = lazyQueue<GuessJob>("email-guess");
+const verifyQueue = lazyQueue<VerifyJob>("email-verify");
 
 export function enqueueEmailGuess(targetId: string, userId: string): Promise<unknown> {
-  return getGuessQueue().add("guess", { targetId, userId });
+  return guessQueue().add("guess", { targetId, userId });
 }
 
 export function enqueueEmailVerify(candidateId: string, userId: string): Promise<unknown> {
-  return getVerifyQueue().add(
+  return verifyQueue().add(
     "verify",
     { candidateId, userId },
     {
