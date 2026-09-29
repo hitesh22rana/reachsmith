@@ -15,6 +15,13 @@
       "when": 1790688719193,
       "tag": "0001_blue_skreet",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1790771852044,
+      "tag": "0002_tenant_rls",
+      "breakpoints": true
     }
   ]
 }
