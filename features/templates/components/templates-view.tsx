@@ -32,14 +32,6 @@ const CHANNEL_LABELS = {
   other: "Other",
 } as const;
 
-const AUDIENCE_LABELS = {
-  hr: "HR",
-  recruiter: "Recruiter",
-  engineer: "Engineer",
-  founder: "Founder",
-  generic: "Generic",
-} as const;
-
 function SkeletonCard() {
   return (
     <Card aria-hidden="true" className="min-h-52 min-w-0 gap-4 last:hidden md:last:flex">
@@ -109,7 +101,7 @@ export function TemplatesView() {
         <EmptyState
           icon={Mail}
           title="No templates yet"
-          description="Save reusable outreach messages with variables like {{first_name}} and {{company}}."
+          description="Save reusable outreach messages. Wrap anything in double braces, like {{first_name}}, and the compose form will ask for it."
         />
       ) : null}
       {templates.data && templates.data.length > 0 ? (
@@ -124,7 +116,8 @@ export function TemplatesView() {
                   {template.name}
                 </CardTitle>
                 <CardDescription className="truncate">
-                  {CHANNEL_LABELS[template.channel]} · {AUDIENCE_LABELS[template.audienceType]}
+                  {CHANNEL_LABELS[template.channel]}
+                  {template.audience ? ` · ${template.audience}` : ""}
                   {template.purpose ? ` · ${template.purpose}` : ""}
                 </CardDescription>
               </CardHeader>

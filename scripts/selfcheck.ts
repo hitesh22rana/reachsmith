@@ -2,6 +2,10 @@ import assert from "node:assert/strict";
 import { isCrossOrigin, isCsrfAttempt } from "../lib/csrf.ts";
 import { OptionalUrlSchema, TargetPatchSchema } from "../features/targets/validation.ts";
 import { toTargetPatch } from "../features/targets/server.ts";
+// render.ts only, because it is the one templates module with no imports:
+// everything reached from this script must resolve without tsconfig path
+// aliases, which node --experimental-strip-types does not read.
+import { parsePlaceholders, placeholderError, renderTemplate } from "../features/templates/render.ts";
 import * as v from "valibot";
 
 // Self-check for the security-relevant pure logic. No framework: run with
@@ -45,6 +49,9 @@ const ROUTES: ReadonlyArray<readonly [string, string]> = [
   ["POST", "/api/templates"],
   ["PATCH", "/api/templates/t1"],
   ["DELETE", "/api/templates/t1"],
+  ["GET", "/api/audiences"],
+  ["POST", "/api/audiences"],
+  ["DELETE", "/api/audiences/a1"],
   ["POST", "/api/auth/sign-in/email"],
 ];
 for (const [method, path] of ROUTES) {
@@ -96,5 +103,75 @@ assert.equal(
   undefined,
   "unrelated patch leaves the marker alone",
 );
+
+// Placeholders: any snake_case name is a variable, and nothing else is.
+// Substitution is by name, so a template can ask for a field the app has
+// never heard of; what it cannot do is invent one that breaks the name rule
+// and then render as literal text nobody can diagnose.
+const BODY = "Hi {{first_name}}, my resume is at {{resume_link}}. Also {{ resume_link }} and {{first_name}}.";
+assert.equal(
+  renderTemplate(BODY, {
+    first_name: " Aarav ",
+    resume_link: "https://example.com/a.pdf",
+  }),
+  "Hi Aarav, my resume is at https://example.com/a.pdf. Also https://example.com/a.pdf and Aarav.",
+  "every occurrence substitutes, values are trimmed",
+);
+assert.equal(
+  renderTemplate("Hi {{first_name}}, see {{resume_link}}", { first_name: "Aarav" }),
+  "Hi Aarav, see {{resume_link}}",
+  "a missing value leaves its placeholder intact",
+);
+assert.equal(
+  renderTemplate("Hi {{ first_name }}", { first_name: "Aarav" }),
+  "Hi Aarav",
+  "inner whitespace is tolerated",
+);
+assert.equal(
+  renderTemplate("Hi {{First Name}}", { FirstName: "Aarav" }),
+  "Hi {{First Name}}",
+  "a name outside snake_case is not substitutable",
+);
+
+const parsed = parsePlaceholders(BODY);
+assert.deepEqual(
+  parsed.placeholders.map((placeholder) => placeholder.name),
+  ["first_name", "resume_link"],
+  "placeholders are deduped in first-appearance order",
+);
+assert.equal(parsed.placeholders[0]?.source, "target", "first_name comes from the target");
+assert.equal(parsed.placeholders[1]?.source, "input", "resume_link is filled in per message");
+assert.equal(parsed.placeholders[1]?.label, "Resume link", "label is humanized");
+assert.equal(parsed.issues.length, 0, "a valid body reports no issues");
+
+// A name that is too long to label in a two-column grid still stores.
+const long = parsePlaceholders("{{a_very_long_placeholder_name_here}}");
+assert.equal(long.placeholders[0]?.label.endsWith("…"), true, "long labels ellipsize");
+assert.equal(long.issues.length, 0, "32 characters is still a valid name");
+assert.notEqual(
+  placeholderError("{{a_really_long_custom_placeholder_name_here}}"),
+  null,
+  "41 characters is over the name limit",
+);
+
+for (const bad of ["{{First Name}}", "{{1st}}", "{{}}", "{{bad-name}}", "{{ }}"]) {
+  assert.notEqual(placeholderError(bad), null, `rejected placeholder: ${bad}`);
+}
+assert.equal(placeholderError("{{ok_name}}"), null, "valid placeholder body accepted");
+
+const tooMany = Array.from({ length: 51 }, (_, i) => `{{var_${i}}}`).join(" ");
+assert.match(
+  placeholderError(tooMany) ?? "",
+  /at most 50/,
+  "the 51st distinct placeholder is refused with a count",
+);
+assert.equal(
+  placeholderError(Array.from({ length: 50 }, (_, i) => `{{var_${i}}}`).join(" ")),
+  null,
+  "exactly 50 is allowed",
+);
+// The name is reported back so the 400 can name the offender, and it is
+// never a blank string for a real token.
+assert.match(placeholderError("Hi {{First Name}}") ?? "", /\{\{First Name\}\}/);
 
 console.log("selfcheck: ok");
