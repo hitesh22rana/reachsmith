@@ -85,10 +85,10 @@ User can:
 
 User can:
 
-- Create and store templates with variables (e.g. `{{first_name}}`, `{{company}}`, `{{job_title}}`, `{{job_link}}`).
+- Create and store templates with variables: any lowercase `snake_case` name in double braces (e.g. `{{first_name}}`, `{{resume_link}}`), up to 50 per template, declared on the template and filled in when composing.
 - Tag templates by:
   - Channel: email, LinkedIn DM (and others later).
-  - Audience type: HR, recruiter, engineer, founder, generic.
+  - Audience: free text, e.g. HR, recruiter, founder, designer, with per-user presets (`audiences`).
   - Purpose: referral request, cold intro, follow-up, etc.
 - Render templates for a specific contact + job when composing outreach.
 
@@ -219,9 +219,10 @@ Represents a reusable message template.
 - `user_id`
 - `name` (e.g., “Referral request – backend role”)
 - `channel` (enum: `email`, `linkedin_dm`, `other`)
-- `audience_type` (enum: `hr`, `recruiter`, `engineer`, `founder`, `generic`)
+- `audience_id` (nullable FK to `audiences.id`; audience is free text, not an enum)
 - `purpose` (string/enum; e.g., `referral_request`, `cold_intro`, `follow_up`)
-- `body` (text with placeholders like `{{first_name}}`, `{{company}}`, `{{job_title}}`)
+- `body` (text with placeholders like `{{first_name}}`, `{{resume_link}}`)
+- `placeholders` (JSON: one `{name, label, source}` per placeholder in the body, derived on save)
 - `created_at`
 - `updated_at`
 
