@@ -21,6 +21,9 @@ ENV NODE_ENV=production
 # Build-only dummies so module evaluation passes without real secrets.
 # Runtime values come from compose env_file; nothing here is baked in.
 ENV DATABASE_URL=postgresql://build:build@localhost:5432/build
+# The runtime role. Separate from the owner above because an owner or
+# superuser bypasses row-level security, which would make tenant RLS inert.
+ENV APP_DATABASE_URL=postgresql://build:build@localhost:5432/build
 ENV REDIS_URL=redis://localhost:6379
 ENV BETTER_AUTH_SECRET=build-only-dummy-secret
 ENV BETTER_AUTH_URL=http://localhost:3000

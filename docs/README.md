@@ -39,7 +39,7 @@ Parallel-safe pairs: targets + templates, then outreach + email-pipeline.
 
 - Every row is owned by a `user_id` from the Better Auth session. Every query filters by it; every `:id` route re-checks ownership and returns 404 (not 403) on mismatch so IDs can't be probed.
 - Never trust client-supplied `user_id` or nested IDs: verify `target_id`/`template_id` belong to the caller before use.
-- Defense in depth: enforce ownership in app queries and Postgres RLS policies where the stack supports it.
+- Defense in depth, both live: app queries filter by session `user_id`, and Postgres RLS (`drizzle/0002_tenant_rls.sql`) filters again on `targets`, `templates`, `outreaches`, `email_guesses` via a transaction-local `app.user_id` GUC. `FORCE ROW LEVEL SECURITY` plus a non-superuser runtime role (`APP_DATABASE_URL`) is what makes the policies bind; `getDb()` throws at startup if the role could bypass them.
 
 ## Out of scope (all features)
 

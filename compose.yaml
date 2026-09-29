@@ -16,6 +16,9 @@ services:
       - "127.0.0.1:5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql
+      # Creates the non-superuser reachsmith_app role. Runs once on first
+      # init, so an existing pgdata volume needs the role added by hand.
+      - ./docker/postgres-init:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U reachsmith -d reachsmith"]
       interval: 5s
