@@ -25,9 +25,18 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Autocomplete,
+  AutocompleteContent,
+  AutocompleteEmpty,
+  AutocompleteInput,
+  AutocompleteItem,
+  AutocompleteList,
+} from "@/components/ui/autocomplete";
 import { AudienceListSchema, type ApiAudience } from "@/features/audiences/validation";
 import { PLACEHOLDER_MAX, parsePlaceholders, type Placeholder } from "../render";
 import {
+  CHANNEL_LABELS,
   TemplateCreateSchema,
   TemplateJsonSchema,
   type ApiTemplate,
@@ -35,12 +44,6 @@ import {
 
 type TemplateFormInput = v.InferInput<typeof TemplateCreateSchema>;
 type TemplateForm = UseFormReturn<TemplateFormInput>;
-
-const CHANNEL_LABELS = {
-  email: "Email",
-  linkedin_dm: "LinkedIn DM",
-  other: "Other",
-} as const;
 
 async function fetchAudiences(): Promise<ApiAudience[]> {
   const response = await fetch("/api/audiences");
@@ -91,9 +94,10 @@ function FieldError({ message }: { message: string | undefined }) {
   );
 }
 
-// Free text with the caller's presets offered as suggestions, which is what
-// a datalist is for: the browser draws the list, so any name they type is
-// still accepted. Resolved to a row server-side on save.
+// Suggestions over the caller's presets, free text still accepted: the value
+// is the input's own text, so typing a new name and saving resolves-or-creates
+// it. An Autocomplete rather than a Select, because a Select cannot hold a
+// name the caller has never used.
 function AudienceField({
   form,
   presets,
@@ -105,46 +109,68 @@ function AudienceField({
   onRemove: (id: string) => void;
   removing: boolean;
 }) {
-  const { register, watch, setValue, formState: { errors } } = form;
-  const audience = watch("audience") ?? "";
-  const preset = presets.find(
-    (item) => item.id !== null && item.name.toLowerCase() === audience.trim().toLowerCase(),
-  );
+  const { control, setValue, formState: { errors } } = form;
+  const names = presets.map((preset) => preset.name);
   return (
     <div className="flex min-w-0 flex-col gap-1.5">
       <Label htmlFor="template-audience">Audience</Label>
-      <Input
-        id="template-audience"
-        autoComplete="off"
-        list="template-audience-options"
-        placeholder="Founder"
-        {...register("audience")}
+      <Controller
+        name="audience"
+        control={control}
+        render={({ field }) => {
+          const value = field.value ?? "";
+          const preset = presets.find(
+            (item) => item.id !== null && item.name.toLowerCase() === value.trim().toLowerCase(),
+          );
+          return (
+            <>
+              <Autocomplete
+                items={names}
+                value={value}
+                onValueChange={field.onChange}
+                filter={(item, query) =>
+                  item.toLowerCase().includes(query.trim().toLowerCase())
+                }
+              >
+                <AutocompleteInput id="template-audience" placeholder="Founder" />
+                <AutocompleteContent>
+                  <AutocompleteEmpty>
+                    No preset yet, keep typing to add one.
+                  </AutocompleteEmpty>
+                  <AutocompleteList>
+                    {(name) => (
+                      <AutocompleteItem key={name} value={name}>
+                        {name}
+                      </AutocompleteItem>
+                    )}
+                  </AutocompleteList>
+                </AutocompleteContent>
+              </Autocomplete>
+              {/* Only a preset the caller added has a row to take back out;
+                  the built-in defaults are a constant and offer none. Spelled
+                  out rather than an icon in the field, which reads as "clear
+                  this". */}
+              {preset ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  disabled={removing}
+                  onClick={() => {
+                    onRemove(preset.id as string);
+                    setValue("audience", "");
+                  }}
+                  className="self-start px-0 text-muted-foreground"
+                >
+                  <X aria-hidden="true" />
+                  Remove from your presets
+                </Button>
+              ) : null}
+            </>
+          );
+        }}
       />
-      <datalist id="template-audience-options">
-        {presets.map((item) => (
-          <option key={item.id ?? item.name} value={item.name} />
-        ))}
-      </datalist>
       <FieldError message={errors.audience?.message} />
-      {/* Only a preset the caller added has a row to take back out; the
-          built-in defaults are a constant and offer nothing to remove. Spelled
-          out rather than an icon in the field, which reads as "clear this". */}
-      {preset ? (
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          disabled={removing}
-          onClick={() => {
-            onRemove(preset.id as string);
-            setValue("audience", "");
-          }}
-          className="self-start px-0 text-muted-foreground"
-        >
-          <X aria-hidden="true" />
-          Remove from your presets
-        </Button>
-      ) : null}
     </div>
   );
 }
@@ -237,6 +263,10 @@ export function TemplateDialog({ template }: { template?: ApiTemplate }) {
     onSuccess: () => {
       setServerError(null);
       void queryClient.invalidateQueries({ queryKey: ["templates"] });
+      // A name typed here that the server had not seen became a new preset
+      // row. Without this the suggestions the next dialog opens with are up
+      // to staleTime old and will not offer the audience just used.
+      void queryClient.invalidateQueries({ queryKey: ["audiences"] });
       setOpen(false);
       reset();
     },
