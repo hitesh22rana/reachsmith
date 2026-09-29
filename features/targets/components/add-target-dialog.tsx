@@ -49,6 +49,7 @@ const STEPS: { title: string; description: string; fields: FieldName[] }[] = [
       "primary_email",
       "domain",
       "source_type",
+      "location",
       "company_website",
       "social_urls",
     ],
@@ -204,7 +205,12 @@ function ContactStep({ form }: { form: StepForm }) {
           <FieldError message={errors.source_type?.message} />
         </div>
       </div>
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="target-location">Location</Label>
+          <Input id="target-location" autoComplete="off" {...register("location")} />
+          <FieldError message={errors.location?.message} />
+        </div>
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="target-website">Company website</Label>
           <Input
