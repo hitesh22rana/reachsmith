@@ -85,7 +85,7 @@ function settled(guesses: ApiEmailGuess[] | undefined): boolean {
 }
 
 // Poll ceiling. The pipeline caps verify at 10 candidates and retries 3x, so
-// anything past this is a stuck row, not slow work — stop asking and let the
+// anything past this is a stuck row, not slow work: stop asking and let the
 // list render as-is.
 const POLL_INTERVAL_MS = 3000;
 const POLL_DEADLINE_MS = 120_000;
@@ -218,7 +218,7 @@ function StatusHeader({
         </p>
       ) : null}
       {timedOut ? (
-        <p className="mt-1 text-sm text-muted-foreground" role="status">
+        <p className="animate-enter mt-1 text-sm text-muted-foreground" role="status">
           Still checking some candidates. Reopen in a minute or enter one
           manually below.
         </p>
@@ -283,7 +283,9 @@ export function TargetEmailSection({
         </p>
       ) : null}
       {guesses.data && guesses.data.length > 0 && (settled(guesses.data) || pastDeadline) ? (
-        <TriedList guesses={guesses.data} />
+        <div className="animate-enter">
+          <TriedList guesses={guesses.data} />
+        </div>
       ) : null}
 
       <OverrideForm
