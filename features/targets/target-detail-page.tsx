@@ -72,6 +72,7 @@ export default async function TargetDetailPage({
           <Field label="Source" value={target.sourceType} />
           <Field label="Email domain" value={target.domain} />
           <Field label="Company site" value={target.companyWebsite} href={target.companyWebsite} />
+          <Field label="Location" value={target.location} />
         </div>
         {target.socialUrls && target.socialUrls.length > 0 ? (
           <div className="mt-4 space-y-1">

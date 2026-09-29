@@ -8,13 +8,7 @@ import { BackLink } from "@/components/back-link";
 import { EmptyState } from "@/components/empty-state";
 import { DeleteDialog } from "@/components/delete-dialog";
 import { TemplateDialog } from "./template-dialog";
-import { TemplateListSchema, type ApiTemplate } from "../validation";
-
-const CHANNEL_LABELS = {
-  email: "Email",
-  linkedin_dm: "LinkedIn DM",
-  other: "Other",
-} as const;
+import { CHANNEL_LABELS, TemplateListSchema, type ApiTemplate } from "../validation";
 
 async function fetchTemplates(): Promise<ApiTemplate[]> {
   const response = await fetch("/api/templates");
