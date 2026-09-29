@@ -72,24 +72,18 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   if (!target) {
     return NextResponse.json({ message: "Not found" }, { status: 404 });
   }
-  let templateId: string | null = null;
-  let templateBody: string | undefined;
-  let declared: readonly string[] = [];
   const requestedTemplateId = parsed.data.template_id;
-  if (requestedTemplateId) {
-    const [template] = await forUser(userId, (db) =>
-      db
-        .select()
-        .from(templates)
-        .where(and(eq(templates.id, requestedTemplateId), eq(templates.userId, userId)))
-        .limit(1),
-    );
-    if (!template) {
-      return NextResponse.json({ message: "Not found" }, { status: 404 });
-    }
-    templateId = template.id;
-    templateBody = template.body;
-    declared = template.placeholders.map((placeholder) => placeholder.name);
+  const [template] = requestedTemplateId
+    ? await forUser(userId, (db) =>
+        db
+          .select()
+          .from(templates)
+          .where(and(eq(templates.id, requestedTemplateId), eq(templates.userId, userId)))
+          .limit(1),
+      )
+    : [];
+  if (requestedTemplateId && !template) {
+    return NextResponse.json({ message: "Not found" }, { status: 404 });
   }
   // The template's stored placeholder list is the allowlist for metadata.
   // A submitted key the template does not declare is dropped rather than
@@ -97,11 +91,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   // attach values to a template that never asked for them.
   const variables = pickDeclaredVariables(
     parsed.data.variables,
-    declared,
-    templateId !== null,
+    template?.placeholders.map((placeholder) => placeholder.name) ?? [],
+    template != null,
   );
   const bodyFinal =
-    parsed.data.body || buildOutreachBody(templateBody, target, variables);
+    parsed.data.body || buildOutreachBody(template?.body, target, variables);
   if (!bodyFinal) {
     return NextResponse.json(
       { message: "Provide a template or message text" },
@@ -111,7 +105,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   const [outreach] = await forUser(userId, (db) =>
     db
       .insert(outreaches)
-      .values(toOutreachInsert(userId, target.id, templateId, parsed.data, bodyFinal, variables))
+      .values(
+        toOutreachInsert(userId, target.id, template?.id ?? null, parsed.data, bodyFinal, variables),
+      )
       .returning(),
   );
   if (!outreach) {

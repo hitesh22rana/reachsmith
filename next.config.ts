@@ -21,10 +21,9 @@ const nextConfig: NextConfig = {
             key: "Strict-Transport-Security",
             value: "max-age=63072000; includeSubDomains",
           },
-          // Framing and plugin content only. No script-src/default-src: a
-          // working policy for Next's inline bootstrap needs nonces wired
-          // through the RSC render, which is its own project.
-          // ponytail: no script-src: add nonces before trusting XSS defence
+          // ponytail: no script-src/default-src: a working policy for Next's
+          // inline bootstrap needs nonces wired through the RSC render, which
+          // is its own project. Add those nonces before trusting XSS defence
           // in depth; the URL scheme allowlist in features/targets is the
           // current injection control.
           {

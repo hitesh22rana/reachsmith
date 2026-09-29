@@ -2,17 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { Providers } from "@/components/providers";
-
-const siteUrl =
-  process.env.NEXT_PUBLIC_SITE_URL ?? process.env.BETTER_AUTH_URL ?? "https://reachsmith.app";
-
-function resolveBaseUrl() {
-  try {
-    return new URL(siteUrl);
-  } catch {
-    return new URL("https://reachsmith.app");
-  }
-}
+import { SITE_URL, resolveBaseUrl } from "@/lib/seo";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -71,17 +61,17 @@ const siteSchema = {
   "@graph": [
     {
       "@type": "Organization",
-      "@id": `${siteUrl}/#organization`,
+      "@id": `${SITE_URL}/#organization`,
       name: "ReachSmith",
-      url: siteUrl,
-      logo: `${siteUrl}/reachsmith-mascot.svg`,
+      url: SITE_URL,
+      logo: `${SITE_URL}/reachsmith-mascot.svg`,
     },
     {
       "@type": "WebSite",
-      "@id": `${siteUrl}/#website`,
-      url: siteUrl,
+      "@id": `${SITE_URL}/#website`,
+      url: SITE_URL,
       name: "ReachSmith",
-      publisher: { "@id": `${siteUrl}/#organization` },
+      publisher: { "@id": `${SITE_URL}/#organization` },
     },
   ],
 };

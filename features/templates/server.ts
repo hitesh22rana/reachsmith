@@ -1,7 +1,8 @@
+import { eq } from "drizzle-orm";
 import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
 import * as schema from "@/db/schema";
 import { resolveAudienceId } from "@/features/audiences/server";
-import type { NewTemplate, Template } from "@/db/schema";
+import { audiences, templates, type NewTemplate, type Template } from "@/db/schema";
 import { parsePlaceholders } from "./render";
 import type { TemplateCreateInput, TemplatePatchInput } from "./validation";
 
@@ -30,6 +31,18 @@ export function toTemplateJson(template: Template, audienceName: string | null):
     createdAt: template.createdAt.toISOString(),
     updatedAt: template.updatedAt.toISOString(),
   };
+}
+
+// The row may predate this save under different casing, so the name is read
+// back rather than echoing what was typed.
+export async function readBackAudienceName(db: Db, templateId: string): Promise<string | null> {
+  const [row] = await db
+    .select({ audienceName: audiences.name })
+    .from(templates)
+    .leftJoin(audiences, eq(templates.audienceId, audiences.id))
+    .where(eq(templates.id, templateId))
+    .limit(1);
+  return row?.audienceName ?? null;
 }
 
 function cleanText(value: string | undefined): string | null {

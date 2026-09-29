@@ -3,7 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { forUser } from "@/db";
 import { audiences, templates } from "@/db/schema";
 import { getUserId } from "@/lib/auth";
-import { toTemplateJson, toTemplatePatch } from "@/features/templates/server";
+import { readBackAudienceName, toTemplateJson, toTemplatePatch } from "@/features/templates/server";
 import { placeholderError } from "@/features/templates/render";
 import { parseBody } from "@/lib/validators";
 import { TemplatePatchSchema } from "@/features/templates/validation";
@@ -65,15 +65,7 @@ export async function PATCH(request: NextRequest, context: RouteContext): Promis
     if (!template) {
       return { empty: false, template: null, audienceName: null };
     }
-    // The row may predate this save under different casing, so read the name
-    // back rather than echoing what was typed.
-    const [row] = await db
-      .select({ audienceName: audiences.name })
-      .from(templates)
-      .leftJoin(audiences, eq(templates.audienceId, audiences.id))
-      .where(eq(templates.id, template.id))
-      .limit(1);
-    return { empty: false, template, audienceName: row?.audienceName ?? null };
+    return { empty: false, template, audienceName: await readBackAudienceName(db, template.id) };
   });
   if (result.empty) {
     return NextResponse.json({ message: "No fields to update" }, { status: 400 });
