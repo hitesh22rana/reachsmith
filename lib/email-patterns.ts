@@ -17,7 +17,7 @@ export interface EmailCandidate {
 
 const EMAIL_RE = /^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$/;
 
-function cleanPart(value: string | undefined): string {
+export function cleanPart(value: string | undefined): string {
   return (value ?? "").toLowerCase().replace(/[^a-z0-9]/g, "");
 }
 
@@ -42,16 +42,12 @@ export function generateCandidates(input: {
     "last.first": last ? `${last}.${first}` : null,
     f_last: last ? `${first[0]}_${last}` : null,
   };
-  const candidates: EmailCandidate[] = [];
-  for (const pattern of PATTERNS) {
+  return PATTERNS.flatMap((pattern) => {
     const part = local[pattern];
     if (!part) {
-      continue;
+      return [];
     }
     const email = `${part}@${domain}`;
-    if (EMAIL_RE.test(email)) {
-      candidates.push({ email, pattern });
-    }
-  }
-  return candidates;
+    return EMAIL_RE.test(email) ? [{ email, pattern }] : [];
+  });
 }

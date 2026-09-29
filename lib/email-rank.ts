@@ -1,4 +1,4 @@
-import { generateCandidates, type EmailPattern } from "./email-patterns.ts";
+import { cleanPart, generateCandidates, type EmailPattern } from "./email-patterns.ts";
 
 export type CandidateSource = "notes" | "pattern";
 
@@ -79,10 +79,6 @@ export function extractNoteEmails(notes: string | null | undefined): {
   return found;
 }
 
-function cleanPart(value: string | undefined): string {
-  return (value ?? "").toLowerCase().replace(/[^a-z0-9]/g, "");
-}
-
 // Handles people reuse across sites (github.com/foo → foo): observed
 // usernames make strong local parts. Generic path segments are skipped.
 export function extractHandles(urls: string[] | null | undefined): {
@@ -142,18 +138,23 @@ export function inferPattern(
 }
 
 function cueScore(context: string): number {
-  let score = 0;
-  for (const cue of POSITIVE_CUES) {
-    if (context.includes(cue)) {
-      score += 25;
-    }
-  }
-  for (const cue of NEGATIVE_CUES) {
-    if (context.includes(cue)) {
-      score -= 50;
-    }
-  }
-  return score;
+  const hits = (cues: string[]): number =>
+    cues.filter((cue) => context.includes(cue)).length;
+  return hits(POSITIVE_CUES) * 25 - hits(NEGATIVE_CUES) * 50;
+}
+
+// First address wins a duplicate, then the set sorts by score.
+function bestFirst(candidates: RankedCandidate[]): RankedCandidate[] {
+  const seen = new Set<string>();
+  return candidates
+    .filter((candidate) => {
+      if (seen.has(candidate.email)) {
+        return false;
+      }
+      seen.add(candidate.email);
+      return true;
+    })
+    .sort((a, b) => b.score - a.score);
 }
 
 // Explicit domain wins; otherwise the first notes address donates its
@@ -197,48 +198,42 @@ export function rankCandidates(input: {
     });
   }
 
-  if (domain) {
-    for (const { handle, url } of extractHandles(input.social_urls)) {
-      const email = `${handle}@${domain}`;
-      if (!/^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$/.test(email)) {
-        continue;
-      }
-      ranked.push({
-        email,
-        pattern: "handle",
-        source: "pattern",
-        context: url,
-        score: 55,
-      });
-    }
-    const inferred = new Set(
-      noteEmails
-        .map((note) => inferPattern(note.email, input.first_name, input.last_name))
-        .filter((pattern): pattern is EmailPattern => pattern !== null),
-    );
-    for (const candidate of generateCandidates({
-      first_name: input.first_name,
-      last_name: input.last_name,
-      domain,
-    })) {
-      ranked.push({
-        email: candidate.email,
-        pattern: candidate.pattern,
-        source: "pattern",
-        context: null,
-        score: PATTERN_BASE[candidate.pattern] + (inferred.has(candidate.pattern) ? 20 : 0),
-      });
-    }
+  // Without a domain there is nothing to generate from, so the notes
+  // addresses are the whole result.
+  if (!domain) {
+    return bestFirst(ranked);
   }
 
-  const seen = new Set<string>();
-  return ranked
-    .filter((candidate) => {
-      if (seen.has(candidate.email)) {
-        return false;
-      }
-      seen.add(candidate.email);
-      return true;
-    })
-    .sort((a, b) => b.score - a.score);
+  for (const { handle, url } of extractHandles(input.social_urls)) {
+    const email = `${handle}@${domain}`;
+    if (!/^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$/.test(email)) {
+      continue;
+    }
+    ranked.push({
+      email,
+      pattern: "handle",
+      source: "pattern",
+      context: url,
+      score: 55,
+    });
+  }
+  const inferred = new Set(
+    noteEmails
+      .map((note) => inferPattern(note.email, input.first_name, input.last_name))
+      .filter((pattern): pattern is EmailPattern => pattern !== null),
+  );
+  for (const candidate of generateCandidates({
+    first_name: input.first_name,
+    last_name: input.last_name,
+    domain,
+  })) {
+    ranked.push({
+      email: candidate.email,
+      pattern: candidate.pattern,
+      source: "pattern",
+      context: null,
+      score: PATTERN_BASE[candidate.pattern] + (inferred.has(candidate.pattern) ? 20 : 0),
+    });
+  }
+  return bestFirst(ranked);
 }
