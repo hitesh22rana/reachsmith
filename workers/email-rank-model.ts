@@ -25,31 +25,58 @@ const MODEL_FILE =
   "#9217f5db79a29953eb74d5343926648285ec7e67";
 const MODEL_CACHE = process.env.HF_MODEL_CACHE ?? "./.hf-cache";
 
+// One model, one context, one prompt at a time.
+//
+// The old guard held the *resolved* session, which does nothing while the
+// first load is still in flight: the email-guess worker runs at concurrency
+// 5, so five jobs entered here in the same tick, all saw null, and each
+// loaded its own copy of the weights. Five model loads, five contexts, and
+// four of them thrown away, which is what the repeated "control-looking
+// token" line at startup was. That line itself is llama.cpp noticing a vocab
+// entry that is named like a special token but is not typed as one; it
+// overrides the type and carries on, so it is the count that is the signal,
+// not the message.
+//
+// Memoizing the promise makes the session shared for real, so the prompts go
+// through one queue too: two jobs prompting on the same context sequence
+// would interleave and overwrite each other's chat history.
 let llama: Llama | null = null;
-let session: LlamaChatSession | null = null;
-let loadFailed = false;
+let session: Promise<LlamaChatSession | null> | null = null;
+let queue: Promise<unknown> = Promise.resolve();
 
-async function getSession(): Promise<LlamaChatSession | null> {
-  if (session || loadFailed) {
-    return session;
-  }
-  try {
-    llama = await getLlama();
-    // Second argument is a *directory*. Passing the file path used to make
-    // ensureDir throw EEXIST, the catch below swallowed it, and the rank
-    // stage never ran in the shipped image. The image bakes the file at this
-    // directory, so nothing is fetched at runtime; the `#rev` pin above is
-    // what keeps a local fallback download honest.
-    const modelPath = await resolveModelFile(MODEL_FILE, MODEL_CACHE);
-    const model = await llama.loadModel({ modelPath });
-    const context = await model.createContext();
-    session = new LlamaChatSession({ contextSequence: context.getSequence() });
-    return session;
-  } catch (error) {
-    console.error("SLM rank stage unavailable, using deterministic order", error);
-    loadFailed = true;
-    return null;
-  }
+function getSession(): Promise<LlamaChatSession | null> {
+  session ??= (async () => {
+    try {
+      llama = await getLlama();
+      // Second argument is a *directory*. Passing the file path used to make
+      // ensureDir throw EEXIST, the catch below swallowed it, and the rank
+      // stage never ran in the shipped image. The image bakes the file at this
+      // directory, so nothing is fetched at runtime; the `#rev` pin above is
+      // what keeps a local fallback download honest.
+      const modelPath = await resolveModelFile(MODEL_FILE, MODEL_CACHE);
+      const model = await llama?.loadModel({ modelPath });
+      if (!model) {
+        throw new Error("Model failed to load");
+      }
+      const context = await model.createContext();
+      return new LlamaChatSession({ contextSequence: context.getSequence() });
+    } catch (error) {
+      console.error("SLM rank stage unavailable, using deterministic order", error);
+      return null;
+    }
+  })();
+  return session;
+}
+
+// Each call waits for the one before it, and a failure does not stall the
+// chain: the next rank call is still worth attempting.
+function serialize<T>(run: () => Promise<T>): Promise<T> {
+  const result = queue.then(run, run);
+  queue = result.then(
+    () => undefined,
+    () => undefined,
+  );
+  return result;
 }
 
 function buildPrompt(
@@ -73,15 +100,24 @@ function buildPrompt(
 
 // Reorder candidate IDs best-first. Returns null when the model is
 // unavailable or its output is unusable; the caller keeps deterministic order.
-export async function rankWithModel(
+export function rankWithModel(
   target: { fullName: string; company: string | null },
   notes: string | null,
   handles: string[],
   candidates: RankInput[],
 ): Promise<string[] | null> {
   if (candidates.length === 0) {
-    return null;
+    return Promise.resolve(null);
   }
+  return serialize(() => rank(target, notes, handles, candidates));
+}
+
+async function rank(
+  target: { fullName: string; company: string | null },
+  notes: string | null,
+  handles: string[],
+  candidates: RankInput[],
+): Promise<string[] | null> {
   const active = await getSession();
   const engine = llama;
   if (!active || !engine) {
