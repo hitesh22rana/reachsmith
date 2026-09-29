@@ -1,4 +1,3 @@
-CREATE TYPE "public"."audience_type" AS ENUM('hr', 'recruiter', 'engineer', 'founder', 'generic');--> statement-breakpoint
 CREATE TYPE "public"."channel" AS ENUM('email', 'linkedin_dm', 'other');--> statement-breakpoint
 CREATE TYPE "public"."email_guess_status" AS ENUM('pending', 'verifying', 'valid', 'invalid', 'unknown', 'accept_all');--> statement-breakpoint
 CREATE TYPE "public"."enrichment_status" AS ENUM('not_started', 'pending', 'success', 'failed');--> statement-breakpoint
@@ -84,14 +83,22 @@ CREATE TABLE "targets" (
 	"updated_at" timestamp DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
+CREATE TABLE "audiences" (
+	"id" text PRIMARY KEY NOT NULL,
+	"user_id" text NOT NULL,
+	"name" text NOT NULL,
+	"created_at" timestamp DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
 CREATE TABLE "templates" (
 	"id" text PRIMARY KEY NOT NULL,
 	"user_id" text NOT NULL,
 	"name" text NOT NULL,
 	"channel" "channel" DEFAULT 'email' NOT NULL,
-	"audience_type" "audience_type" DEFAULT 'generic' NOT NULL,
+	"audience_id" text,
 	"purpose" text,
 	"body" text NOT NULL,
+	"placeholders" jsonb DEFAULT '[]'::jsonb NOT NULL,
 	"created_at" timestamp DEFAULT now() NOT NULL,
 	"updated_at" timestamp DEFAULT now() NOT NULL
 );
@@ -117,6 +124,7 @@ CREATE TABLE "verifications" (
 );
 --> statement-breakpoint
 ALTER TABLE "accounts" ADD CONSTRAINT "accounts_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "audiences" ADD CONSTRAINT "audiences_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "email_guesses" ADD CONSTRAINT "email_guesses_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "email_guesses" ADD CONSTRAINT "email_guesses_target_id_targets_id_fk" FOREIGN KEY ("target_id") REFERENCES "public"."targets"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "outreaches" ADD CONSTRAINT "outreaches_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
@@ -125,7 +133,10 @@ ALTER TABLE "outreaches" ADD CONSTRAINT "outreaches_template_id_templates_id_fk"
 ALTER TABLE "sessions" ADD CONSTRAINT "sessions_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "targets" ADD CONSTRAINT "targets_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "templates" ADD CONSTRAINT "templates_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "templates" ADD CONSTRAINT "templates_audience_id_audiences_id_fk" FOREIGN KEY ("audience_id") REFERENCES "public"."audiences"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 CREATE INDEX "accounts_user_id_idx" ON "accounts" USING btree ("user_id");--> statement-breakpoint
+CREATE INDEX "audiences_user_id_idx" ON "audiences" USING btree ("user_id");--> statement-breakpoint
+CREATE UNIQUE INDEX "audiences_user_id_name_key" ON "audiences" USING btree ("user_id", lower("name"));--> statement-breakpoint
 CREATE INDEX "email_guesses_target_id_idx" ON "email_guesses" USING btree ("target_id");--> statement-breakpoint
 CREATE INDEX "outreaches_user_id_idx" ON "outreaches" USING btree ("user_id");--> statement-breakpoint
 CREATE INDEX "sessions_user_id_idx" ON "sessions" USING btree ("user_id");--> statement-breakpoint
