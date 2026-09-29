@@ -37,6 +37,7 @@ import { AudienceListSchema, type ApiAudience } from "@/features/audiences/valid
 import { PLACEHOLDER_MAX, parsePlaceholders, type Placeholder } from "../render";
 import {
   CHANNEL_LABELS,
+  CHANNEL_OPTIONS,
   TemplateCreateSchema,
   TemplateJsonSchema,
   type ApiTemplate,
@@ -327,9 +328,11 @@ export function TemplateDialog({ template }: { template?: ApiTemplate }) {
                       <SelectValue>{CHANNEL_LABELS[field.value ?? "email"]}</SelectValue>
                     </SelectTrigger>
                     <SelectContent alignItemWithTrigger={false}>
-                      <SelectItem value="email">Email</SelectItem>
-                      <SelectItem value="linkedin_dm">LinkedIn DM</SelectItem>
-                      <SelectItem value="other">Other</SelectItem>
+                      {CHANNEL_OPTIONS.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 )}
