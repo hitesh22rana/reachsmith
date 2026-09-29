@@ -1,6 +1,6 @@
 import { and, eq } from "drizzle-orm";
 import { NextResponse, type NextRequest } from "next/server";
-import { getDb } from "@/db";
+import { forUser } from "@/db";
 import { targets } from "@/db/schema";
 import { getUserId } from "@/lib/auth";
 import { enqueueEmailGuess } from "@/lib/queues/email";
@@ -13,11 +13,13 @@ interface RouteContext {
 }
 
 async function findOwnedTarget(userId: string, id: string) {
-  const [target] = await getDb()
-    .select()
-    .from(targets)
-    .where(and(eq(targets.id, id), eq(targets.userId, userId)))
-    .limit(1);
+  const [target] = await forUser(userId, (db) =>
+    db
+      .select()
+      .from(targets)
+      .where(and(eq(targets.id, id), eq(targets.userId, userId)))
+      .limit(1),
+  );
   return target ?? null;
 }
 
@@ -46,17 +48,20 @@ export async function PATCH(request: NextRequest, context: RouteContext): Promis
   if (Object.keys(patch).length === 0) {
     return NextResponse.json({ message: "No fields to update" }, { status: 400 });
   }
-  const [updated] = await getDb()
-    .update(targets)
-    .set({ ...patch, updatedAt: new Date() })
-    .where(and(eq(targets.id, (await context.params).id), eq(targets.userId, userId)))
-    .returning();
+  const id = (await context.params).id;
+  const [updated] = await forUser(userId, (db) =>
+    db
+      .update(targets)
+      .set({ ...patch, updatedAt: new Date() })
+      .where(and(eq(targets.id, id), eq(targets.userId, userId)))
+      .returning(),
+  );
   if (!updated) {
     return NextResponse.json({ message: "Not found" }, { status: 404 });
   }
   // Best effort: re-guess on updates; the worker skips existing candidates.
   try {
-    await enqueueEmailGuess(updated.id);
+    await enqueueEmailGuess(updated.id, userId);
   } catch (error) {
     console.error("Failed to enqueue email-guess", error);
   }
@@ -69,10 +74,13 @@ export async function DELETE(_request: NextRequest, context: RouteContext): Prom
     return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
   }
   // Email guesses and outreach cascade via FK; template links set-null.
-  const [deleted] = await getDb()
-    .delete(targets)
-    .where(and(eq(targets.id, (await context.params).id), eq(targets.userId, userId)))
-    .returning({ id: targets.id });
+  const id = (await context.params).id;
+  const [deleted] = await forUser(userId, (db) =>
+    db
+      .delete(targets)
+      .where(and(eq(targets.id, id), eq(targets.userId, userId)))
+      .returning({ id: targets.id }),
+  );
   if (!deleted) {
     return NextResponse.json({ message: "Not found" }, { status: 404 });
   }

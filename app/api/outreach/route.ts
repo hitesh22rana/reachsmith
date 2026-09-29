@@ -1,7 +1,7 @@
 import { and, desc, eq } from "drizzle-orm";
 import { NextResponse, type NextRequest } from "next/server";
 import * as v from "valibot";
-import { getDb } from "@/db";
+import { forUser } from "@/db";
 import { outreaches, targets, templates } from "@/db/schema";
 import { getUserId } from "@/lib/auth";
 import { buildOutreachBody, toOutreachInsert, toOutreachJson } from "@/features/outreach/server";
@@ -33,12 +33,14 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   if (filter.output.targetId) {
     conditions.push(eq(outreaches.targetId, filter.output.targetId));
   }
-  const rows = await getDb()
-    .select({ outreach: outreaches, fullName: targets.fullName, company: targets.company })
-    .from(outreaches)
-    .innerJoin(targets, eq(outreaches.targetId, targets.id))
-    .where(and(...conditions))
-    .orderBy(desc(outreaches.lastStatusChangeAt));
+  const rows = await forUser(userId, (db) =>
+    db
+      .select({ outreach: outreaches, fullName: targets.fullName, company: targets.company })
+      .from(outreaches)
+      .innerJoin(targets, eq(outreaches.targetId, targets.id))
+      .where(and(...conditions))
+      .orderBy(desc(outreaches.lastStatusChangeAt)),
+  );
   return NextResponse.json({
     outreach: rows.map((row) =>
       toOutreachJson(row.outreach, { fullName: row.fullName, company: row.company }),
@@ -55,22 +57,27 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   if (!parsed.ok) {
     return NextResponse.json({ message: parsed.message }, { status: 400 });
   }
-  const [target] = await getDb()
-    .select()
-    .from(targets)
-    .where(and(eq(targets.id, parsed.data.target_id), eq(targets.userId, userId)))
-    .limit(1);
+  const [target] = await forUser(userId, (db) =>
+    db
+      .select()
+      .from(targets)
+      .where(and(eq(targets.id, parsed.data.target_id), eq(targets.userId, userId)))
+      .limit(1),
+  );
   if (!target) {
     return NextResponse.json({ message: "Not found" }, { status: 404 });
   }
   let templateId: string | null = null;
   let templateBody: string | undefined;
-  if (parsed.data.template_id) {
-    const [template] = await getDb()
-      .select()
-      .from(templates)
-      .where(and(eq(templates.id, parsed.data.template_id), eq(templates.userId, userId)))
-      .limit(1);
+  const requestedTemplateId = parsed.data.template_id;
+  if (requestedTemplateId) {
+    const [template] = await forUser(userId, (db) =>
+      db
+        .select()
+        .from(templates)
+        .where(and(eq(templates.id, requestedTemplateId), eq(templates.userId, userId)))
+        .limit(1),
+    );
     if (!template) {
       return NextResponse.json({ message: "Not found" }, { status: 404 });
     }
@@ -89,10 +96,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       { status: 400 },
     );
   }
-  const [outreach] = await getDb()
-    .insert(outreaches)
-    .values(toOutreachInsert(userId, target.id, templateId, parsed.data, bodyFinal))
-    .returning();
+  const [outreach] = await forUser(userId, (db) =>
+    db
+      .insert(outreaches)
+      .values(toOutreachInsert(userId, target.id, templateId, parsed.data, bodyFinal))
+      .returning(),
+  );
   if (!outreach) {
     return NextResponse.json({ message: "Failed to create outreach" }, { status: 500 });
   }

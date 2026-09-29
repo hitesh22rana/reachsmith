@@ -1,6 +1,6 @@
 import { headers } from "next/headers";
 import { and, count, desc, eq, inArray } from "drizzle-orm";
-import { getDb } from "@/db";
+import { forUser } from "@/db";
 import { outreaches, targets, templates } from "@/db/schema";
 import { auth, requireUserId } from "@/lib/auth";
 import { BlobatarAvatar } from "@/components/blobatar-avatar";
@@ -33,7 +33,6 @@ function roleAtCompany(roleTitle: string | null, company: string | null): string
 export default async function DashboardPage() {
   const userId = await requireUserId();
   const session = await auth.api.getSession({ headers: await headers() });
-  const db = getDb();
 
   const [
     [targetRow],
@@ -43,45 +42,47 @@ export default async function DashboardPage() {
     newTemplates,
     statusRows,
     recentOutreach,
-  ] = await Promise.all([
-    db.select({ count: count() }).from(targets).where(eq(targets.userId, userId)),
-    db.select({ count: count() }).from(templates).where(eq(templates.userId, userId)),
-    db.select({ count: count() }).from(outreaches).where(eq(outreaches.userId, userId)),
-    db
-      .select({
-        id: targets.id,
-        fullName: targets.fullName,
-        roleTitle: targets.roleTitle,
-        company: targets.company,
-        createdAt: targets.createdAt,
-      })
-      .from(targets)
-      .where(eq(targets.userId, userId))
-      .orderBy(desc(targets.createdAt))
-      .limit(5),
-    db
-      .select({ id: templates.id, name: templates.name, createdAt: templates.createdAt })
-      .from(templates)
-      .where(eq(templates.userId, userId))
-      .orderBy(desc(templates.createdAt))
-      .limit(5),
-    db
-      .select({ status: outreaches.status })
-      .from(outreaches)
-      .where(eq(outreaches.userId, userId)),
-    db
-      .select({
-        id: outreaches.id,
-        status: outreaches.status,
-        channel: outreaches.channel,
-        targetId: outreaches.targetId,
-        lastStatusChangeAt: outreaches.lastStatusChangeAt,
-      })
-      .from(outreaches)
-      .where(eq(outreaches.userId, userId))
+  ] = await forUser(userId, (db) =>
+    Promise.all([
+      db.select({ count: count() }).from(targets).where(eq(targets.userId, userId)),
+      db.select({ count: count() }).from(templates).where(eq(templates.userId, userId)),
+      db.select({ count: count() }).from(outreaches).where(eq(outreaches.userId, userId)),
+      db
+        .select({
+          id: targets.id,
+          fullName: targets.fullName,
+          roleTitle: targets.roleTitle,
+          company: targets.company,
+          createdAt: targets.createdAt,
+        })
+        .from(targets)
+        .where(eq(targets.userId, userId))
+        .orderBy(desc(targets.createdAt))
+        .limit(5),
+      db
+        .select({ id: templates.id, name: templates.name, createdAt: templates.createdAt })
+        .from(templates)
+        .where(eq(templates.userId, userId))
+        .orderBy(desc(templates.createdAt))
+        .limit(5),
+      db
+        .select({ status: outreaches.status })
+        .from(outreaches)
+        .where(eq(outreaches.userId, userId)),
+      db
+        .select({
+          id: outreaches.id,
+          status: outreaches.status,
+          channel: outreaches.channel,
+          targetId: outreaches.targetId,
+          lastStatusChangeAt: outreaches.lastStatusChangeAt,
+        })
+        .from(outreaches)
+        .where(eq(outreaches.userId, userId))
       .orderBy(desc(outreaches.lastStatusChangeAt))
       .limit(5),
-  ]);
+    ]),
+  );
 
   const targetCount = targetRow?.count ?? 0;
   const templateCount = templateRow?.count ?? 0;
@@ -95,10 +96,12 @@ export default async function DashboardPage() {
   const outreachTargetIds = [...new Set(recentOutreach.map((o) => o.targetId))];
   const outreachTargets =
     outreachTargetIds.length > 0
-      ? await db
-          .select({ id: targets.id, fullName: targets.fullName })
-          .from(targets)
-          .where(and(eq(targets.userId, userId), inArray(targets.id, outreachTargetIds)))
+      ? await forUser(userId, (db) =>
+          db
+            .select({ id: targets.id, fullName: targets.fullName })
+            .from(targets)
+            .where(and(eq(targets.userId, userId), inArray(targets.id, outreachTargetIds))),
+        )
       : [];
   const targetNames = new Map(outreachTargets.map((t) => [t.id, t.fullName]));
 

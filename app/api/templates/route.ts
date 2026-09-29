@@ -1,6 +1,6 @@
 import { desc, eq } from "drizzle-orm";
 import { NextResponse, type NextRequest } from "next/server";
-import { getDb } from "@/db";
+import { forUser } from "@/db";
 import { templates } from "@/db/schema";
 import { getUserId } from "@/lib/auth";
 import { toTemplateInsert, toTemplateJson } from "@/features/templates/server";
@@ -12,11 +12,13 @@ export async function GET(): Promise<NextResponse> {
   if (!userId) {
     return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
   }
-  const rows = await getDb()
-    .select()
-    .from(templates)
-    .where(eq(templates.userId, userId))
-    .orderBy(desc(templates.createdAt));
+  const rows = await forUser(userId, (db) =>
+    db
+      .select()
+      .from(templates)
+      .where(eq(templates.userId, userId))
+      .orderBy(desc(templates.createdAt)),
+  );
   return NextResponse.json({ templates: rows.map(toTemplateJson) });
 }
 
@@ -29,10 +31,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   if (!parsed.ok) {
     return NextResponse.json({ message: parsed.message }, { status: 400 });
   }
-  const [template] = await getDb()
-    .insert(templates)
-    .values(toTemplateInsert(userId, parsed.data))
-    .returning();
+  const [template] = await forUser(userId, (db) =>
+    db
+      .insert(templates)
+      .values(toTemplateInsert(userId, parsed.data))
+      .returning(),
+  );
   if (!template) {
     return NextResponse.json({ message: "Failed to create template" }, { status: 500 });
   }
