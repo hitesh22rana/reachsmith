@@ -29,7 +29,7 @@ import { Stepper } from "@/components/ui/stepper";
 import { ReviewList } from "@/components/review-list";
 import { buildOutreachBody, targetVariables } from "@/features/outreach/server";
 import type { Placeholder } from "@/features/templates/render";
-import { TemplateListSchema } from "@/features/templates/validation";
+import { CHANNEL_LABELS, CHANNEL_OPTIONS, TemplateListSchema } from "@/features/templates/validation";
 import { OutreachCreateSchema, OutreachJsonSchema } from "../validation";
 import type { OutreachTarget } from "../server";
 
@@ -50,18 +50,6 @@ const STEPS: { title: string; description: string; fields: FieldName[] }[] = [
 ];
 
 const LAST_STEP = STEPS.length - 1;
-
-const CHANNEL_LABELS = {
-  email: "Email",
-  linkedin_dm: "LinkedIn DM",
-  other: "Other",
-} as const;
-
-const CHANNEL_OPTIONS: { value: OutreachFormInput["channel"]; label: string }[] = [
-  { value: "email", label: "Email" },
-  { value: "linkedin_dm", label: "LinkedIn DM" },
-  { value: "other", label: "Other" },
-];
 
 async function fetchTemplates() {
   const response = await fetch("/api/templates");
@@ -321,7 +309,9 @@ function ReviewStep({ items, body }: { items: { label: string; value: string }[]
       {body ? (
         <div className="flex min-w-0 flex-col gap-1.5">
           <p className="text-sm font-medium">Message</p>
-          <p className="max-h-40 overflow-y-auto whitespace-pre-wrap rounded-xl border bg-muted/50 p-4 text-sm">
+          {/* break-words, not just pre-wrap: a pasted job link is one
+              unbreakable token, and whitespace alone cannot wrap it. */}
+          <p className="max-h-40 min-w-0 overflow-y-auto break-words whitespace-pre-wrap rounded-xl border bg-muted/50 p-4 text-sm">
             {body}
           </p>
         </div>
