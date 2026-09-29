@@ -1,10 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import * as v from "valibot";
-import { ArrowLeft, Send } from "lucide-react";
+import { Send } from "lucide-react";
 import { EmptyState } from "@/components/empty-state";
 import { Label } from "@/components/ui/label";
 import {
@@ -14,6 +13,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { CHANNEL_LABELS } from "@/features/templates/validation";
+import { BackLink } from "@/components/back-link";
 import { OutreachListSchema, OutreachStatusSchema, type ApiOutreach } from "../validation";
 
 type StatusFilter = "all" | v.InferOutput<typeof OutreachStatusSchema>;
@@ -27,12 +28,6 @@ const STATUS_LABELS: Record<StatusFilter, string> = {
   no_response: "No response",
   success: "Success",
 };
-
-const CHANNEL_LABELS = {
-  email: "Email",
-  linkedin_dm: "LinkedIn DM",
-  other: "Other",
-} as const;
 
 async function fetchOutreach(status: StatusFilter): Promise<ApiOutreach[]> {
   const params = status === "all" ? "" : `?status=${status}`;
@@ -73,15 +68,7 @@ export function OutreachView() {
 
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-6 px-6 py-12">
-      <div className="animate-enter">
-        <Link
-          href="/dashboard"
-          className="inline-flex items-center gap-1 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
-        >
-          <ArrowLeft className="size-4" aria-hidden="true" />
-          Back to dashboard
-        </Link>
-      </div>
+      <BackLink href="/dashboard">Back to dashboard</BackLink>
       <div className="animate-enter flex flex-wrap items-center justify-between gap-4">
         <div className="space-y-1">
           <h1 className="text-3xl font-semibold tracking-tight">Outreach</h1>

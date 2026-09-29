@@ -7,6 +7,20 @@ export const ChannelSchema = v.picklist(
   "Pick a valid channel",
 );
 
+// The one place the channel list is written down. Every channel picker in the
+// app maps over this and reads its label from the same object, so adding a
+// channel is one edit rather than three, and an option cannot exist without a
+// label.
+export const CHANNEL_LABELS = {
+  email: "Email",
+  linkedin_dm: "LinkedIn DM",
+  other: "Other",
+} as const satisfies Record<v.InferOutput<typeof ChannelSchema>, string>;
+
+export const CHANNEL_OPTIONS = (
+  Object.keys(CHANNEL_LABELS) as (keyof typeof CHANNEL_LABELS)[]
+).map((value) => ({ value, label: CHANNEL_LABELS[value] }));
+
 export const PlaceholderSchema = v.object({
   name: v.pipe(v.string(), v.maxLength(PLACEHOLDER_MAX_LENGTH)),
   label: v.pipe(v.string(), v.maxLength(PLACEHOLDER_MAX_LENGTH + 4)),
