@@ -101,7 +101,11 @@ export default async function TargetDetailPage({
       </section>
 
       <section aria-label="Email candidates" className="animate-enter rounded-2xl border bg-card p-6">
-        <TargetEmailSection targetId={target.id} primaryEmail={target.primaryEmail} />
+        <TargetEmailSection
+          targetId={target.id}
+          primaryEmail={target.primaryEmail}
+          primaryEmailSource={target.primaryEmailSource}
+        />
       </section>
 
       <section aria-label="Outreach history" className="animate-enter rounded-2xl border bg-card p-6">

@@ -1,4 +1,3 @@
-import path from "node:path";
 import {
   getLlama,
   resolveModelFile,
@@ -18,8 +17,13 @@ interface RankInput {
   source: string;
 }
 
+// Pinned to the same revision the Dockerfile bakes (MODEL_SHA). Without the
+// `#rev` fragment this resolves against `main`, so a moved tag would change
+// the weights the worker loads.
 const MODEL_FILE =
-  "hf:Qwen/Qwen2.5-0.5B-Instruct-GGUF/qwen2.5-0.5b-instruct-q4_k_m.gguf";
+  "hf:Qwen/Qwen2.5-0.5B-Instruct-GGUF/qwen2.5-0.5b-instruct-q4_k_m.gguf" +
+  "#9217f5db79a29953eb74d5343926648285ec7e67";
+const MODEL_CACHE = process.env.HF_MODEL_CACHE ?? "./.hf-cache";
 
 let llama: Llama | null = null;
 let session: LlamaChatSession | null = null;
@@ -31,10 +35,12 @@ async function getSession(): Promise<LlamaChatSession | null> {
   }
   try {
     llama = await getLlama();
-    const modelPath = await resolveModelFile(
-      MODEL_FILE,
-      path.join(process.env.HF_MODEL_CACHE ?? "./.hf-cache", "qwen2.5-0.5b-instruct-q4_k_m.gguf"),
-    );
+    // Second argument is a *directory*. Passing the file path used to make
+    // ensureDir throw EEXIST, the catch below swallowed it, and the rank
+    // stage never ran in the shipped image. The image bakes the file at this
+    // directory, so nothing is fetched at runtime; the `#rev` pin above is
+    // what keeps a local fallback download honest.
+    const modelPath = await resolveModelFile(MODEL_FILE, MODEL_CACHE);
     const model = await llama.loadModel({ modelPath });
     const context = await model.createContext();
     session = new LlamaChatSession({ contextSequence: context.getSequence() });

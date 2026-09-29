@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import * as v from "valibot";
@@ -84,6 +84,12 @@ function settled(guesses: ApiEmailGuess[] | undefined): boolean {
   return !!guesses && guesses.every((guess) => guess.status !== "pending" && guess.status !== "verifying");
 }
 
+// Poll ceiling. The pipeline caps verify at 10 candidates and retries 3x, so
+// anything past this is a stuck row, not slow work — stop asking and let the
+// list render as-is.
+const POLL_INTERVAL_MS = 3000;
+const POLL_DEADLINE_MS = 120_000;
+
 function ResultCard({
   primaryEmail,
   confidence,
@@ -165,7 +171,17 @@ function OverrideForm({
   );
 }
 
-function confidenceFor(primaryEmail: string, guesses: ApiEmailGuess[] | undefined): string | null {
+// Reads the stored provenance marker rather than inferring it by matching
+// the address against guess rows: a manual value that happens to equal a
+// verified guess used to render as "Verified".
+function confidenceFor(
+  primaryEmail: string,
+  source: "manual" | "verified" | null,
+  guesses: ApiEmailGuess[] | undefined,
+): string | null {
+  if (source === "manual") {
+    return "Set manually";
+  }
   const match = guesses?.find((guess) => guess.email === primaryEmail);
   if (match?.status === "valid") {
     return `Verified · pattern ${match.patternUsed}`;
@@ -176,15 +192,17 @@ function confidenceFor(primaryEmail: string, guesses: ApiEmailGuess[] | undefine
   if (match?.source === "notes") {
     return "From your notes · unverified";
   }
-  return "Set manually";
+  return null;
 }
 
 function StatusHeader({
   running,
   empty,
+  timedOut,
 }: {
   running: boolean;
   empty: boolean;
+  timedOut: boolean;
 }) {
   return (
     <div>
@@ -199,6 +217,12 @@ function StatusHeader({
           Email not found – try manual entry or LinkedIn DM.
         </p>
       ) : null}
+      {timedOut ? (
+        <p className="mt-1 text-sm text-muted-foreground" role="status">
+          Still checking some candidates. Reopen in a minute or enter one
+          manually below.
+        </p>
+      ) : null}
     </div>
   );
 }
@@ -206,23 +230,31 @@ function StatusHeader({
 export function TargetEmailSection({
   targetId,
   primaryEmail,
+  primaryEmailSource,
 }: {
   targetId: string;
   primaryEmail: string | null;
+  primaryEmailSource: "manual" | "verified" | null;
 }) {
   const queryClient = useQueryClient();
   const [copiedEmail, setCopiedEmail] = useState<string | null>(null);
+  const [pastDeadline, setPastDeadline] = useState(false);
+  useEffect(() => {
+    const timer = setTimeout(() => setPastDeadline(true), POLL_DEADLINE_MS);
+    return () => clearTimeout(timer);
+  }, []);
   const guesses = useQuery({
     queryKey: ["guesses", targetId],
     queryFn: () => fetchGuesses(targetId),
-    refetchInterval: (query) => (settled(query.state.data) ? false : 3000),
+    refetchInterval: (query) =>
+      settled(query.state.data) || pastDeadline ? false : POLL_INTERVAL_MS,
   });
 
-  const running = guesses.isPending || (!!guesses.data && !settled(guesses.data));
+  const running = !pastDeadline && (guesses.isPending || (!!guesses.data && !settled(guesses.data)));
   // Settled with no winner (all invalid/unknown, nothing set) is the same
   // "not found" state as zero guesses: the section must never go silent.
   const empty =
-    !!guesses.data && settled(guesses.data) && !primaryEmail;
+    !!guesses.data && (settled(guesses.data) || pastDeadline) && !primaryEmail;
 
   async function copyEmail() {
     if (!primaryEmail) {
@@ -234,12 +266,12 @@ export function TargetEmailSection({
 
   return (
     <div className="flex flex-col gap-4">
-      <StatusHeader running={running} empty={empty} />
+      <StatusHeader running={running} empty={empty} timedOut={pastDeadline} />
 
       {primaryEmail ? (
         <ResultCard
           primaryEmail={primaryEmail}
-          confidence={confidenceFor(primaryEmail, guesses.data)}
+          confidence={confidenceFor(primaryEmail, primaryEmailSource, guesses.data)}
           copiedEmail={copiedEmail}
           onCopy={() => void copyEmail()}
         />
@@ -250,7 +282,7 @@ export function TargetEmailSection({
           Could not load candidates. Check the connection and try again.
         </p>
       ) : null}
-      {guesses.data && guesses.data.length > 0 && settled(guesses.data) ? (
+      {guesses.data && guesses.data.length > 0 && (settled(guesses.data) || pastDeadline) ? (
         <TriedList guesses={guesses.data} />
       ) : null}
 

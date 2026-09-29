@@ -2,6 +2,8 @@
 # Production stack (app + workers, model baked into the worker image):
 #   docker compose --profile prod up --build
 # Dev default (`docker compose up`) stays Postgres + Redis only.
+# Both stores publish on 127.0.0.1 only: a short-syntax port binds 0.0.0.0,
+# and the Postgres password here is a published literal. Never widen these.
 services:
   postgres:
     image: postgres:18.0-alpine
@@ -11,7 +13,7 @@ services:
       POSTGRES_PASSWORD: reachsmith
       POSTGRES_DB: reachsmith
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql
     healthcheck:
@@ -24,7 +26,7 @@ services:
     restart: unless-stopped
     command: redis-server --appendonly yes
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"
     volumes:
       - redisdata:/data
     healthcheck:

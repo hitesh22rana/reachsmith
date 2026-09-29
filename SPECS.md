@@ -195,6 +195,7 @@ Represents a target contact (recruiter, HR, employee, etc.).
 - `company`
 - `role_title`
 - `primary_email` (nullable, derived from verification or manual input)
+- `primary_email_source` (nullable `manual | verified`; records which of the two authorized writers settled the column, so a later valid guess cannot clobber an owner decision)
 - `profile_url` (e.g., LinkedIn/GitHub URL)
 - `source_type` (enum: `linkedin`, `github`, `website`, `manual`, `other`)
 - `enrichment_status` (enum: `not_started`, `pending`, `success`, `failed`)
@@ -337,6 +338,13 @@ Logic:
   - Do not set primary_email; UI indicates “email not found – try manual or LinkedIn DM”.
 
 The chosen email is written to `target.primary_email` and surfaced in the UI.
+
+**Precedence: an owner's settled override outranks the pipeline.** Every owner-facing
+write stamps `primary_email_source = 'manual'`; the recompute stamps `'verified'`
+and its `WHERE` clause excludes rows already marked `manual`, so a later valid
+candidate never silently overwrites a decision the user made. Clearing the field
+clears the marker and lets the pipeline propose again. The UI reads the stored
+marker rather than inferring provenance by matching the address against guesses.
 
 ---
 

@@ -10,7 +10,20 @@ const OptionalTextSchema = (max: number) =>
     v.pipe(v.string(), v.trim(), v.maxLength(max, `Must be ${max} characters or fewer`)),
   );
 
-// Empty stays empty (field is optional); anything typed must be a valid URL.
+// Empty stays empty (field is optional); anything typed must be a real web
+// URL. valibot's v.url() is URL.canParse-based and happily accepts
+// `javascript:` and `data:`, which is what the rendered href executes, so
+// the scheme is checked here rather than trusted from the parser. Same
+// check as linesAreUrls below.
+function isWebUrl(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" || url.protocol === "http:";
+  } catch {
+    return false;
+  }
+}
+
 export const OptionalUrlSchema = v.optional(
   v.union(
     [
@@ -19,7 +32,7 @@ export const OptionalUrlSchema = v.optional(
         v.string(),
         v.trim(),
         v.maxLength(2048, "Must be 2048 characters or fewer"),
-        v.url("Enter a valid URL starting with https://"),
+        v.check(isWebUrl, "Enter a valid URL starting with https://"),
       ),
     ],
     "Enter a valid URL starting with https://",
@@ -69,14 +82,7 @@ function socialUrlLines(raw: string): string[] {
 }
 
 function linesAreUrls(raw: string): boolean {
-  return socialUrlLines(raw).every((line) => {
-    try {
-      const url = new URL(line);
-      return url.protocol === "https:" || url.protocol === "http:";
-    } catch {
-      return false;
-    }
-  });
+  return socialUrlLines(raw).every(isWebUrl);
 }
 
 export const SocialUrlsSchema = v.optional(
@@ -121,6 +127,7 @@ export const TargetJsonSchema = v.object({
   company: v.nullable(v.string()),
   roleTitle: v.nullable(v.string()),
   primaryEmail: v.nullable(v.string()),
+  primaryEmailSource: v.nullable(v.picklist(["manual", "verified"])),
   sourceType: SourceTypeSchema,
   enrichmentStatus: v.picklist(["not_started", "pending", "success", "failed"]),
   notes: v.nullable(v.string()),

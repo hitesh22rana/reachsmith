@@ -44,6 +44,7 @@ export function toTargetInsert(userId: string, data: TargetCreateInput): NewTarg
     company: cleanText(data.company),
     roleTitle: cleanText(data.role_title),
     primaryEmail: cleanText(data.primary_email),
+    primaryEmailSource: cleanText(data.primary_email) ? "manual" : null,
     sourceType: data.source_type ?? "manual",
     notes: cleanText(data.notes),
     location: cleanText(data.location),
@@ -74,6 +75,9 @@ export function toTargetPatch(data: TargetPatchInput): Partial<NewTarget> {
   }
   if (data.primary_email !== undefined) {
     patch.primaryEmail = cleanText(data.primary_email);
+    // Any owner-side write claims the column; clearing it drops the marker
+    // so the pipeline can propose a value again.
+    patch.primaryEmailSource = cleanText(data.primary_email) ? "manual" : null;
   }
   if (data.source_type !== undefined) {
     patch.sourceType = data.source_type;
