@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Controller, useForm, type UseFormReturn } from "react-hook-form";
 import { valibotResolver } from "@hookform/resolvers/valibot";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -27,6 +27,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { Stepper } from "@/components/ui/stepper";
 import { ReviewList } from "@/components/review-list";
+import { errorMessage } from "@/lib/validators";
 import { buildOutreachBody, targetVariables } from "@/features/outreach/server";
 import type { Placeholder } from "@/features/templates/render";
 import { CHANNEL_LABELS, CHANNEL_OPTIONS, TemplateListSchema } from "@/features/templates/validation";
@@ -74,14 +75,7 @@ async function saveOutreach(
   });
   if (!created.ok) {
     const body: unknown = await created.json().catch(() => null);
-    const message =
-      body !== null &&
-      typeof body === "object" &&
-      "message" in body &&
-      typeof body.message === "string"
-        ? body.message
-        : `Failed to save outreach (${created.status})`;
-    throw new Error(message);
+    throw new Error(errorMessage(body, `Failed to save outreach (${created.status})`));
   }
   const createdBody: unknown = await created.json();
   const { outreach } = v.parse(v.object({ outreach: OutreachJsonSchema }), createdBody);
@@ -458,7 +452,7 @@ export function NewOutreachDialog({
   const stepHeadingRef = useRef<HTMLHeadingElement>(null);
   const templates = useQuery({ queryKey: ["templates"], queryFn: fetchTemplates });
 
-  const derived = useMemo(() => targetVariables(target), [target]);
+  const derived = targetVariables(target);
 
   const form = useForm<OutreachFormInput>({
     resolver: valibotResolver(OutreachFormSchema),
@@ -518,15 +512,15 @@ export function NewOutreachDialog({
   function pickTemplate(id: string | null) {
     setBodyDirty(false);
     const next = templates.data?.find((item) => item.id === id) ?? null;
-    // Carry over values the new template also asks for, drop the rest, and
-    // prefill whatever comes from the target.
-    const prefilled: Record<string, string> = {};
-    for (const placeholder of next?.placeholders ?? []) {
-      prefilled[placeholder.name] =
-        variables[placeholder.name] ??
-        (placeholder.source === "target" ? (derived[placeholder.name] ?? "") : "");
-    }
-    setVariables(prefilled);
+    setVariables(
+      Object.fromEntries(
+        (next?.placeholders ?? []).map((placeholder) => [
+          placeholder.name,
+          variables[placeholder.name] ??
+            (placeholder.source === "target" ? (derived[placeholder.name] ?? "") : ""),
+        ]),
+      ),
+    );
   }
 
   async function next(): Promise<void> {

@@ -7,6 +7,7 @@ import * as v from "valibot";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { errorMessage } from "@/lib/validators";
 import { GuessListSchema, PrimaryEmailSchema, type ApiEmailGuess } from "../validation";
 
 const TRIED_STYLES: Record<ApiEmailGuess["status"], string> = {
@@ -75,8 +76,8 @@ async function savePrimaryEmail(targetId: string, email: string): Promise<void> 
     body: JSON.stringify(parsed),
   });
   if (!response.ok) {
-    const body = (await response.json().catch(() => null)) as { message?: string } | null;
-    throw new Error(body?.message ?? `Failed to save email (${response.status})`);
+    const body: unknown = await response.json().catch(() => null);
+    throw new Error(errorMessage(body, `Failed to save email (${response.status})`));
   }
 }
 

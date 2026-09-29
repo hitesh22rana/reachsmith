@@ -13,9 +13,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 
-// Confirm popup for destructive deletes: names the blast radius
-// (cascades) and confirms with a red action. Closes on confirm;
-// the caller surfaces any failure underneath.
+// Closes on confirm; the caller surfaces any failure underneath.
 export function DeleteDialog({
   itemName,
   description,

@@ -1,7 +1,6 @@
-// Read-only summary of a filled form, used by the last step of the multi-step
-// dialogs. Values truncate rather than wrap: this is a confirmation of what
-// was entered, not a second place to read a long message, and the full text
-// is one hover away via the title attribute.
+// Values truncate rather than wrap: this is a confirmation of what was
+// entered, not a second place to read a long message, and the full text is one
+// hover away via the title attribute.
 //
 // The truncation needs flex-1 on the value, not just min-w-0. A job link is
 // one unbreakable 100-character token, so its max-content width is what sizes

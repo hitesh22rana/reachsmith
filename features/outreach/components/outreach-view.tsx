@@ -29,6 +29,8 @@ const STATUS_LABELS: Record<StatusFilter, string> = {
   success: "Success",
 };
 
+const STATUS_KEYS = Object.keys(STATUS_LABELS) as StatusFilter[];
+
 async function fetchOutreach(status: StatusFilter): Promise<ApiOutreach[]> {
   const params = status === "all" ? "" : `?status=${status}`;
   const response = await fetch(`/api/outreach${params}`);
@@ -85,7 +87,7 @@ export function OutreachView() {
               <SelectValue>{STATUS_LABELS[filter]}</SelectValue>
             </SelectTrigger>
             <SelectContent alignItemWithTrigger={false}>
-              {(Object.keys(STATUS_LABELS) as StatusFilter[]).map((status) => (
+              {STATUS_KEYS.map((status) => (
                 <SelectItem key={status} value={status}>
                   {STATUS_LABELS[status]}
                 </SelectItem>
@@ -156,7 +158,7 @@ export function OutreachView() {
                         <SelectValue>{STATUS_LABELS[item.status]}</SelectValue>
                       </SelectTrigger>
                       <SelectContent alignItemWithTrigger={false}>
-                        {(Object.keys(STATUS_LABELS) as StatusFilter[])
+                        {STATUS_KEYS
                           .filter((status) => status !== "all")
                           .map((status) => (
                             <SelectItem key={status} value={status}>

@@ -27,6 +27,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { Stepper } from "@/components/ui/stepper";
 import { ReviewList } from "@/components/review-list";
+import { errorMessage } from "@/lib/validators";
 import {
   TargetCreateSchema,
   TargetJsonSchema,
@@ -79,14 +80,7 @@ async function createTarget(data: TargetFormInput): Promise<void> {
   });
   if (!response.ok) {
     const body: unknown = await response.json().catch(() => null);
-    const message =
-      body !== null &&
-      typeof body === "object" &&
-      "message" in body &&
-      typeof body.message === "string"
-        ? body.message
-        : `Failed to create target (${response.status})`;
-    throw new Error(message);
+    throw new Error(errorMessage(body, `Failed to create target (${response.status})`));
   }
   const body: unknown = await response.json();
   v.parse(v.object({ target: TargetJsonSchema }), body);
@@ -189,15 +183,15 @@ function ContactStep({ form }: { form: StepForm }) {
                   field.onChange(value as TargetFormInput["source_type"])
                 }
               >
-                        <SelectTrigger id="target-source" className="w-full">
-                          <SelectValue>{SOURCE_LABELS[field.value ?? "manual"]}</SelectValue>
-                        </SelectTrigger>
-                        <SelectContent alignItemWithTrigger={false}>
-                  <SelectItem value="manual">Manual</SelectItem>
-                  <SelectItem value="linkedin">LinkedIn</SelectItem>
-                  <SelectItem value="github">GitHub</SelectItem>
-                  <SelectItem value="website">Website</SelectItem>
-                  <SelectItem value="other">Other</SelectItem>
+                <SelectTrigger id="target-source" className="w-full">
+                  <SelectValue>{SOURCE_LABELS[field.value ?? "manual"]}</SelectValue>
+                </SelectTrigger>
+                <SelectContent alignItemWithTrigger={false}>
+                  {Object.entries(SOURCE_LABELS).map(([value, label]) => (
+                    <SelectItem key={value} value={value}>
+                      {label}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             )}
@@ -301,10 +295,7 @@ export function AddTargetDialog() {
     mutationFn: createTarget,
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["targets"] });
-      setOpen(false);
-      setStep(0);
-      reset();
-      setServerError(null);
+      cancel();
     },
     onError: (error) => {
       setServerError(error instanceof Error ? error.message : "Failed to create target");
@@ -313,11 +304,7 @@ export function AddTargetDialog() {
 
   async function next(): Promise<void> {
     const fields = STEPS[step]?.fields;
-    if (!fields) {
-      return;
-    }
-    const valid = await trigger(fields);
-    if (valid) {
+    if (fields && (await trigger(fields))) {
       setStep((current) => Math.min(current + 1, LAST_STEP));
     }
   }
