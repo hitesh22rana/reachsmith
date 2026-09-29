@@ -1,5 +1,5 @@
 import { and, eq, sql } from "drizzle-orm";
-import { getWorkerDb } from "./db.ts";
+import type { WorkerDb } from "./db.ts";
 import { emailGuesses, targets } from "../db/schema.ts";
 
 // §7.5 preference order: most frequent pattern first; observed social
@@ -42,9 +42,11 @@ export function mapResult(data: VerifierResponse): TerminalStatus {
 // Only a valid candidate moves primary_email; anything else leaves the
 // target untouched. An owner's settled override wins: the provenance
 // predicate is in the WHERE, so the guard is one statement and cannot
-// race a concurrent manual write.
-export async function recomputePrimaryEmail(targetId: string): Promise<void> {
-  const db = getWorkerDb();
+// race a manual write.
+//
+// Takes the caller's tenant-scoped db rather than opening its own, so this
+// runs inside the job's RLS scope and cannot reach another tenant's row.
+export async function recomputePrimaryEmail(db: WorkerDb, targetId: string): Promise<void> {
   const guesses = await db
     .select()
     .from(emailGuesses)
