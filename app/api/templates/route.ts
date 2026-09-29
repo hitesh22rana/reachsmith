@@ -3,7 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { forUser } from "@/db";
 import { audiences, templates } from "@/db/schema";
 import { getUserId } from "@/lib/auth";
-import { toTemplateInsert, toTemplateJson } from "@/features/templates/server";
+import { readBackAudienceName, toTemplateInsert, toTemplateJson } from "@/features/templates/server";
 import { placeholderError } from "@/features/templates/render";
 import { parseBody } from "@/lib/validators";
 import { TemplateCreateSchema } from "@/features/templates/validation";
@@ -49,15 +49,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     if (!template) {
       return null;
     }
-    // The row may predate this save under different casing, so read the name
-    // back rather than echoing what was typed.
-    const [row] = await db
-      .select({ audienceName: audiences.name })
-      .from(templates)
-      .leftJoin(audiences, eq(templates.audienceId, audiences.id))
-      .where(eq(templates.id, template.id))
-      .limit(1);
-    return { template, audienceName: row?.audienceName ?? null };
+    return { template, audienceName: await readBackAudienceName(db, template.id) };
   });
   if (!created) {
     return NextResponse.json({ message: "Failed to create template" }, { status: 500 });

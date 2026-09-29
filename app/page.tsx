@@ -1,29 +1,36 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { getUserId } from "@/lib/auth";
-import { SiteFooter, SiteHeader } from "@/features/landing";
-import { FAQS, Hero } from "@/features/landing";
-import { Benefits, HowItWorks } from "@/features/landing";
-import { Faq, FinalCta } from "@/features/landing";
+import {
+  Benefits,
+  FAQS,
+  Faq,
+  FinalCta,
+  Hero,
+  HowItWorks,
+  SiteFooter,
+  SiteHeader,
+} from "@/features/landing";
+
+const TITLE = "ReachSmith | Referral outreach without the spreadsheet";
+const DESCRIPTION =
+  "Referral outreach without the spreadsheet. Keep every contact in one place, verify each email, and track every conversation to its outcome.";
 
 export const metadata: Metadata = {
-  title: "ReachSmith | Referral outreach without the spreadsheet",
-  description:
-    "Referral outreach without the spreadsheet. Keep every contact in one place, verify each email, and track every conversation to its outcome.",
+  title: TITLE,
+  description: DESCRIPTION,
   alternates: { canonical: "/" },
   openGraph: {
     type: "website",
     siteName: "ReachSmith",
     url: "/",
-    title: "ReachSmith | Referral outreach without the spreadsheet",
-    description:
-      "Referral outreach without the spreadsheet. Keep every contact in one place, verify each email, and track every conversation to its outcome.",
+    title: TITLE,
+    description: DESCRIPTION,
   },
   twitter: {
     card: "summary_large_image",
-    title: "ReachSmith | Referral outreach without the spreadsheet",
-    description:
-      "Referral outreach without the spreadsheet. Keep every contact in one place, verify each email, and track every conversation to its outcome.",
+    title: TITLE,
+    description: DESCRIPTION,
   },
 };
 
