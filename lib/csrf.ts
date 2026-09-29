@@ -9,6 +9,9 @@
 // as https://app.example.com. Kept free of any Next import so it is
 // runnable outside the app (scripts/selfcheck.ts).
 
+// GET/HEAD/OPTIONS cannot change state, so they pass regardless of Origin.
+const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
+
 export function isCrossOrigin(origin: string | null, host: string | null): boolean {
   if (origin === null) {
     return false;
@@ -22,4 +25,15 @@ export function isCrossOrigin(origin: string | null, host: string | null): boole
     // "null" (opaque origin) and anything unparseable.
     return true;
   }
+}
+
+// True when the request must be refused. Applied once in proxy.ts, so a new
+// route cannot forget it; that is the whole reason the decision lives here
+// rather than in each handler.
+export function isCsrfAttempt(
+  method: string,
+  origin: string | null,
+  host: string | null,
+): boolean {
+  return !SAFE_METHODS.has(method) && isCrossOrigin(origin, host);
 }

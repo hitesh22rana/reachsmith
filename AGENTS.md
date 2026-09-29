@@ -9,7 +9,7 @@ Follow `MEMORY.md`: it holds durable user preferences.
 
 ## Repository layout
 - `app/` contains thin route entry points and route handlers; domain code lives in `features/<name>/`. See `SPECS.md` §12.
-- `features/<name>/index.ts` exports public UI; server-only logic has a separate entry point. `components/ui/` holds shared primitives; `lib/` holds cross-feature framework setup and helpers.
+- `features/<name>/index.ts` exports public UI; server-only logic has a separate entry point. `components/ui/` holds shared primitives; `lib/` holds cross-feature framework setup and helpers. `proxy.ts` at the root is the cross-cutting request interceptor; `middleware.ts` is deprecated in Next 16.
 - `db/` contains Drizzle schema and client; `drizzle/` contains migrations. Add `lib/queues/` and standalone `workers/` with the email pipeline.
 - Env via `.env`: database URL, Redis URL, verifier API key, Better Auth secrets.
 
@@ -17,6 +17,7 @@ Follow `MEMORY.md`: it holds durable user preferences.
 - Auth = Better Auth only. No NextAuth, no hand-rolled sessions. Every domain row carries `user_id` from the session.
 - SECURITY is non-negotiable: every query filters by session `user_id`; every `:id` route re-checks ownership (404 on mismatch, never 403); never trust client-supplied `user_id` or nested `target_id`/`template_id`; workers re-verify ownership from DB before writing. Enforce in app queries + Postgres RLS where supported.
 - Validate at trust boundaries with feature-owned Valibot schemas (`features/<name>/validation.ts`) and shared `parseBody` (`lib/validators.ts`); forms use react-hook-form with the Valibot resolver; client data flows through TanStack Query, server components fetch directly.
+- Cross-cutting request concerns (CSRF origin check) live once in `proxy.ts` via `lib/csrf.ts`; per-tenant authn/authz stays in each handler — every route calls `getUserId()` itself. A Server Action posts to its page route, so it bypasses the `/api` matcher and must check origin itself.
 - No server-side LinkedIn scraping (ToS). Enrichment = manual input + compliant APIs only (`SPECS.md` §6.2, §10).
 - Outreach sending is manual in MVP: generate message, copy to clipboard, mark `sent`. No Gmail/Outlook sync, no `send-email` worker yet (`SPECS.md` §3.5, §8.1).
 - Keep Postgres enums (Drizzle pgEnum) exactly as specced: `source_type`, `enrichment_status`, `channel`, `audience_type`, `Outreach.status`, `EmailGuess.status` (`SPECS.md` §6). Template vars are `{{first_name}}`, `{{company}}`, `{{job_title}}`, `{{job_link}}`.
