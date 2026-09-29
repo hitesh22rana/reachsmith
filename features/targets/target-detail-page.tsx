@@ -8,9 +8,8 @@ import { NotesForm } from "./components/notes-form";
 import { EditTargetDialog } from "./components/edit-target-dialog";
 import { TargetEmailSection } from "@/features/email";
 import { TargetOutreachSection } from "@/features/outreach";
+import { BackLink } from "@/components/back-link";
 import { toTargetJson } from "./server";
-import { buttonVariants } from "@/components/ui/button-variants";
-import { cn } from "@/lib/utils";
 
 function Field({ label, value, href }: { label: string; value: string | null; href?: string | null }) {
   return (
@@ -58,17 +57,13 @@ export default async function TargetDetailPage({
 
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-8 px-6 py-12">
+      <BackLink href="/targets">Back to targets</BackLink>
       <div className="animate-enter flex flex-wrap items-center justify-between gap-4">
         <div className="space-y-1">
           <h1 className="text-3xl font-semibold tracking-tight">{target.fullName}</h1>
           {title ? <p className="text-muted-foreground">{title}</p> : null}
         </div>
-        <div className="flex items-center gap-2">
-          <Link href="/targets" className={cn(buttonVariants({ variant: "outline" }), "pressable")}>
-            Back to targets
-          </Link>
-          <EditTargetDialog target={toTargetJson(target)} />
-        </div>
+        <EditTargetDialog target={toTargetJson(target)} />
       </div>
 
       <section aria-label="Contact info" className="animate-enter rounded-2xl border bg-card p-6">
