@@ -9,6 +9,7 @@ import { ModeToggle } from "@/components/mode-toggle";
 import { ActivityCard, type ActivityItem } from "./components/activity-card";
 import { PipelineCard } from "./components/pipeline-card";
 import { AddFirstTargetCta, StatCards } from "./components/stat-cards";
+import { CHANNEL_LABELS } from "@/features/templates/validation";
 
 const STATUS_LABELS: Record<string, string> = {
   draft: "Draft",
@@ -17,12 +18,6 @@ const STATUS_LABELS: Record<string, string> = {
   no_response: "No response",
   rejected: "Rejected",
   success: "Success",
-};
-
-const CHANNEL_LABELS: Record<string, string> = {
-  email: "Email",
-  linkedin_dm: "LinkedIn DM",
-  other: "Other",
 };
 
 function roleAtCompany(roleTitle: string | null, company: string | null): string {
