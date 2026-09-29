@@ -1,29 +1,87 @@
-import { renderTemplate } from "@/features/templates/render";
+// Relative and with the extension, like scripts/seed.ts does for the same
+// module, so scripts/selfcheck.ts can import this file under node
+// --experimental-strip-types, which resolves no path aliases.
+import {
+  renderTemplate,
+  TARGET_VAR_NAMES,
+  type TemplateVars,
+} from "../templates/render.ts";
 import type { NewOutreach, Outreach } from "@/db/schema";
 import type { OutreachCreateInput } from "./validation";
 
+// The target fields a template placeholder can be pre-filled from. Which
+// names map here is decided by TARGET_VAR_NAMES, so the compose form and
+// the renderer agree on what a `source: "target"` placeholder means.
 export interface OutreachTarget {
   firstName: string | null;
+  lastName?: string | null;
   company: string | null;
   roleTitle: string | null;
+  location?: string | null;
+  companyWebsite?: string | null;
+  domain?: string | null;
+  primaryEmail?: string | null;
 }
 
-// Fill a template body from target contact data plus optional job context.
-// Unknown or missing placeholders stay intact; empty template renders "".
+const TARGET_VAR_VALUES: Record<
+  (typeof TARGET_VAR_NAMES)[number],
+  (target: OutreachTarget) => string | null | undefined
+> = {
+  first_name: (target) => target.firstName,
+  last_name: (target) => target.lastName,
+  company: (target) => target.company,
+  role_title: (target) => target.roleTitle,
+  // Not the target's role: templates have always fallen back to it when the
+  // caller left the job title blank, and the field is per-message editable.
+  job_title: (target) => target.roleTitle,
+  location: (target) => target.location,
+  company_website: (target) => target.companyWebsite,
+  domain: (target) => target.domain,
+  primary_email: (target) => target.primaryEmail,
+};
+
+export function targetVariables(target: OutreachTarget): TemplateVars {
+  const vars: TemplateVars = {};
+  for (const name of TARGET_VAR_NAMES) {
+    vars[name] = TARGET_VAR_VALUES[name](target) ?? undefined;
+  }
+  return vars;
+}
+
+// Fill a template body from target contact data plus the values entered for
+// whatever placeholders the template declares. Entered values win, so a
+// prefilled field can be corrected per message. Unknown or missing
+// placeholders stay intact; an empty template renders "".
 export function buildOutreachBody(
   templateBody: string | undefined,
   target: OutreachTarget,
-  opts: { job_title?: string | undefined; job_link?: string | undefined },
+  variables: Record<string, string>,
 ): string {
   if (!templateBody) {
     return "";
   }
-  return renderTemplate(templateBody, {
-    first_name: target.firstName ?? undefined,
-    company: target.company ?? undefined,
-    job_title: opts.job_title || target.roleTitle || undefined,
-    job_link: opts.job_link || undefined,
-  });
+  return renderTemplate(templateBody, { ...targetVariables(target), ...variables });
+}
+
+// The template's stored placeholder list is the allowlist for what may be
+// written to metadata. Pure, because this is the one piece of the create
+// path a test can reach without a database: submitted is fully
+// client-controlled, so anything it declares that the template does not
+// ask for is dropped rather than stored. With no template the caller chose
+// the body itself, so every key is theirs to write.
+export function pickDeclaredVariables(
+  submitted: Record<string, string>,
+  declared: readonly string[],
+  hasTemplate: boolean,
+): Record<string, string> {
+  const allowed = new Set(declared);
+  const variables: Record<string, string> = {};
+  for (const [name, value] of Object.entries(submitted)) {
+    if (value !== "" && (!hasTemplate || allowed.has(name))) {
+      variables[name] = value;
+    }
+  }
+  return variables;
 }
 
 // JSON-safe outreach, trimmed to what the client renders: dates leave
@@ -72,11 +130,10 @@ export function toOutreachInsert(
   templateId: string | null,
   data: OutreachCreateInput,
   bodyFinal: string,
+  // Already intersected with the template's declared placeholders by the
+  // route, which is the only place that knows the allowlist.
+  variables: Record<string, string>,
 ): NewOutreach {
-  const metadata =
-    data.job_title || data.job_link
-      ? { job_title: data.job_title ?? null, job_link: data.job_link ?? null }
-      : null;
   return {
     userId,
     targetId,
@@ -84,6 +141,6 @@ export function toOutreachInsert(
     channel: data.channel ?? "email",
     subject: cleanText(data.subject),
     bodyFinal,
-    metadata,
+    metadata: Object.keys(variables).length > 0 ? variables : null,
   };
 }

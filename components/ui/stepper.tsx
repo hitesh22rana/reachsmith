@@ -1,6 +1,9 @@
 import { Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 
+// Shared step indicator for the multi-step dialogs (add target, new
+// outreach). Presentation only: the owning dialog owns the current index,
+// the per-step validation gate, and where the steps go.
 export interface StepDef {
   title: string;
   description: string;

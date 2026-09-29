@@ -6,6 +6,7 @@ import { toTargetPatch } from "../features/targets/server.ts";
 // everything reached from this script must resolve without tsconfig path
 // aliases, which node --experimental-strip-types does not read.
 import { parsePlaceholders, placeholderError, renderTemplate } from "../features/templates/render.ts";
+import { pickDeclaredVariables } from "../features/outreach/server.ts";
 import * as v from "valibot";
 
 // Self-check for the security-relevant pure logic. No framework: run with
@@ -173,5 +174,28 @@ assert.equal(
 // The name is reported back so the 400 can name the offender, and it is
 // never a blank string for a real token.
 assert.match(placeholderError("Hi {{First Name}}") ?? "", /\{\{First Name\}\}/);
+
+// metadata is written from this, and the submitted key set is entirely
+// client-controlled, so a key the template never asked for must not survive.
+const declared = ["first_name", "job_title", "resume_link"];
+assert.deepEqual(
+  pickDeclaredVariables(
+    { first_name: "Aarav", job_title: "Engineer", resume_link: "", not_declared: "x" },
+    declared,
+    true,
+  ),
+  { first_name: "Aarav", job_title: "Engineer" },
+  "undeclared and empty keys are dropped when a template is chosen",
+);
+assert.deepEqual(
+  pickDeclaredVariables({ anything: "x", __proto__: "y" }, declared, true),
+  {},
+  "nothing a template did not declare gets through",
+);
+assert.deepEqual(
+  pickDeclaredVariables({ anything: "x" }, [], false),
+  { anything: "x" },
+  "a custom message owns its own key set",
+);
 
 console.log("selfcheck: ok");

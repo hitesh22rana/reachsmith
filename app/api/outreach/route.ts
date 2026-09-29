@@ -4,7 +4,12 @@ import * as v from "valibot";
 import { forUser } from "@/db";
 import { outreaches, targets, templates } from "@/db/schema";
 import { getUserId } from "@/lib/auth";
-import { buildOutreachBody, toOutreachInsert, toOutreachJson } from "@/features/outreach/server";
+import {
+  buildOutreachBody,
+  pickDeclaredVariables,
+  toOutreachInsert,
+  toOutreachJson,
+} from "@/features/outreach/server";
 import { parseBody } from "@/lib/validators";
 import { OutreachCreateSchema, OutreachStatusSchema } from "@/features/outreach/validation";
 
@@ -69,6 +74,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   }
   let templateId: string | null = null;
   let templateBody: string | undefined;
+  let declared: readonly string[] = [];
   const requestedTemplateId = parsed.data.template_id;
   if (requestedTemplateId) {
     const [template] = await forUser(userId, (db) =>
@@ -83,13 +89,19 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     }
     templateId = template.id;
     templateBody = template.body;
+    declared = template.placeholders.map((placeholder) => placeholder.name);
   }
+  // The template's stored placeholder list is the allowlist for metadata.
+  // A submitted key the template does not declare is dropped rather than
+  // stored, so this column cannot be used to smuggle unbounded data or to
+  // attach values to a template that never asked for them.
+  const variables = pickDeclaredVariables(
+    parsed.data.variables,
+    declared,
+    templateId !== null,
+  );
   const bodyFinal =
-    parsed.data.body ||
-    buildOutreachBody(templateBody, target, {
-      job_title: parsed.data.job_title,
-      job_link: parsed.data.job_link,
-    });
+    parsed.data.body || buildOutreachBody(templateBody, target, variables);
   if (!bodyFinal) {
     return NextResponse.json(
       { message: "Provide a template or message text" },
@@ -99,7 +111,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   const [outreach] = await forUser(userId, (db) =>
     db
       .insert(outreaches)
-      .values(toOutreachInsert(userId, target.id, templateId, parsed.data, bodyFinal))
+      .values(toOutreachInsert(userId, target.id, templateId, parsed.data, bodyFinal, variables))
       .returning(),
   );
   if (!outreach) {

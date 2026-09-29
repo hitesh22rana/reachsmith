@@ -3,7 +3,9 @@ import { and, eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import * as schema from "../db/schema.ts";
-import { renderTemplate } from "../features/templates/render.ts";
+// render.ts is imported relatively and by extension because this script
+// runs under node --experimental-strip-types, which has no path aliases.
+import { parsePlaceholders, renderTemplate } from "../features/templates/render.ts";
 
 // Local test data: one target, two templates, two outreach rows.
 // Usage: pnpm db:seed you@example.com (must already have signed up).
@@ -65,33 +67,55 @@ async function main(): Promise<void> {
     throw new Error("Failed to insert seed target");
   }
 
+  // Free-text audiences, one row each, exactly as the templates API
+  // resolve-or-create would.
+  const audienceIds = new Map<string, string>();
+  for (const name of ["Founder", "Recruiter"]) {
+    const [row] = await db
+      .insert(schema.audiences)
+      .values({ userId: user.id, name })
+      .onConflictDoNothing()
+      .returning({ id: schema.audiences.id });
+    audienceIds.set(name.toLowerCase(), row?.id ?? "");
+  }
+
+  const referralBody =
+    "Hi {{first_name}},\n\nI saw the {{job_title}} opening at {{company}} ({{job_link}}) and it matches my work closely. Would you be open to a quick chat or a referral?\n\nMy resume is here: {{resume_link}}\n\nThanks!";
+  const introBody =
+    "Hi {{first_name}}, I am exploring {{job_title}} roles at {{company}}. Mind if I send over a short note about my background?";
   const [referral] = await db
     .insert(schema.templates)
     .values({
       userId: user.id,
-      name: "Referral request – backend role",
+      name: "Referral request, backend role",
       channel: "email",
-      audienceType: "engineer",
+      audienceId: audienceIds.get("founder") || null,
       purpose: "referral_request",
-      body: "Hi {{first_name}},\n\nI saw the {{job_title}} opening at {{company}} ({{job_link}}) and it matches my work closely. Would you be open to a quick chat or a referral?\n\nThanks!",
+      body: referralBody,
+      placeholders: parsePlaceholders(referralBody).placeholders,
     })
     .returning();
   const [intro] = await db
     .insert(schema.templates)
     .values({
       userId: user.id,
-      name: "Cold intro – recruiter",
+      name: "Cold intro, recruiter",
       channel: "linkedin_dm",
-      audienceType: "recruiter",
+      audienceId: audienceIds.get("recruiter") || null,
       purpose: "cold_intro",
-      body: "Hi {{first_name}}, I am exploring {{job_title}} roles at {{company}}. Mind if I send over a short note about my background?",
+      body: introBody,
+      placeholders: parsePlaceholders(introBody).placeholders,
     })
     .returning();
   if (!referral || !intro) {
     throw new Error("Failed to insert seed templates");
   }
 
-  const jobLink = "https://example.com/jobs/backend-1";
+  const variables = {
+    job_title: "Senior Backend Engineer",
+    job_link: "https://example.com/jobs/backend-1",
+    resume_link: "https://example.com/aarav/resume.pdf",
+  };
   await db.insert(schema.outreaches).values({
     userId: user.id,
     targetId: target.id,
@@ -101,11 +125,10 @@ async function main(): Promise<void> {
     bodyFinal: renderTemplate(referral.body, {
       first_name: target.firstName ?? undefined,
       company: target.company ?? undefined,
-      job_title: "Senior Backend Engineer",
-      job_link: jobLink,
+      ...variables,
     }),
     status: "draft",
-    metadata: { job_title: "Senior Backend Engineer", job_link: jobLink },
+    metadata: variables,
   });
   await db.insert(schema.outreaches).values({
     userId: user.id,
@@ -118,7 +141,7 @@ async function main(): Promise<void> {
     sentAt: new Date(),
   });
 
-  console.log(`Seeded 1 target, 2 templates, 2 outreach rows for ${email}.`);
+  console.log(`Seeded 1 target, 2 audiences, 2 templates, 2 outreach rows for ${email}.`);
   process.exit(0);
 }
 
