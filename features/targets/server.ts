@@ -21,7 +21,7 @@ export function toTargetJson(target: Target): TargetJson {
 }
 
 function cleanText(value: string | undefined): string | null {
-  return value === undefined || value === "" ? null : value;
+  return value || null;
 }
 
 function cleanUrls(value: string | undefined): string[] | null {

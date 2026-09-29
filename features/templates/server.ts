@@ -33,7 +33,7 @@ export function toTemplateJson(template: Template, audienceName: string | null):
 }
 
 function cleanText(value: string | undefined): string | null {
-  return value === undefined || value === "" ? null : value;
+  return value || null;
 }
 
 export async function toTemplateInsert(
