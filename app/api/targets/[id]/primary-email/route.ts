@@ -3,7 +3,6 @@ import { NextResponse, type NextRequest } from "next/server";
 import { getDb } from "@/db";
 import { targets } from "@/db/schema";
 import { getUserId } from "@/lib/auth";
-import { isCrossOrigin } from "@/lib/csrf";
 import { toTargetJson } from "@/features/targets/server";
 import { parseBody } from "@/lib/validators";
 import { PrimaryEmailSchema } from "@/features/email/validation";
@@ -13,9 +12,6 @@ interface RouteContext {
 }
 
 export async function PATCH(request: NextRequest, context: RouteContext): Promise<NextResponse> {
-  if (isCrossOrigin(request.headers.get("origin"), request.headers.get("host"))) {
-    return NextResponse.json({ message: "Forbidden" }, { status: 403 });
-  }
   const userId = await getUserId();
   if (!userId) {
     return NextResponse.json({ message: "Unauthorized" }, { status: 401 });

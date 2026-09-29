@@ -3,7 +3,6 @@ import { NextResponse, type NextRequest } from "next/server";
 import { getDb } from "@/db";
 import { templates } from "@/db/schema";
 import { getUserId } from "@/lib/auth";
-import { isCrossOrigin } from "@/lib/csrf";
 import { toTemplateInsert, toTemplateJson } from "@/features/templates/server";
 import { parseBody } from "@/lib/validators";
 import { TemplateCreateSchema } from "@/features/templates/validation";
@@ -22,9 +21,6 @@ export async function GET(): Promise<NextResponse> {
 }
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
-  if (isCrossOrigin(request.headers.get("origin"), request.headers.get("host"))) {
-    return NextResponse.json({ message: "Forbidden" }, { status: 403 });
-  }
   const userId = await getUserId();
   if (!userId) {
     return NextResponse.json({ message: "Unauthorized" }, { status: 401 });

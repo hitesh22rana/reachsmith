@@ -4,7 +4,6 @@ import * as v from "valibot";
 import { getDb } from "@/db";
 import { outreaches, targets, templates } from "@/db/schema";
 import { getUserId } from "@/lib/auth";
-import { isCrossOrigin } from "@/lib/csrf";
 import { buildOutreachBody, toOutreachInsert, toOutreachJson } from "@/features/outreach/server";
 import { parseBody } from "@/lib/validators";
 import { OutreachCreateSchema, OutreachStatusSchema } from "@/features/outreach/validation";
@@ -48,9 +47,6 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 }
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
-  if (isCrossOrigin(request.headers.get("origin"), request.headers.get("host"))) {
-    return NextResponse.json({ message: "Forbidden" }, { status: 403 });
-  }
   const userId = await getUserId();
   if (!userId) {
     return NextResponse.json({ message: "Unauthorized" }, { status: 401 });

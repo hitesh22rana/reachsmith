@@ -28,6 +28,7 @@ Foundation, targets. Trigger is `POST /api/targets` and `PATCH /api/targets/[id]
 ## Security
 - Workers never trust job payloads: reload `target`/`EmailGuess` from DB and confirm `user_id` chain before any read/write; mismatched or missing ownership → drop the job, write nothing. The same chain check guards the `failed`-listener recovery write.
 - `primary_email` write-back stays inside the target owner's row, and the recompute additionally requires the row not be marked `manual`. Candidate-list/manual-override endpoints are `user_id`-scoped (404 on mismatch).
+- CSRF is applied once in `proxy.ts` (matcher `/api/:path*`) via `isCsrfAttempt` in `lib/csrf.ts`, not repeated per handler, so a new route cannot forget it. Authentication and authorization stay in the handlers: every route still calls `getUserId()` and 404s a foreign id. A Server Action would post to its page route and bypass the matcher, so one must re-check origin itself.
 - The model is resolved from the baked, revision-pinned weights in `HF_MODEL_CACHE` (a directory, resolved with `resolveModelFile(file#rev, dir)`), so the shipped worker makes no model egress at runtime.
 - Verifier API key stays server-side in workers only; rate-limit verify jobs.
 

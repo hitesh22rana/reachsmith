@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { isCrossOrigin } from "../lib/csrf.ts";
+import { isCrossOrigin, isCsrfAttempt } from "../lib/csrf.ts";
 import { OptionalUrlSchema, TargetPatchSchema } from "../features/targets/validation.ts";
 import { toTargetPatch } from "../features/targets/server.ts";
 import * as v from "valibot";
@@ -8,11 +8,13 @@ import * as v from "valibot";
 //   node --experimental-strip-types --no-warnings scripts/selfcheck.ts
 
 const HOST = "app.example.com";
+const CROSS = "https://evil.example";
+const SAME = `https://${HOST}`;
 
 // CSRF: only a present-and-foreign Origin is rejected.
 assert.equal(isCrossOrigin(null, HOST), false, "missing Origin allowed (non-browser client)");
-assert.equal(isCrossOrigin(`https://${HOST}`, HOST), false, "same origin allowed");
-assert.equal(isCrossOrigin("https://evil.example", HOST), true, "cross origin rejected");
+assert.equal(isCrossOrigin(SAME, HOST), false, "same origin allowed");
+assert.equal(isCrossOrigin(CROSS, HOST), true, "cross origin rejected");
 assert.equal(isCrossOrigin("null", HOST), true, "opaque origin rejected");
 assert.equal(isCrossOrigin("not-a-url", HOST), true, "unparseable origin rejected");
 assert.equal(
@@ -20,12 +22,46 @@ assert.equal(
   true,
   "same host, different port rejected",
 );
-assert.equal(isCrossOrigin(`https://${HOST}`, null), true, "no host header is not a match");
+assert.equal(isCrossOrigin(SAME, null), true, "no host header is not a match");
 assert.equal(
-  isCrossOrigin(`https://${HOST}`, `https://${HOST}`),
+  isCrossOrigin(SAME, `https://${HOST}`),
   true,
   "host header is host:port, not the full origin",
 );
+
+// The proxy is the only CSRF gate now, so this method filter is
+// load-bearing. Every mutating route must be refused cross-origin and
+// allowed same-origin; every read must pass either way.
+const ROUTES: ReadonlyArray<readonly [string, string]> = [
+  ["POST", "/api/targets"],
+  ["GET", "/api/targets"],
+  ["PATCH", "/api/targets/t1"],
+  ["DELETE", "/api/targets/t1"],
+  ["PATCH", "/api/targets/t1/primary-email"],
+  ["GET", "/api/targets/t1/guesses"],
+  ["POST", "/api/outreach"],
+  ["GET", "/api/outreach"],
+  ["PATCH", "/api/outreach/o1"],
+  ["POST", "/api/templates"],
+  ["PATCH", "/api/templates/t1"],
+  ["DELETE", "/api/templates/t1"],
+  ["POST", "/api/auth/sign-in/email"],
+];
+for (const [method, path] of ROUTES) {
+  const safe = method === "GET" || method === "HEAD" || method === "OPTIONS";
+  assert.equal(
+    isCsrfAttempt(method, CROSS, HOST),
+    !safe,
+    `${method} ${path} ${safe ? "passes through" : "rejects cross origin"}`,
+  );
+  assert.equal(isCsrfAttempt(method, SAME, HOST), false, `${method} ${path} allows same origin`);
+  assert.equal(
+    isCsrfAttempt(method, null, HOST),
+    false,
+    `${method} ${path} allows a non-browser client with no Origin`,
+  );
+}
+
 
 // URL scheme: v.url() accepts these, the rendered href would execute them.
 for (const hostile of [
