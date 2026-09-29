@@ -149,13 +149,7 @@ async function rank(
     }
     // Omitted candidates keep deterministic positions.
     const placed = new Set(ranked);
-    for (const candidate of candidates) {
-      if (!placed.has(candidate.id)) {
-        placed.add(candidate.id);
-        ranked.push(candidate.id);
-      }
-    }
-    return ranked;
+    return [...ranked, ...candidates.map((c) => c.id).filter((id) => !placed.has(id))];
   } catch (error) {
     console.error("SLM ranking failed, using deterministic order", error);
     return null;

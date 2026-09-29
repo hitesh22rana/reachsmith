@@ -34,7 +34,7 @@ export async function processGuessJob(job: { data: { targetId: string; userId: s
     }
     const nameParts = target.fullName.trim().split(/\s+/);
     const firstName = target.firstName ?? nameParts[0];
-    const lastName = target.lastName ?? nameParts.slice(1).join(" ") ?? undefined;
+    const lastName = target.lastName ?? nameParts.slice(1).join(" ");
 
     const ranked = rankCandidates({
       first_name: firstName,

@@ -82,13 +82,11 @@ export async function processVerifyJob(job: {
     await setStatus(db, guess, "verifying", guess.verificationMeta);
 
     const domain = guess.email.split("@")[1] ?? "";
-    try {
-      const records = await dns.resolveMx(domain);
-      if (records.length === 0) {
-        await setStatus(db, guess, "invalid", { reason: "no-mx" });
-        return;
-      }
-    } catch {
+    const hasMx = await dns.resolveMx(domain).then(
+      (records) => records.length > 0,
+      () => false,
+    );
+    if (!hasMx) {
       await setStatus(db, guess, "invalid", { reason: "no-mx" });
       return;
     }
