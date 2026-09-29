@@ -1,6 +1,6 @@
 -- Tenant isolation via row-level security.
 --
--- Scope: the four domain tables only. Better Auth owns users, sessions,
+-- Scope: the domain tables only. Better Auth owns users, sessions,
 -- accounts and verifications and does its own token-scoped lookups, so a
 -- policy there would break the library's own queries.
 --
@@ -55,6 +55,8 @@ ALTER TABLE "targets" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "targets" FORCE ROW LEVEL SECURITY;
 ALTER TABLE "templates" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "templates" FORCE ROW LEVEL SECURITY;
+ALTER TABLE "audiences" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "audiences" FORCE ROW LEVEL SECURITY;
 ALTER TABLE "outreaches" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "outreaches" FORCE ROW LEVEL SECURITY;
 ALTER TABLE "email_guesses" ENABLE ROW LEVEL SECURITY;
@@ -68,6 +70,10 @@ CREATE POLICY "tenant_isolation" ON "targets"
   WITH CHECK (user_id = nullif(current_setting('app.user_id', true), ''));
 --> statement-breakpoint
 CREATE POLICY "tenant_isolation" ON "templates"
+  USING (user_id = nullif(current_setting('app.user_id', true), ''))
+  WITH CHECK (user_id = nullif(current_setting('app.user_id', true), ''));
+--> statement-breakpoint
+CREATE POLICY "tenant_isolation" ON "audiences"
   USING (user_id = nullif(current_setting('app.user_id', true), ''))
   WITH CHECK (user_id = nullif(current_setting('app.user_id', true), ''));
 --> statement-breakpoint

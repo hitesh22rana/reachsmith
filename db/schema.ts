@@ -1,5 +1,15 @@
-import { relations } from "drizzle-orm";
-import { pgTable, text, timestamp, boolean, index, integer, jsonb, pgEnum } from "drizzle-orm/pg-core";
+import { relations, sql } from "drizzle-orm";
+import {
+  pgTable,
+  text,
+  timestamp,
+  boolean,
+  index,
+  uniqueIndex,
+  integer,
+  jsonb,
+  pgEnum,
+} from "drizzle-orm/pg-core";
 
 // Convention: table names and their consts are always plural.
 // Better Auth models map to these tables explicitly in lib/auth.ts.
@@ -153,13 +163,40 @@ export type NewTarget = typeof targets.$inferInsert;
 
 export const channelEnum = pgEnum("channel", ["email", "linkedin_dm", "other"]);
 
-export const audienceTypeEnum = pgEnum("audience_type", [
-  "hr",
-  "recruiter",
-  "engineer",
-  "founder",
-  "generic",
-]);
+// Free-text audience tags the caller can reuse across templates. The old
+// audience_type enum was wrong the moment someone was a designer, so the
+// set is open and these rows are the presets. Names are unique per user,
+// case-insensitively, which also makes resolve-or-create a single
+// ON CONFLICT DO NOTHING away.
+export const audiences = pgTable(
+  "audiences",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("audiences_user_id_idx").on(table.userId),
+    uniqueIndex("audiences_user_id_name_key").on(table.userId, sql`lower(${table.name})`),
+  ],
+);
+
+export type Audience = typeof audiences.$inferSelect;
+export type NewAudience = typeof audiences.$inferInsert;
+
+// One entry per {{placeholder}} found in a template body, stored so the
+// compose form does not re-parse the body to know what to ask for. Written
+// server-side from the body on every save; never read from the client.
+export interface Placeholder {
+  name: string;
+  label: string;
+  source: "target" | "input";
+}
 
 export const templates = pgTable(
   "templates",
@@ -172,9 +209,14 @@ export const templates = pgTable(
       .references(() => users.id, { onDelete: "cascade" }),
     name: text("name").notNull(),
     channel: channelEnum("channel").notNull().default("email"),
-    audienceType: audienceTypeEnum("audience_type").notNull().default("generic"),
+    // set null, not restrict: deleting a preset should unlink the templates
+    // that used it, never block the delete.
+    audienceId: text("audience_id").references(() => audiences.id, {
+      onDelete: "set null",
+    }),
     purpose: text("purpose"),
     body: text("body").notNull(),
+    placeholders: jsonb("placeholders").$type<Placeholder[]>().notNull().default([]),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at")
       .defaultNow()
@@ -217,7 +259,9 @@ export const outreaches = pgTable(
     status: outreachStatusEnum("status").notNull().default("draft"),
     sentAt: timestamp("sent_at"),
     lastStatusChangeAt: timestamp("last_status_change_at").defaultNow().notNull(),
-    metadata: jsonb("metadata"),
+    // Filled values for whatever placeholders the chosen template declared,
+    // e.g. { job_title: "…", job_link: "…" }. Null for a custom message.
+    metadata: jsonb("metadata").$type<Record<string, string> | null>(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at")
       .defaultNow()
