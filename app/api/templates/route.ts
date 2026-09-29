@@ -1,9 +1,10 @@
 import { desc, eq } from "drizzle-orm";
 import { NextResponse, type NextRequest } from "next/server";
 import { forUser } from "@/db";
-import { templates } from "@/db/schema";
+import { audiences, templates } from "@/db/schema";
 import { getUserId } from "@/lib/auth";
 import { toTemplateInsert, toTemplateJson } from "@/features/templates/server";
+import { placeholderError } from "@/features/templates/render";
 import { parseBody } from "@/lib/validators";
 import { TemplateCreateSchema } from "@/features/templates/validation";
 
@@ -14,12 +15,15 @@ export async function GET(): Promise<NextResponse> {
   }
   const rows = await forUser(userId, (db) =>
     db
-      .select()
+      .select({ template: templates, audienceName: audiences.name })
       .from(templates)
+      .leftJoin(audiences, eq(templates.audienceId, audiences.id))
       .where(eq(templates.userId, userId))
       .orderBy(desc(templates.createdAt)),
   );
-  return NextResponse.json({ templates: rows.map(toTemplateJson) });
+  return NextResponse.json({
+    templates: rows.map((row) => toTemplateJson(row.template, row.audienceName)),
+  });
 }
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
@@ -31,14 +35,35 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   if (!parsed.ok) {
     return NextResponse.json({ message: parsed.message }, { status: 400 });
   }
-  const [template] = await forUser(userId, (db) =>
-    db
+  // The schema's check is static so the form can show it; this is the same
+  // problem with the offending placeholder named.
+  const problem = placeholderError(parsed.data.body);
+  if (problem) {
+    return NextResponse.json({ message: problem }, { status: 400 });
+  }
+  const created = await forUser(userId, async (db) => {
+    const [template] = await db
       .insert(templates)
-      .values(toTemplateInsert(userId, parsed.data))
-      .returning(),
-  );
-  if (!template) {
+      .values(await toTemplateInsert(db, userId, parsed.data))
+      .returning();
+    if (!template) {
+      return null;
+    }
+    // The row may predate this save under different casing, so read the name
+    // back rather than echoing what was typed.
+    const [row] = await db
+      .select({ audienceName: audiences.name })
+      .from(templates)
+      .leftJoin(audiences, eq(templates.audienceId, audiences.id))
+      .where(eq(templates.id, template.id))
+      .limit(1);
+    return { template, audienceName: row?.audienceName ?? null };
+  });
+  if (!created) {
     return NextResponse.json({ message: "Failed to create template" }, { status: 500 });
   }
-  return NextResponse.json({ template: toTemplateJson(template) }, { status: 201 });
+  return NextResponse.json(
+    { template: toTemplateJson(created.template, created.audienceName) },
+    { status: 201 },
+  );
 }
