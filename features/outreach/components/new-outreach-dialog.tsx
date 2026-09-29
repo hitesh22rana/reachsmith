@@ -405,11 +405,11 @@ function StepFooter({
     return (
       <div className="grid grid-cols-2 gap-4">
         {step === 0 ? (
-          <Button type="button" variant="ghost" onClick={onCancel} className="justify-start px-3">
+          <Button type="button" variant="secondary" onClick={onCancel}>
             Cancel
           </Button>
         ) : (
-          <Button type="button" variant="outline" onClick={onBack} className="pressable">
+          <Button type="button" variant="secondary" onClick={onBack} className="pressable">
             <ArrowLeft aria-hidden="true" />
             Previous
           </Button>
@@ -423,12 +423,7 @@ function StepFooter({
   }
   return (
     <div className="flex flex-col gap-2">
-      <Button
-        type="button"
-        variant="ghost"
-        onClick={onBack}
-        className="self-start px-3"
-      >
+      <Button type="button" variant="secondary" onClick={onBack} className="self-start">
         <ArrowLeft aria-hidden="true" />
         Previous
       </Button>

@@ -380,17 +380,13 @@ export function AddTargetDialog() {
           ) : null}
           <div className="grid grid-cols-2 gap-4">
             {step === 0 ? (
-              <button
-                type="button"
-                onClick={cancel}
-                className="rounded-lg px-3 py-2 text-base font-semibold text-muted-foreground transition-colors outline-none hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50"
-              >
+              <Button type="button" variant="secondary" onClick={cancel}>
                 Cancel
-              </button>
+              </Button>
             ) : (
               <Button
                 type="button"
-                variant="outline"
+                variant="secondary"
                 onClick={() => setStep((current) => current - 1)}
                 className="pressable"
               >
