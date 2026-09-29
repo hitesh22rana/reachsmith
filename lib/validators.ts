@@ -20,3 +20,12 @@ export function parseBody<TSchema extends v.GenericSchema>(
   const path = first.path?.map((segment) => String(segment.key)).join(".");
   return { ok: false, message: path ? `${path}: ${first.message}` : first.message };
 }
+
+const ErrorBodySchema = v.object({ message: v.optional(v.string()) });
+
+// The message a route returned, or the caller's own text. A body that is not
+// JSON at all, or carries no string message, falls back rather than throwing.
+export function errorMessage(body: unknown, fallback: string): string {
+  const parsed = v.safeParse(ErrorBodySchema, body);
+  return (parsed.success ? parsed.output.message : undefined) ?? fallback;
+}

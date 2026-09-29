@@ -33,6 +33,7 @@ import {
   AutocompleteItem,
   AutocompleteList,
 } from "@/components/ui/autocomplete";
+import { errorMessage } from "@/lib/validators";
 import { AudienceListSchema, type ApiAudience } from "@/features/audiences/validation";
 import { PLACEHOLDER_MAX, parsePlaceholders, type Placeholder } from "../render";
 import {
@@ -71,14 +72,7 @@ async function saveTemplate(id: string | null, data: TemplateFormInput): Promise
   });
   if (!response.ok) {
     const body: unknown = await response.json().catch(() => null);
-    const message =
-      body !== null &&
-      typeof body === "object" &&
-      "message" in body &&
-      typeof body.message === "string"
-        ? body.message
-        : `Failed to save template (${response.status})`;
-    throw new Error(message);
+    throw new Error(errorMessage(body, `Failed to save template (${response.status})`));
   }
   const body: unknown = await response.json();
   v.parse(v.object({ template: TemplateJsonSchema }), body);
@@ -121,7 +115,8 @@ function AudienceField({
         render={({ field }) => {
           const value = field.value ?? "";
           const preset = presets.find(
-            (item) => item.id !== null && item.name.toLowerCase() === value.trim().toLowerCase(),
+            (item): item is ApiAudience & { id: string } =>
+              item.id !== null && item.name.toLowerCase() === value.trim().toLowerCase(),
           );
           return (
             <>
@@ -158,7 +153,7 @@ function AudienceField({
                   size="sm"
                   disabled={removing}
                   onClick={() => {
-                    onRemove(preset.id as string);
+                    onRemove(preset.id);
                     setValue("audience", "");
                   }}
                   className="self-start px-0 text-muted-foreground"
@@ -176,8 +171,7 @@ function AudienceField({
   );
 }
 
-// What the body will ask for when composing, or exactly what is wrong with
-// it. Same list the server validates against, so the two cannot disagree.
+// Same list the server validates against, so the two cannot disagree.
 function PlaceholderHints({
   placeholders,
   issues,

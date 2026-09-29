@@ -14,8 +14,8 @@ function useMounted() {
   return useSyncExternalStore(subscribe, () => true, () => false);
 }
 
-// Single-button light/dark toggle. Renders a sized placeholder until
-// mounted so server and client HTML match (theme is client-only state).
+// Renders a sized placeholder until mounted so server and client HTML match
+// (theme is client-only state).
 export function ModeToggle() {
   const { resolvedTheme, setTheme } = useTheme();
   const mounted = useMounted();
