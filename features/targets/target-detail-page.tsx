@@ -116,8 +116,13 @@ export default async function TargetDetailPage({
           target={{
             id: target.id,
             firstName: target.firstName,
+            lastName: target.lastName,
             company: target.company,
             roleTitle: target.roleTitle,
+            location: target.location,
+            companyWebsite: target.companyWebsite,
+            domain: target.domain,
+            primaryEmail: target.primaryEmail,
           }}
         />
       </section>
