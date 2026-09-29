@@ -1,5 +1,5 @@
 import { headers } from "next/headers";
-import { count, desc, eq, inArray } from "drizzle-orm";
+import { and, count, desc, eq, inArray } from "drizzle-orm";
 import { getDb } from "@/db";
 import { outreaches, targets, templates } from "@/db/schema";
 import { auth, requireUserId } from "@/lib/auth";
@@ -98,7 +98,7 @@ export default async function DashboardPage() {
       ? await db
           .select({ id: targets.id, fullName: targets.fullName })
           .from(targets)
-          .where(inArray(targets.id, outreachTargetIds))
+          .where(and(eq(targets.userId, userId), inArray(targets.id, outreachTargetIds)))
       : [];
   const targetNames = new Map(outreachTargets.map((t) => [t.id, t.fullName]));
 

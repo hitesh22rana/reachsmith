@@ -3,6 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { getDb } from "@/db";
 import { targets } from "@/db/schema";
 import { getUserId } from "@/lib/auth";
+import { isCrossOrigin } from "@/lib/csrf";
 import { enqueueEmailGuess } from "@/lib/queues/email";
 import { toTargetJson, toTargetPatch } from "@/features/targets/server";
 import { parseBody } from "@/lib/validators";
@@ -34,6 +35,9 @@ export async function GET(_request: NextRequest, context: RouteContext): Promise
 }
 
 export async function PATCH(request: NextRequest, context: RouteContext): Promise<NextResponse> {
+  if (isCrossOrigin(request.headers.get("origin"), request.headers.get("host"))) {
+    return NextResponse.json({ message: "Forbidden" }, { status: 403 });
+  }
   const userId = await getUserId();
   if (!userId) {
     return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
@@ -63,7 +67,10 @@ export async function PATCH(request: NextRequest, context: RouteContext): Promis
   return NextResponse.json({ target: toTargetJson(updated) });
 }
 
-export async function DELETE(_request: NextRequest, context: RouteContext): Promise<NextResponse> {
+export async function DELETE(request: NextRequest, context: RouteContext): Promise<NextResponse> {
+  if (isCrossOrigin(request.headers.get("origin"), request.headers.get("host"))) {
+    return NextResponse.json({ message: "Forbidden" }, { status: 403 });
+  }
   const userId = await getUserId();
   if (!userId) {
     return NextResponse.json({ message: "Unauthorized" }, { status: 401 });

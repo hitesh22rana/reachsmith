@@ -123,6 +123,12 @@ export const targets = pgTable(
     company: text("company"),
     roleTitle: text("role_title"),
     primaryEmail: text("primary_email"),
+    // Who settled the column: "manual" is an owner decision and outranks the
+    // pipeline; "verified" was written by recomputePrimaryEmail from a valid
+    // guess. Null = never set. Without this marker the two authorized writers
+    // are indistinguishable and a later valid guess silently overwrites the
+    // owner's own value.
+    primaryEmailSource: text("primary_email_source").$type<"manual" | "verified">(),
     sourceType: sourceTypeEnum("source_type").notNull().default("manual"),
     enrichmentStatus: enrichmentStatusEnum("enrichment_status")
       .notNull()
@@ -258,7 +264,10 @@ export const emailGuesses = pgTable(
       .$onUpdate(() => /* @__PURE__ */ new Date())
       .notNull(),
   },
-  (table) => [index("email_guesses_target_id_idx").on(table.targetId)],
+  (table) => [
+    index("email_guesses_target_id_idx").on(table.targetId),
+    index("email_guesses_user_id_idx").on(table.userId),
+  ],
 );
 
 export type EmailGuess = typeof emailGuesses.$inferSelect;

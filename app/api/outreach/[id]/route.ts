@@ -3,6 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { getDb } from "@/db";
 import { outreaches, targets } from "@/db/schema";
 import { getUserId } from "@/lib/auth";
+import { isCrossOrigin } from "@/lib/csrf";
 import { toOutreachJson } from "@/features/outreach/server";
 import { parseBody } from "@/lib/validators";
 import { OutreachPatchSchema } from "@/features/outreach/validation";
@@ -12,6 +13,9 @@ interface RouteContext {
 }
 
 export async function PATCH(request: NextRequest, context: RouteContext): Promise<NextResponse> {
+  if (isCrossOrigin(request.headers.get("origin"), request.headers.get("host"))) {
+    return NextResponse.json({ message: "Forbidden" }, { status: 403 });
+  }
   const userId = await getUserId();
   if (!userId) {
     return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
@@ -30,6 +34,7 @@ export async function PATCH(request: NextRequest, context: RouteContext): Promis
     return NextResponse.json({ message: "Not found" }, { status: 404 });
   }
   const now = new Date();
+  // Owner predicate repeats inside the write, not just in the read above.
   const [updated] = await getDb()
     .update(outreaches)
     .set({
@@ -38,7 +43,7 @@ export async function PATCH(request: NextRequest, context: RouteContext): Promis
       lastStatusChangeAt: now,
       updatedAt: now,
     })
-    .where(eq(outreaches.id, row.outreach.id))
+    .where(and(eq(outreaches.id, row.outreach.id), eq(outreaches.userId, userId)))
     .returning();
   if (!updated) {
     return NextResponse.json({ message: "Not found" }, { status: 404 });

@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { getWorkerDb } from "./db.ts";
 import { emailGuesses, targets } from "../db/schema.ts";
 
@@ -40,7 +40,9 @@ export function mapResult(data: VerifierResponse): TerminalStatus {
 }
 
 // Only a valid candidate moves primary_email; anything else leaves the
-// target untouched (a manual override must survive an empty pipeline run).
+// target untouched. An owner's settled override wins: the provenance
+// predicate is in the WHERE, so the guard is one statement and cannot
+// race a concurrent manual write.
 export async function recomputePrimaryEmail(targetId: string): Promise<void> {
   const db = getWorkerDb();
   const guesses = await db
@@ -62,6 +64,12 @@ export async function recomputePrimaryEmail(targetId: string): Promise<void> {
   }
   await db
     .update(targets)
-    .set({ primaryEmail: best.email, updatedAt: new Date() })
-    .where(and(eq(targets.id, targetId), eq(targets.userId, best.userId)));
+    .set({ primaryEmail: best.email, primaryEmailSource: "verified", updatedAt: new Date() })
+    .where(
+      and(
+        eq(targets.id, targetId),
+        eq(targets.userId, best.userId),
+        sql`${targets.primaryEmailSource} is distinct from 'manual'`,
+      ),
+    );
 }

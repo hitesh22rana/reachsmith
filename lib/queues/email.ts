@@ -46,6 +46,11 @@ export function enqueueEmailVerify(candidateId: string): Promise<unknown> {
   return getVerifyQueue().add(
     "verify",
     { candidateId },
-    { attempts: 3, backoff: { type: "exponential", delay: 5000 } },
+    {
+      attempts: 3,
+      backoff: { type: "exponential", delay: 5000 },
+      // Failed jobs are pointless once the row has been settled to `unknown`.
+      removeOnFail: true,
+    },
   );
 }

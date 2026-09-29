@@ -1,5 +1,5 @@
 import "dotenv/config";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import * as schema from "../db/schema.ts";
@@ -37,7 +37,7 @@ async function main(): Promise<void> {
   const [existing] = await db
     .select({ id: schema.targets.id })
     .from(schema.targets)
-    .where(eq(schema.targets.fullName, SEED_TARGET))
+    .where(and(eq(schema.targets.fullName, SEED_TARGET), eq(schema.targets.userId, user.id)))
     .limit(1);
   if (existing) {
     console.log("Seed data already present, nothing to do.");
