@@ -1,14 +1,20 @@
 import { Queue } from "bullmq";
 
 // Queue payloads carry IDs only; workers reload rows and re-verify
-// ownership from the DB before any read or write.
+// ownership from the DB before any read or write. The userId rides along
+// because tenant RLS is scoped by a transaction-local GUC, and the worker
+// has to set that before its first read (it looks the target up by id alone).
+// The worker treats it as a scope, not a grant, and re-checks the ownership
+// chain regardless.
 
 interface GuessJob {
   targetId: string;
+  userId: string;
 }
 
 interface VerifyJob {
   candidateId: string;
+  userId: string;
 }
 
 // Lazy: importing this module never connects, so pages render without env
@@ -38,14 +44,14 @@ function getVerifyQueue(): Queue<VerifyJob> {
   return verifyQueue;
 }
 
-export function enqueueEmailGuess(targetId: string): Promise<unknown> {
-  return getGuessQueue().add("guess", { targetId });
+export function enqueueEmailGuess(targetId: string, userId: string): Promise<unknown> {
+  return getGuessQueue().add("guess", { targetId, userId });
 }
 
-export function enqueueEmailVerify(candidateId: string): Promise<unknown> {
+export function enqueueEmailVerify(candidateId: string, userId: string): Promise<unknown> {
   return getVerifyQueue().add(
     "verify",
-    { candidateId },
+    { candidateId, userId },
     {
       attempts: 3,
       backoff: { type: "exponential", delay: 5000 },
