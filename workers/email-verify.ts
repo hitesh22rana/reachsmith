@@ -19,8 +19,8 @@ function redisConnection() {
   return { url };
 }
 
-// Bounded so one hung provider cannot pin a job — and the row it set to
-// "verifying" — for the lifetime of the process.
+// Bounded so one hung provider cannot pin a job, and the row it set to
+// "verifying", for the lifetime of the process.
 const VERIFIER_TIMEOUT_MS = 10_000;
 
 async function verifyWithProvider(email: string, apiKey: string): Promise<VerifierResponse> {
