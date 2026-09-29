@@ -1,7 +1,7 @@
 import { and, eq } from "drizzle-orm";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getDb } from "@/db";
+import { forUser } from "@/db";
 import { targets } from "@/db/schema";
 import { requireUserId } from "@/lib/auth";
 import { NotesForm } from "./components/notes-form";
@@ -42,11 +42,14 @@ export default async function TargetDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const userId = await requireUserId();
-  const [target] = await getDb()
-    .select()
-    .from(targets)
-    .where(and(eq(targets.id, (await params).id), eq(targets.userId, userId)))
-    .limit(1);
+  const id = (await params).id;
+  const [target] = await forUser(userId, (db) =>
+    db
+      .select()
+      .from(targets)
+      .where(and(eq(targets.id, id), eq(targets.userId, userId)))
+      .limit(1),
+  );
   if (!target) {
     notFound();
   }

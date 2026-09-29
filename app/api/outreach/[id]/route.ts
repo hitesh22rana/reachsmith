@@ -1,6 +1,6 @@
 import { and, eq } from "drizzle-orm";
 import { NextResponse, type NextRequest } from "next/server";
-import { getDb } from "@/db";
+import { forUser } from "@/db";
 import { outreaches, targets } from "@/db/schema";
 import { getUserId } from "@/lib/auth";
 import { toOutreachJson } from "@/features/outreach/server";
@@ -20,27 +20,32 @@ export async function PATCH(request: NextRequest, context: RouteContext): Promis
   if (!parsed.ok) {
     return NextResponse.json({ message: parsed.message }, { status: 400 });
   }
-  const [row] = await getDb()
-    .select({ outreach: outreaches, fullName: targets.fullName, company: targets.company })
-    .from(outreaches)
-    .innerJoin(targets, eq(outreaches.targetId, targets.id))
-    .where(and(eq(outreaches.id, (await context.params).id), eq(outreaches.userId, userId)))
-    .limit(1);
+  const id = (await context.params).id;
+  const [row] = await forUser(userId, (db) =>
+    db
+      .select({ outreach: outreaches, fullName: targets.fullName, company: targets.company })
+      .from(outreaches)
+      .innerJoin(targets, eq(outreaches.targetId, targets.id))
+      .where(and(eq(outreaches.id, id), eq(outreaches.userId, userId)))
+      .limit(1),
+  );
   if (!row) {
     return NextResponse.json({ message: "Not found" }, { status: 404 });
   }
   const now = new Date();
   // Owner predicate repeats inside the write, not just in the read above.
-  const [updated] = await getDb()
-    .update(outreaches)
-    .set({
-      status: parsed.data.status,
-      sentAt: parsed.data.status === "sent" && !row.outreach.sentAt ? now : row.outreach.sentAt,
-      lastStatusChangeAt: now,
-      updatedAt: now,
-    })
-    .where(and(eq(outreaches.id, row.outreach.id), eq(outreaches.userId, userId)))
-    .returning();
+  const [updated] = await forUser(userId, (db) =>
+    db
+      .update(outreaches)
+      .set({
+        status: parsed.data.status,
+        sentAt: parsed.data.status === "sent" && !row.outreach.sentAt ? now : row.outreach.sentAt,
+        lastStatusChangeAt: now,
+        updatedAt: now,
+      })
+      .where(and(eq(outreaches.id, row.outreach.id), eq(outreaches.userId, userId)))
+      .returning(),
+  );
   if (!updated) {
     return NextResponse.json({ message: "Not found" }, { status: 404 });
   }

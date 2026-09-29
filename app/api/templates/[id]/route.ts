@@ -1,6 +1,6 @@
 import { and, eq } from "drizzle-orm";
 import { NextResponse, type NextRequest } from "next/server";
-import { getDb } from "@/db";
+import { forUser } from "@/db";
 import { templates } from "@/db/schema";
 import { getUserId } from "@/lib/auth";
 import { toTemplateJson, toTemplatePatch } from "@/features/templates/server";
@@ -12,11 +12,13 @@ interface RouteContext {
 }
 
 async function findOwnedTemplate(userId: string, id: string) {
-  const [template] = await getDb()
-    .select()
-    .from(templates)
-    .where(and(eq(templates.id, id), eq(templates.userId, userId)))
-    .limit(1);
+  const [template] = await forUser(userId, (db) =>
+    db
+      .select()
+      .from(templates)
+      .where(and(eq(templates.id, id), eq(templates.userId, userId)))
+      .limit(1),
+  );
   return template ?? null;
 }
 
@@ -45,11 +47,14 @@ export async function PATCH(request: NextRequest, context: RouteContext): Promis
   if (Object.keys(patch).length === 0) {
     return NextResponse.json({ message: "No fields to update" }, { status: 400 });
   }
-  const [updated] = await getDb()
-    .update(templates)
-    .set({ ...patch, updatedAt: new Date() })
-    .where(and(eq(templates.id, (await context.params).id), eq(templates.userId, userId)))
-    .returning();
+  const id = (await context.params).id;
+  const [updated] = await forUser(userId, (db) =>
+    db
+      .update(templates)
+      .set({ ...patch, updatedAt: new Date() })
+      .where(and(eq(templates.id, id), eq(templates.userId, userId)))
+      .returning(),
+  );
   if (!updated) {
     return NextResponse.json({ message: "Not found" }, { status: 404 });
   }
@@ -61,10 +66,13 @@ export async function DELETE(_request: NextRequest, context: RouteContext): Prom
   if (!userId) {
     return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
   }
-  const [deleted] = await getDb()
-    .delete(templates)
-    .where(and(eq(templates.id, (await context.params).id), eq(templates.userId, userId)))
-    .returning({ id: templates.id });
+  const id = (await context.params).id;
+  const [deleted] = await forUser(userId, (db) =>
+    db
+      .delete(templates)
+      .where(and(eq(templates.id, id), eq(templates.userId, userId)))
+      .returning({ id: templates.id }),
+  );
   if (!deleted) {
     return NextResponse.json({ message: "Not found" }, { status: 404 });
   }
