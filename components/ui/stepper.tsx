@@ -19,7 +19,12 @@ export function Stepper({
   onSelect?: (index: number) => void;
 }) {
   return (
-    <ol aria-label="Progress" className="flex items-start">
+    // min-w-0, not decoration: as a grid item inside the dialog the default
+    // min-width: auto lets the widest step description set the column's
+    // min-content width, which pushes the whole dialog past its own
+    // max-width and clips the last step's label. With it constrained, the
+    // descriptions wrap inside their own column instead.
+    <ol aria-label="Progress" className="flex w-full min-w-0 items-start">
       {steps.map((step, index) => {
         const done = index < current;
         const active = index === current;
