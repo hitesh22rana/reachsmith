@@ -18,11 +18,13 @@ export function toAudienceJson(audience: Audience): ApiAudience {
 // Caller's own rows first, then the defaults that are not already covered.
 export function mergeAudiences(rows: Audience[]): ApiAudience[] {
   const seen = new Set(rows.map((row) => row.name.toLowerCase()));
-  const own = rows.map(toAudienceJson);
-  const defaults = DEFAULT_AUDIENCES.filter((name) => !seen.has(name.toLowerCase())).map(
-    (name) => ({ id: null, name }),
-  );
-  return [...own, ...defaults];
+  return [
+    ...rows.map(toAudienceJson),
+    ...DEFAULT_AUDIENCES.filter((name) => !seen.has(name.toLowerCase())).map((name) => ({
+      id: null,
+      name,
+    })),
+  ];
 }
 
 // Find the caller's preset by name, creating it if it is new. Runs on the
@@ -41,16 +43,12 @@ export async function resolveAudienceId(db: Db, userId: string, name: string): P
   if (existing) {
     return existing;
   }
-  const inserted = await db
+  const [inserted] = await db
     .insert(audiences)
     .values({ userId, name: trimmed })
     .onConflictDoNothing()
     .returning({ id: audiences.id });
-  const id = inserted[0]?.id;
-  if (id) {
-    return id;
-  }
-  return await findByName(db, userId, trimmed);
+  return inserted?.id || (await findByName(db, userId, trimmed));
 }
 
 async function findByName(db: Db, userId: string, name: string): Promise<string | null> {

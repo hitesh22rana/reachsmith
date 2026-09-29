@@ -1,6 +1,5 @@
-// Relative and with the extension, like scripts/seed.ts does for the same
-// module, so scripts/selfcheck.ts can import this file under node
-// --experimental-strip-types, which resolves no path aliases.
+// Relative and with the extension so scripts/selfcheck.ts can import this
+// file under node --experimental-strip-types, which resolves no path aliases.
 import {
   renderTemplate,
   TARGET_VAR_NAMES,
@@ -9,9 +8,9 @@ import {
 import type { NewOutreach, Outreach } from "@/db/schema";
 import type { OutreachCreateInput } from "./validation";
 
-// The target fields a template placeholder can be pre-filled from. Which
-// names map here is decided by TARGET_VAR_NAMES, so the compose form and
-// the renderer agree on what a `source: "target"` placeholder means.
+// Which names a placeholder can prefill is decided by TARGET_VAR_NAMES, so
+// the compose form and the renderer agree on what a `source: "target"`
+// placeholder means.
 export interface OutreachTarget {
   firstName: string | null;
   lastName?: string | null;
@@ -48,10 +47,9 @@ export function targetVariables(target: OutreachTarget): TemplateVars {
   return vars;
 }
 
-// Fill a template body from target contact data plus the values entered for
-// whatever placeholders the template declares. Entered values win, so a
-// prefilled field can be corrected per message. Unknown or missing
-// placeholders stay intact; an empty template renders "".
+// Entered values win over prefilled ones, so a prefilled field can be
+// corrected per message. Unknown or missing placeholders stay intact; an
+// empty template renders "".
 export function buildOutreachBody(
   templateBody: string | undefined,
   target: OutreachTarget,
@@ -64,11 +62,9 @@ export function buildOutreachBody(
 }
 
 // The template's stored placeholder list is the allowlist for what may be
-// written to metadata. Pure, because this is the one piece of the create
-// path a test can reach without a database: submitted is fully
-// client-controlled, so anything it declares that the template does not
-// ask for is dropped rather than stored. With no template the caller chose
-// the body itself, so every key is theirs to write.
+// written to metadata. submitted is fully client-controlled, so a key the
+// template never asked for is dropped rather than stored; with no template
+// the caller chose the body, so every key is theirs to write.
 export function pickDeclaredVariables(
   submitted: Record<string, string>,
   declared: readonly string[],
@@ -121,7 +117,7 @@ export function toOutreachJson(
 }
 
 function cleanText(value: string | undefined): string | null {
-  return value === undefined || value === "" ? null : value;
+  return value || null;
 }
 
 export function toOutreachInsert(

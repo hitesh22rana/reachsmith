@@ -122,8 +122,5 @@ export function placeholderError(body: string): string | null {
 // partially filled message still shows the placeholders it is missing
 // rather than dropping them silently.
 export function renderTemplate(body: string, vars: TemplateVars): string {
-  return body.replace(SUBSTITUTABLE, (match, name: string) => {
-    const value = vars[name]?.trim();
-    return value ? value : match;
-  });
+  return body.replace(SUBSTITUTABLE, (match, name: string) => vars[name]?.trim() || match);
 }
