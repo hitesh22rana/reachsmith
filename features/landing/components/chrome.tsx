@@ -20,7 +20,7 @@ export function SiteHeader() {
     <header className="relative z-40 mx-auto mt-6 w-max max-w-[calc(100%-2rem)] md:sticky md:top-6 md:mt-0">
       <nav
         aria-label="Primary"
-        className="flex w-max max-w-full items-center gap-2 rounded-full border bg-background/80 py-2 pr-2 pl-5 shadow-sm backdrop-blur-xl"
+        className="flex w-max max-w-full items-center gap-2 rounded-full border bg-background/80 py-2 pr-2 pl-5 shadow-sm backdrop-blur-xl reduced-transparency:bg-background reduced-transparency:backdrop-filter-none"
       >
         <Link href="/" className="flex items-center gap-2 text-base font-semibold tracking-tight" aria-current="page">
           <Image src="/reachsmith-mascot.svg" alt="ReachSmith" width={28} height={28} />
@@ -58,14 +58,14 @@ export function SiteHeader() {
             <span
               aria-hidden="true"
               className={cn(
-                "absolute h-0.5 w-5 rounded-full bg-foreground transition-transform duration-300 ease-[cubic-bezier(0.32,0.72,0,1)]",
+                "absolute h-0.5 w-5 rounded-full bg-foreground transition-transform duration-200 ease-drawer",
                 open ? "translate-y-0 rotate-45" : "-translate-y-1",
               )}
             />
             <span
               aria-hidden="true"
               className={cn(
-                "absolute h-0.5 w-5 rounded-full bg-foreground transition-transform duration-300 ease-[cubic-bezier(0.32,0.72,0,1)]",
+                "absolute h-0.5 w-5 rounded-full bg-foreground transition-transform duration-200 ease-drawer",
                 open ? "translate-y-0 -rotate-45" : "translate-y-1",
               )}
             />
@@ -74,21 +74,20 @@ export function SiteHeader() {
       </nav>
       <div
         className={cn(
-          "absolute top-full right-0 mt-2 overflow-hidden transition-[transform,opacity] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] md:hidden",
+          "absolute top-full right-0 mt-2 overflow-hidden transition-[transform,opacity] duration-200 ease-drawer md:hidden",
           open ? "translate-y-0 opacity-100" : "pointer-events-none -translate-y-2 opacity-0",
         )}
       >
-        <div className="mt-2 flex w-64 max-w-[calc(100vw-2rem)] flex-col gap-1 rounded-2xl border bg-background/95 p-2 shadow-lg backdrop-blur-xl">
-          {LINKS.map((link, index) => (
+        {/* One panel, one transition. The links used to carry their own
+            translate plus a 100ms-indexed delay, which meant the last one was
+            live and invisible for 250ms and fully settled at 450ms. */}
+        <div className="mt-2 flex w-64 max-w-[calc(100vw-2rem)] flex-col gap-1 rounded-2xl border bg-background/95 p-2 shadow-lg backdrop-blur-xl reduced-transparency:bg-background reduced-transparency:backdrop-filter-none">
+          {LINKS.map((link) => (
             <Link
               key={link.href}
               href={link.href}
               onClick={() => setOpen(false)}
-              style={{ transitionDelay: `${100 + index * 50}ms` }}
-              className={cn(
-                "rounded-xl px-3 py-2 text-sm font-medium transition-[transform,opacity,background-color] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] hover:bg-muted",
-                open ? "translate-y-0 opacity-100" : "translate-y-3 opacity-0",
-              )}
+              className="rounded-xl px-3 py-2 text-sm font-medium transition-colors hover:bg-muted"
             >
               {link.label}
             </Link>
