@@ -2,47 +2,13 @@
 
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import * as v from "valibot";
+
 import { Button } from "@/components/ui/button";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { NewOutreachDialog } from "./new-outreach-dialog";
-import { OutreachListSchema, OutreachStatusSchema, type ApiOutreach } from "../validation";
+import { fetchTargetOutreach, setOutreachStatus } from "../client";
+import { StatusSelect } from "./status-select";
+import { STATUS_LABELS, type ApiOutreach, type OutreachStatus } from "../validation";
 import type { OutreachTarget } from "../server";
-
-const STATUS_LABELS: Record<v.InferOutput<typeof OutreachStatusSchema>, string> = {
-  draft: "Draft",
-  sent: "Sent",
-  replied: "Replied",
-  rejected: "Rejected",
-  no_response: "No response",
-  success: "Success",
-};
-
-async function fetchTargetOutreach(targetId: string): Promise<ApiOutreach[]> {
-  const response = await fetch(`/api/outreach?targetId=${targetId}`);
-  if (!response.ok) {
-    throw new Error(`Failed to load outreach (${response.status})`);
-  }
-  const data: unknown = await response.json();
-  return v.parse(OutreachListSchema, data).outreach;
-}
-
-async function setOutreachStatus(id: string, status: string): Promise<void> {
-  const response = await fetch(`/api/outreach/${id}`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ status }),
-  });
-  if (!response.ok) {
-    throw new Error(`Failed to update status (${response.status})`);
-  }
-}
 
 export function TargetOutreachSection({
   target,
@@ -57,7 +23,7 @@ export function TargetOutreachSection({
   });
 
   const changeStatus = useMutation({
-    mutationFn: ({ id, status }: { id: string; status: string }) =>
+    mutationFn: ({ id, status }: { id: string; status: OutreachStatus }) =>
       setOutreachStatus(id, status),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["outreach"] });
@@ -124,24 +90,12 @@ export function TargetOutreachSection({
                   >
                     {copiedId === item.id ? "Copied" : "Copy"}
                   </Button>
-                  <Select
+                  <StatusSelect
                     value={item.status}
+                    ariaLabel="Change status"
                     disabled={changeStatus.isPending}
-                    onValueChange={(status) => changeStatus.mutate({ id: item.id, status: status ?? item.status })}
-                  >
-                    <SelectTrigger aria-label="Change status" className="w-36">
-                      <SelectValue>{STATUS_LABELS[item.status]}</SelectValue>
-                    </SelectTrigger>
-                    <SelectContent alignItemWithTrigger={false}>
-                      {(Object.keys(STATUS_LABELS) as (keyof typeof STATUS_LABELS)[]).map(
-                        (status) => (
-                          <SelectItem key={status} value={status}>
-                            {STATUS_LABELS[status]}
-                          </SelectItem>
-                        ),
-                      )}
-                    </SelectContent>
-                  </Select>
+                    onChange={(status) => changeStatus.mutate({ id: item.id, status })}
+                  />
                 </div>
               </div>
             </li>

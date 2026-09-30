@@ -12,6 +12,7 @@ import {
 } from "@/features/outreach/server";
 import { parseBody } from "@/lib/validators";
 import { OutreachCreateSchema, OutreachStatusSchema } from "@/features/outreach/validation";
+import { decodeCursor, keysetAfter, paginate, PaginationQuerySchema } from "@/lib/pagination";
 
 const FilterSchema = v.object({
   status: v.optional(OutreachStatusSchema),
@@ -31,6 +32,17 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   if (!filter.success) {
     return NextResponse.json({ message: "Invalid filter" }, { status: 400 });
   }
+  const query = v.safeParse(PaginationQuerySchema, {
+    limit: params.get("limit") ?? undefined,
+    cursor: params.get("cursor") ?? undefined,
+  });
+  if (!query.success) {
+    return NextResponse.json({ message: "Invalid pagination" }, { status: 400 });
+  }
+  const cursor = decodeCursor(query.output.cursor);
+  if (query.output.cursor && !cursor) {
+    return NextResponse.json({ message: "Invalid cursor" }, { status: 400 });
+  }
   const conditions = [eq(outreaches.userId, userId)];
   if (filter.output.status) {
     conditions.push(eq(outreaches.status, filter.output.status));
@@ -38,18 +50,29 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   if (filter.output.targetId) {
     conditions.push(eq(outreaches.targetId, filter.output.targetId));
   }
+  // The cursor composes with the filters: both narrow one keyset scan, so
+  // filtering and paging cannot disagree about which rows exist.
+  if (cursor) {
+    conditions.push(keysetAfter(outreaches.createdAt, outreaches.id, cursor));
+  }
   const rows = await forUser(userId, (db) =>
     db
       .select({ outreach: outreaches, fullName: targets.fullName, company: targets.company })
       .from(outreaches)
       .innerJoin(targets, eq(outreaches.targetId, targets.id))
       .where(and(...conditions))
-      .orderBy(desc(outreaches.lastStatusChangeAt)),
+      // created_at, not last_status_change_at: a status PATCH rewrites the
+      // latter, re-sorting the list under a reader mid-scroll and moving the
+      // cursor's position. The Updated column still renders lastStatusChangeAt.
+      .orderBy(desc(outreaches.createdAt), desc(outreaches.id))
+      .limit(query.output.limit + 1),
   );
+  const page = paginate(rows, query.output.limit, (row) => row.outreach);
   return NextResponse.json({
-    outreach: rows.map((row) =>
+    outreach: page.items.map((row) =>
       toOutreachJson(row.outreach, { fullName: row.fullName, company: row.company }),
     ),
+    nextCursor: page.nextCursor,
   });
 }
 

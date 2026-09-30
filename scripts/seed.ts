@@ -6,6 +6,7 @@ import * as schema from "../db/schema.ts";
 // render.ts is imported relatively and by extension because this script
 // runs under node --experimental-strip-types, which has no path aliases.
 import { parsePlaceholders, renderTemplate } from "../features/templates/render.ts";
+import { targetVariables } from "../features/outreach/server.ts";
 
 // Local test data: one target, two templates, two outreach rows.
 // Usage: pnpm db:seed you@example.com (must already have signed up).
@@ -51,8 +52,8 @@ async function main(): Promise<void> {
     .values({
       userId: user.id,
       fullName: SEED_TARGET,
-      firstName: "Aarav",
-      lastName: "Sharma",
+      // Split left null on purpose: it is an override, and "Aarav Sharma"
+      // splits correctly. Seeding it would hide the default path.
       company: "FinEdge Technologies",
       roleTitle: "Senior Backend Engineer",
       primaryEmail: "aarav.sharma@example.com",
@@ -123,8 +124,9 @@ async function main(): Promise<void> {
     channel: "email",
     subject: "Referral for the backend opening?",
     bodyFinal: renderTemplate(referral.body, {
-      first_name: target.firstName ?? undefined,
-      company: target.company ?? undefined,
+      // Same call the compose flow makes, and reading target.firstName here
+      // left {{first_name}} unsubstituted, since the split is usually null.
+      ...targetVariables(target),
       ...variables,
     }),
     status: "draft",

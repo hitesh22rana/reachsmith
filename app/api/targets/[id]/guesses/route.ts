@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { NextResponse, type NextRequest } from "next/server";
 import { forUser } from "@/db";
 import { emailGuesses, targets } from "@/db/schema";
@@ -28,7 +28,12 @@ export async function GET(_request: NextRequest, context: RouteContext): Promise
     db
       .select()
       .from(emailGuesses)
-      .where(and(eq(emailGuesses.targetId, target.id), eq(emailGuesses.userId, userId))),
+      .where(and(eq(emailGuesses.targetId, target.id), eq(emailGuesses.userId, userId)))
+      // ~5-20 rows for one target, so no pagination, but they do need a
+      // defined order and created_at cannot give one: the guess worker
+      // inserts a whole ranked batch in one statement, so every candidate
+      // shares a transaction timestamp. score is the ranking it computed.
+      .orderBy(desc(emailGuesses.score), desc(emailGuesses.createdAt)),
   );
   return NextResponse.json({
     guesses: rows.map((row) => ({

@@ -9,8 +9,9 @@ Foundation, targets, templates. If either missing: hardcode `target_id` / allow 
 ## Scope
 - `Outreach` model exactly per `SPECS.md` §6.4: `user_id, target_id, template_id?, channel, subject?, body_final, status, sent_at?, last_status_change_at, metadata, created_at, updated_at`. Status enum verbatim. `metadata` is now `{[placeholder]: value}` for whatever variables the template declared; the old fixed `job_title`/`job_link` pair is gone.
 - `features/outreach/server.ts`: `buildOutreachBody(template.body?, target, variables)` over `renderTemplate` (no `sender` param: no variable consumes one). Target-sourced values fill first, then user-entered `variables` override them, so any prefilled field can be corrected per message. The existing `job_title → target.roleTitle` fallback is preserved.
+- `targetVariables()` resolves `{{first_name}}`/`{{last_name}}` through `lib/target-name.ts`, the same helper the email pipeline uses, so a target with no name override prefills a greeting instead of an empty string. `OutreachTarget` therefore carries `fullName`; before this, the pipeline derived the tokens from it and the compose form read the nullable columns directly, so the same person produced `bae.suzy@` guesses and a blank `{{first_name}}`.
 - `POST /api/outreach` takes `variables: Record<string, string>` in place of `job_title`/`job_link`. The server re-reads the owned template, intersects the submitted keys with that template's stored placeholder names, and drops everything else, so `metadata` can only ever hold declared variables (at most 50). With `template_id` null the key set is arbitrary and capped at 50, else 400. A blank `body` still falls back to the server-side render, else 400 `Provide a template or message text`.
-- `PATCH /api/outreach/[id]` is unchanged (status transitions set `sent_at` on first `sent`, always bump `last_status_change_at`). `GET /api/outreach?status=&targetId=` is unchanged for pipeline + history.
+- `PATCH /api/outreach/[id]` is unchanged (status transitions set `sent_at` on first `sent`, always bump `last_status_change_at`). `GET /api/outreach?status=&targetId=` keeps both filters and gained cursor pagination plus a sort-key change; see `docs/features/pagination/SPEC.md`.
 - UI, a 4-step dialog on `/targets/[id]`, reusing `components/ui/stepper.tsx` (moved out of `features/targets/components/`) and the per-step `trigger` gate from `add-target-dialog`:
   1. Channel + template picker, including the Custom message option.
   2. Variables: one field per placeholder in stored order. `source: target` prefills from the target row and stays editable; `source: input` starts empty. Two columns at `sm+`, one below, `min-w-0` on every grid child so a long label ellipsizes instead of overflowing; the label is the stored `label` with the full name in a `title` attribute.
@@ -33,6 +34,7 @@ Foundation, targets, templates. If either missing: hardcode `target_id` / allow 
 
 ## Acceptance
 - A template with `{{first_name}}`, `{{company}}`, `{{resume_link}}` shows three fields on step 2, two prefilled and editable, `resume_link` empty.
+- A target stored with only a full name (no split override) still prefills `{{first_name}}` from that name, matching what the email pipeline guesses.
 - Filling `resume_link` updates the body live; hand-editing the body stops live re-render, and Re-apply template restores it.
 - A 50-placeholder template renders 50 fields and saves; 51 is rejected at save naming the 51st.
 - A long custom placeholder name ellipsizes on step 2 and does not break the grid at 360px.

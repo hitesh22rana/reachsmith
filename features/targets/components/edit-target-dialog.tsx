@@ -6,6 +6,8 @@ import { valibotResolver } from "@hookform/resolvers/valibot";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import * as v from "valibot";
+import { ChevronRight } from "lucide-react";
+import { sendJson } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -27,7 +29,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import {
   TargetCreateSchema,
-  TargetJsonSchema,
+  TargetEnvelopeSchema,
   type ApiTarget,
 } from "../validation";
 
@@ -41,18 +43,14 @@ const SOURCE_LABELS = {
   other: "Other",
 } as const;
 
-async function saveTarget(id: string, data: TargetFormInput): Promise<void> {
-  const parsed = v.parse(TargetCreateSchema, data);
-  const response = await fetch(`/api/targets/${id}`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(parsed),
-  });
-  if (!response.ok) {
-    throw new Error(`Failed to save target (${response.status})`);
-  }
-  const body: unknown = await response.json();
-  v.parse(v.object({ target: TargetJsonSchema }), body);
+function saveTarget(id: string, data: TargetFormInput) {
+  return sendJson(
+    "PATCH",
+    `/api/targets/${id}`,
+    v.parse(TargetCreateSchema, data),
+    TargetEnvelopeSchema,
+    "save target",
+  );
 }
 
 function FieldError({ message }: { message: string | undefined }) {
@@ -66,6 +64,24 @@ function FieldError({ message }: { message: string | undefined }) {
   );
 }
 
+// A function because useForm reads defaultValues once, at mount.
+function formDefaults(target: ApiTarget): TargetFormInput {
+  return {
+    full_name: target.fullName,
+    first_name: target.firstName ?? "",
+    last_name: target.lastName ?? "",
+    company: target.company ?? "",
+    role_title: target.roleTitle ?? "",
+    primary_email: target.primaryEmail ?? "",
+    domain: target.domain ?? "",
+    source_type: target.sourceType,
+    notes: target.notes ?? "",
+    location: target.location ?? "",
+    company_website: target.companyWebsite ?? "",
+    social_urls: (target.socialUrls ?? []).join("\n"),
+  };
+}
+
 export function EditTargetDialog({ target }: { target: ApiTarget }) {
   const queryClient = useQueryClient();
   const router = useRouter();
@@ -76,24 +92,12 @@ export function EditTargetDialog({ target }: { target: ApiTarget }) {
     register,
     control,
     handleSubmit,
+    reset,
     formState: { errors, isSubmitting },
   } = useForm<TargetFormInput>({
     resolver: valibotResolver(TargetCreateSchema),
     mode: "onChange",
-    defaultValues: {
-      full_name: target.fullName,
-      first_name: target.firstName ?? "",
-      last_name: target.lastName ?? "",
-      company: target.company ?? "",
-      role_title: target.roleTitle ?? "",
-      primary_email: target.primaryEmail ?? "",
-      domain: target.domain ?? "",
-      source_type: target.sourceType,
-      notes: target.notes ?? "",
-      location: target.location ?? "",
-      company_website: target.companyWebsite ?? "",
-      social_urls: (target.socialUrls ?? []).join("\n"),
-    },
+    defaultValues: formDefaults(target),
   });
 
   const save = useMutation({
@@ -109,8 +113,19 @@ export function EditTargetDialog({ target }: { target: ApiTarget }) {
     },
   });
 
+  // Reset on open, not off the prop: a useEffect keyed on `target` would
+  // reset on every background refetch and eat the user's typing.
+  function openDialog(nextOpen: boolean): void {
+    setOpen(nextOpen);
+    if (nextOpen) {
+      reset(formDefaults(target));
+    } else {
+      setServerError(null);
+    }
+  }
+
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={openDialog}>
       <DialogTrigger render={<Button variant="outline" className="pressable">Edit target</Button>} />
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-xl">
         <DialogHeader>
@@ -123,19 +138,37 @@ export function EditTargetDialog({ target }: { target: ApiTarget }) {
             <Input id="edit-full-name" autoComplete="off" {...register("full_name")} />
             <FieldError message={errors.full_name?.message} />
           </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="edit-first-name">First name</Label>
-              <Input id="edit-first-name" autoComplete="off" {...register("first_name")} />
-              <FieldError message={errors.first_name?.message} />
+          <details className="group rounded-lg border px-3 py-2 open:pb-3">
+            <summary className="flex cursor-pointer list-none items-center justify-between gap-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground">
+              Name for email patterns
+              <ChevronRight
+                className="size-4 shrink-0 transition-transform group-open:rotate-90"
+                aria-hidden="true"
+              />
+            </summary>
+            {/* The only place these are entered. Blank means "split the full
+                name", which is right for almost everyone; fill them in only
+                when that split is wrong, e.g. Bae Suzy, van der Berg, Cher.
+                See lib/target-name.ts. */}
+            <p className="mt-2 text-sm text-muted-foreground">
+              Leave blank to split the full name. Only fill these in if that split is wrong,
+              which is what puts them in guessed email addresses and{" "}
+              <code>{"{{first_name}}"}</code>.
+            </p>
+            <div className="mt-3 grid grid-cols-2 gap-4">
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="edit-first-name">First name</Label>
+                <Input id="edit-first-name" autoComplete="off" {...register("first_name")} />
+                <FieldError message={errors.first_name?.message} />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="edit-last-name">Last name</Label>
+                <Input id="edit-last-name" autoComplete="off" {...register("last_name")} />
+                <FieldError message={errors.last_name?.message} />
+              </div>
             </div>
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="edit-last-name">Last name</Label>
-              <Input id="edit-last-name" autoComplete="off" {...register("last_name")} />
-              <FieldError message={errors.last_name?.message} />
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-4">
+          </details>
+      <div className="grid grid-cols-2 gap-4">
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="edit-company">Company</Label>
               <Input id="edit-company" autoComplete="off" {...register("company")} />
@@ -220,7 +253,7 @@ export function EditTargetDialog({ target }: { target: ApiTarget }) {
             </p>
           ) : null}
           <div className="flex justify-end gap-2">
-            <Button type="button" variant="ghost" onClick={() => setOpen(false)}>
+            <Button type="button" variant="ghost" onClick={() => openDialog(false)}>
               Cancel
             </Button>
             <Button type="submit" disabled={isSubmitting || save.isPending} className="pressable">

@@ -7,7 +7,8 @@ import * as v from "valibot";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { errorMessage } from "@/lib/validators";
+import { getJson, sendJson } from "@/lib/api";
+import { TargetEnvelopeSchema } from "@/features/targets/validation";
 import { GuessListSchema, PrimaryEmailSchema, type ApiEmailGuess } from "../validation";
 
 const TRIED_STYLES: Record<ApiEmailGuess["status"], string> = {
@@ -59,26 +60,20 @@ function TriedList({ guesses }: { guesses: ApiEmailGuess[] }) {
   );
 }
 
-async function fetchGuesses(targetId: string): Promise<ApiEmailGuess[]> {
-  const response = await fetch(`/api/targets/${targetId}/guesses`);
-  if (!response.ok) {
-    throw new Error(`Failed to load candidates (${response.status})`);
-  }
-  const data: unknown = await response.json();
-  return v.parse(GuessListSchema, data).guesses;
+function fetchGuesses(targetId: string): Promise<ApiEmailGuess[]> {
+  return getJson(`/api/targets/${targetId}/guesses`, GuessListSchema, "candidates").then(
+    (page) => page.guesses,
+  );
 }
 
-async function savePrimaryEmail(targetId: string, email: string): Promise<void> {
-  const parsed = v.parse(PrimaryEmailSchema, { email });
-  const response = await fetch(`/api/targets/${targetId}/primary-email`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(parsed),
-  });
-  if (!response.ok) {
-    const body: unknown = await response.json().catch(() => null);
-    throw new Error(errorMessage(body, `Failed to save email (${response.status})`));
-  }
+function savePrimaryEmail(targetId: string, email: string) {
+  return sendJson(
+    "PATCH",
+    `/api/targets/${targetId}/primary-email`,
+    v.parse(PrimaryEmailSchema, { email }),
+    TargetEnvelopeSchema,
+    "save email",
+  );
 }
 
 function settled(guesses: ApiEmailGuess[] | undefined): boolean {

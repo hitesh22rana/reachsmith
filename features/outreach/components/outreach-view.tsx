@@ -1,10 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import * as v from "valibot";
+import { useMutation, useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
 import { Send } from "lucide-react";
+import { fetchOutreachPage, setOutreachStatus } from "../client";
 import { EmptyState } from "@/components/empty-state";
+import { LoadMore } from "@/components/load-more";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -15,53 +16,89 @@ import {
 } from "@/components/ui/select";
 import { CHANNEL_LABELS } from "@/features/templates/validation";
 import { BackLink } from "@/components/back-link";
-import { OutreachListSchema, OutreachStatusSchema, type ApiOutreach } from "../validation";
+import { StatusSelect } from "./status-select";
+import { STATUS_LABELS, type ApiOutreach, type OutreachStatus } from "../validation";
+import type { StatusFilter } from "../client";
 
-type StatusFilter = "all" | v.InferOutput<typeof OutreachStatusSchema>;
-
-const STATUS_LABELS: Record<StatusFilter, string> = {
+const FILTER_LABELS: Record<StatusFilter, string> = {
   all: "All statuses",
-  draft: "Draft",
-  sent: "Sent",
-  replied: "Replied",
-  rejected: "Rejected",
-  no_response: "No response",
-  success: "Success",
+  ...STATUS_LABELS,
 };
 
-const STATUS_KEYS = Object.keys(STATUS_LABELS) as StatusFilter[];
+const FILTER_KEYS = Object.keys(FILTER_LABELS) as StatusFilter[];
 
-async function fetchOutreach(status: StatusFilter): Promise<ApiOutreach[]> {
-  const params = status === "all" ? "" : `?status=${status}`;
-  const response = await fetch(`/api/outreach${params}`);
-  if (!response.ok) {
-    throw new Error(`Failed to load outreach (${response.status})`);
-  }
-  const data: unknown = await response.json();
-  return v.parse(OutreachListSchema, data).outreach;
+function PendingRows() {
+  return (
+    <>
+      {[0, 1, 2].map((row) => (
+        <tr key={row} className="border-b align-top last:border-b-0" aria-hidden="true">
+          <td className="px-4 py-3">
+            <div className="h-5 w-2/3 animate-pulse rounded bg-muted" />
+            <div className="mt-1 h-4 w-full animate-pulse rounded bg-muted" />
+            <div className="mt-1 h-4 w-5/6 animate-pulse rounded bg-muted" />
+          </td>
+          <td className="px-4 py-3">
+            <div className="h-5 w-24 animate-pulse rounded bg-muted" />
+          </td>
+          <td className="px-4 py-3">
+            <div className="h-8 w-36 animate-pulse rounded-lg bg-muted" />
+          </td>
+          <td className="px-4 py-3">
+            <div className="h-5 w-24 animate-pulse rounded bg-muted" />
+          </td>
+        </tr>
+      ))}
+    </>
+  );
 }
 
-async function setOutreachStatus(id: string, status: string): Promise<void> {
-  const response = await fetch(`/api/outreach/${id}`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ status }),
-  });
-  if (!response.ok) {
-    throw new Error(`Failed to update status (${response.status})`);
-  }
+function OutreachRow({
+  item,
+  busy,
+  onStatus,
+}: {
+  item: ApiOutreach;
+  busy: boolean;
+  onStatus: (status: OutreachStatus) => void;
+}) {
+  return (
+    <tr className="border-b align-top last:border-b-0">
+      <td className="px-4 py-3">
+        <p className="truncate font-medium">{item.targetName}</p>
+        <p className="line-clamp-2 text-muted-foreground">{item.bodyFinal}</p>
+      </td>
+      <td className="px-4 py-3 whitespace-nowrap text-muted-foreground">
+        {CHANNEL_LABELS[item.channel]}
+      </td>
+      <td className="px-4 py-3">
+        <StatusSelect
+          value={item.status}
+          ariaLabel={`Status for ${item.targetName}`}
+          disabled={busy}
+          onChange={(status) => onStatus(status)}
+        />
+      </td>
+      <td className="px-4 py-3 whitespace-nowrap text-muted-foreground">
+        {item.lastStatusChangeAt.slice(0, 10)}
+      </td>
+    </tr>
+  );
 }
 
 export function OutreachView() {
   const queryClient = useQueryClient();
   const [filter, setFilter] = useState<StatusFilter>("all");
-  const outreach = useQuery({
+  const outreach = useInfiniteQuery({
     queryKey: ["outreach", { status: filter }],
-    queryFn: () => fetchOutreach(filter),
+    queryFn: ({ pageParam }) => fetchOutreachPage(filter, pageParam),
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
   });
+  const items = outreach.data?.pages.flatMap((page) => page.outreach) ?? [];
+  const loaded = outreach.data ? items.length : null;
 
   const changeStatus = useMutation({
-    mutationFn: ({ id, status }: { id: string; status: string }) =>
+    mutationFn: ({ id, status }: { id: string; status: OutreachStatus }) =>
       setOutreachStatus(id, status),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["outreach"] });
@@ -75,7 +112,10 @@ export function OutreachView() {
         <div className="space-y-1">
           <h1 className="text-3xl font-semibold tracking-tight">Outreach</h1>
           <p className="text-muted-foreground">
-            {outreach.data ? `${outreach.data.length} messages` : "Copy, send manually, track."}
+            {loaded === null
+              ? "Copy, send manually, track."
+              : // "+" so the count never claims rows the user has not loaded.
+                `${loaded}${outreach.hasNextPage ? "+" : ""} messages`}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -84,12 +124,12 @@ export function OutreachView() {
           </Label>
           <Select value={filter} onValueChange={(value) => setFilter(value as StatusFilter)}>
             <SelectTrigger id="outreach-filter" className="w-44">
-              <SelectValue>{STATUS_LABELS[filter]}</SelectValue>
+              <SelectValue>{FILTER_LABELS[filter]}</SelectValue>
             </SelectTrigger>
             <SelectContent alignItemWithTrigger={false}>
-              {STATUS_KEYS.map((status) => (
+              {FILTER_KEYS.map((status) => (
                 <SelectItem key={status} value={status}>
-                  {STATUS_LABELS[status]}
+                  {FILTER_LABELS[status]}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -102,9 +142,13 @@ export function OutreachView() {
           Could not load outreach. Check the connection and try again.
         </p>
       ) : null}
-      {outreach.isPending || (outreach.data && outreach.data.length > 0) ? (
+      {outreach.isPending || items.length > 0 ? (
         <div className="overflow-x-auto rounded-2xl border bg-card">
-          <table className="w-full min-w-[44rem] table-fixed text-left text-sm" aria-label="Outreach messages" aria-busy={outreach.isPending}>
+          <table
+            className="w-full min-w-[44rem] table-fixed text-left text-sm"
+            aria-label="Outreach messages"
+            aria-busy={outreach.isPending}
+          >
             <colgroup>
               <col className="w-[35%]" />
               <col className="w-[19%]" />
@@ -120,68 +164,33 @@ export function OutreachView() {
               </tr>
             </thead>
             <tbody>
-              {outreach.isPending ? [0, 1, 2].map((row) => (
-                <tr key={row} className="border-b align-top last:border-b-0" aria-hidden="true">
-                  <td className="px-4 py-3">
-                    <div className="h-5 w-2/3 animate-pulse rounded bg-muted" />
-                    <div className="mt-1 h-4 w-full animate-pulse rounded bg-muted" />
-                    <div className="mt-1 h-4 w-5/6 animate-pulse rounded bg-muted" />
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="h-5 w-24 animate-pulse rounded bg-muted" />
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="h-8 w-36 animate-pulse rounded-lg bg-muted" />
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="h-5 w-24 animate-pulse rounded bg-muted" />
-                  </td>
-                </tr>
-              )) : outreach.data?.map((item) => (
-                <tr key={item.id} className="border-b align-top last:border-b-0">
-                  <td className="px-4 py-3">
-                    <p className="truncate font-medium">{item.targetName}</p>
-                    <p className="line-clamp-2 text-muted-foreground">{item.bodyFinal}</p>
-                  </td>
-                  <td className="px-4 py-3 whitespace-nowrap text-muted-foreground">
-                    {CHANNEL_LABELS[item.channel]}
-                  </td>
-                  <td className="px-4 py-3">
-                    <Select
-                      value={item.status}
-                      disabled={changeStatus.isPending}
-                      onValueChange={(status) =>
-                        changeStatus.mutate({ id: item.id, status: status ?? item.status })
-                      }
-                    >
-                      <SelectTrigger aria-label={`Status for ${item.targetName}`} className="w-36">
-                        <SelectValue>{STATUS_LABELS[item.status]}</SelectValue>
-                      </SelectTrigger>
-                      <SelectContent alignItemWithTrigger={false}>
-                        {STATUS_KEYS
-                          .filter((status) => status !== "all")
-                          .map((status) => (
-                            <SelectItem key={status} value={status}>
-                              {STATUS_LABELS[status]}
-                            </SelectItem>
-                          ))}
-                      </SelectContent>
-                    </Select>
-                  </td>
-                  <td className="px-4 py-3 whitespace-nowrap text-muted-foreground">
-                    {item.lastStatusChangeAt.slice(0, 10)}
-                  </td>
-                </tr>
-              ))}
+              {outreach.isPending ? (
+                <PendingRows />
+              ) : (
+                items.map((item) => (
+                  <OutreachRow
+                    key={item.id}
+                    item={item}
+                    busy={changeStatus.isPending}
+                    onStatus={(status) => changeStatus.mutate({ id: item.id, status })}
+                  />
+                ))
+              )}
             </tbody>
           </table>
         </div>
       ) : null}
-      {outreach.data && outreach.data.length === 0 ? (
+      {loaded === 0 ? (
         <EmptyState
           icon={Send}
           title="No outreach yet"
           description="Compose a message from a template, copy it, and mark it sent."
+        />
+      ) : null}
+      {outreach.hasNextPage ? (
+        <LoadMore
+          pending={outreach.isFetchingNextPage}
+          onClick={() => void outreach.fetchNextPage()}
         />
       ) : null}
       {changeStatus.isError ? (

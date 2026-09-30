@@ -6,7 +6,16 @@ import { toTargetPatch } from "../features/targets/server.ts";
 // everything reached from this script must resolve without tsconfig path
 // aliases, which node --experimental-strip-types does not read.
 import { parsePlaceholders, placeholderError, renderTemplate } from "../features/templates/render.ts";
-import { pickDeclaredVariables } from "../features/outreach/server.ts";
+import { pickDeclaredVariables, targetVariables } from "../features/outreach/server.ts";
+import { nameParts } from "../lib/target-name.ts";
+import {
+  decodeCursor,
+  encodeCursor,
+  keysetAfter,
+  paginate,
+  PaginationQuerySchema,
+  MAX_LIMIT,
+} from "../lib/pagination.ts";
 import * as v from "valibot";
 
 // Self-check for the security-relevant pure logic. No framework: run with
@@ -197,5 +206,112 @@ assert.deepEqual(
   { anything: "x" },
   "a custom message owns its own key set",
 );
+
+// Cursors are client input: they must round-trip, and anything that is not
+// exactly what the encoder emits has to decode to null so the route can 400.
+const AT = new Date("2026-03-04T05:06:07.008Z");
+const ID = "550e8400-e29b-41d4-a716-446655440000";
+const roundTrip = decodeCursor(encodeCursor({ createdAt: AT, id: ID }));
+assert.equal(roundTrip?.createdAt.toISOString(), AT.toISOString(), "cursor round-trips its timestamp");
+assert.equal(roundTrip?.id, ID, "cursor round-trips its id");
+assert.equal(decodeCursor(undefined), null, "no cursor decodes to null, not an epoch");
+assert.equal(decodeCursor(""), null, "an empty cursor is not a position");
+for (const hostile of [
+  "not-a-cursor",
+  "!!!!",
+  "////",
+  Buffer.from("2026-03-04T05:06:07.008Z", "utf8").toString("base64url"), // no id half
+  Buffer.from(`2026-03-04T05:06:07.008Z.${ID}.extra`, "utf8").toString("base64url"), // trailing junk
+  Buffer.from("2026-03-04T05:06:07.8Z." + ID, "utf8").toString("base64url"), // wrong precision
+  Buffer.from("2026-03-04 05:06:07.008Z." + ID, "utf8").toString("base64url"), // not ISO-8601
+  Buffer.from(`not-a-date.${ID}`, "utf8").toString("base64url"),
+  Buffer.from("2026-13-45T99:99:99.999Z." + ID, "utf8").toString("base64url"), // shaped, not a date
+  Buffer.from(`${AT.toISOString()}.${"x".repeat(65)}`, "utf8").toString("base64url"), // absurd id
+  Buffer.from(`${AT.toISOString()}.\n${ID}`, "utf8").toString("base64url"), // newline
+]) {
+  assert.equal(decodeCursor(hostile), null, `rejected malformed cursor: ${hostile.slice(0, 32)}`);
+}
+// No user_id to smuggle: the id half is uuid-shaped. Scope comes from the session.
+assert.equal(roundTrip && "userId" in roundTrip, false, "a decoded cursor exposes no tenant field");
+
+// limit is bounded so one request cannot ask for the whole table.
+const limitOf = (raw: string) => v.parse(PaginationQuerySchema, { limit: raw }).limit;
+assert.equal(limitOf("25"), 25, "an explicit limit is honoured");
+assert.equal(limitOf("1"), 1, "the minimum is allowed");
+assert.equal(limitOf(String(MAX_LIMIT)), MAX_LIMIT, "the maximum is allowed");
+assert.equal(v.parse(PaginationQuerySchema, {}).limit, 25, "an absent limit falls back to the default");
+for (const bad of ["0", "-1", String(MAX_LIMIT + 1), "abc", "1.5", "1e3", ""]) {
+  assert.equal(
+    v.safeParse(PaginationQuerySchema, { limit: bad }).success,
+    false,
+    `rejected out-of-range limit: ${JSON.stringify(bad)}`,
+  );
+}
+
+// limit + 1: the extra row only decides nextCursor, and is trimmed.
+const rows = Array.from({ length: 30 }, (_, i) => ({
+  id: `id-${String(i).padStart(2, "0")}`,
+  createdAt: new Date(AT.getTime() - i * 1000),
+}));
+const full = paginate(rows, 25);
+assert.equal(full.items.length, 25, "a full page is exactly the limit");
+assert.ok(full.nextCursor, "a full page has a next cursor");
+assert.equal(full.nextCursor, encodeCursor(rows[24]!), "the cursor points at the last row sent, not the probe");
+const tail = paginate(rows.slice(25), 25);
+assert.equal(tail.items.length, 5, "a short page is returned whole");
+assert.equal(tail.nextCursor, null, "a short page ends the walk");
+assert.equal(paginate([], 25).nextCursor, null, "an empty result has no cursor");
+assert.equal(paginate(rows, MAX_LIMIT).nextCursor, null, "fewer rows than the limit is not a next page");
+// Rows sharing a timestamp still page, which is what the id half is for.
+const tied = Array.from({ length: 4 }, (_, i) => ({ id: `t-${i}`, createdAt: AT }));
+assert.equal(paginate(tied, 3).nextCursor, encodeCursor(tied[2]!), "a shared timestamp still yields a distinct cursor");
+assert.ok(keysetAfter, "the keyset predicate is constructible");
+
+// Name tokens. The email pipeline and {{first_name}} share this, so a
+// regression here changes both guessed addresses and greetings at once.
+assert.deepEqual(nameParts({ fullName: "Aarav Sharma" }), { firstName: "Aarav", lastName: "Sharma" }, "two tokens split cleanly");
+assert.deepEqual(nameParts({ fullName: "  Priya   Menon  " }), { firstName: "Priya", lastName: "Menon" }, "runs of whitespace collapse");
+assert.deepEqual(nameParts({ fullName: "Cher" }), { firstName: "Cher" }, "a mononym has no last name, not an empty string");
+assert.deepEqual(nameParts({ fullName: "Mary-Kate O'Neill" }), { firstName: "Mary-Kate", lastName: "O'Neill" }, "hyphenated given name survives");
+assert.deepEqual(nameParts({ fullName: "Juan van der Berg" }), { firstName: "Juan", lastName: "van der Berg" }, "a multi-token surname stays whole");
+assert.deepEqual(nameParts({ fullName: "J. Smith" }), { firstName: "J.", lastName: "Smith" }, "an initial is the given name");
+// Each half falls back independently: correcting only the surname works.
+assert.deepEqual(
+  nameParts({ fullName: "Bae Suzy", firstName: "Suzy", lastName: "Bae" }),
+  { firstName: "Suzy", lastName: "Bae" },
+  "an override beats the split, which guessed the family name backwards",
+);
+assert.deepEqual(
+  nameParts({ fullName: "Aarav Sharma", lastName: "Sharma" }),
+  { firstName: "Aarav", lastName: "Sharma" },
+  "correcting only the last name leaves the split to supply the first",
+);
+assert.deepEqual(
+  nameParts({ fullName: "Aarav Sharma", firstName: "Aarav", lastName: null }),
+  { firstName: "Aarav", lastName: "Sharma" },
+  "a null override half falls through to the split, it is not a blank",
+);
+assert.deepEqual(
+  nameParts({ fullName: "Cher", lastName: "  " }),
+  { firstName: "Cher" },
+  "a whitespace-only override is not a last name",
+);
+// {{first_name}} must resolve the way the pipeline does, not to "".
+const GREET = targetVariables({
+  fullName: "Bae Suzy",
+  firstName: null,
+  company: "Acme",
+  roleTitle: "Engineer",
+});
+assert.equal(GREET.first_name, "Bae", "{{first_name}} falls back to the split, matching the pipeline");
+assert.equal(GREET.last_name, "Suzy", "{{last_name}} falls back to the split, matching the pipeline");
+const GREET_OVERRIDE = targetVariables({
+  fullName: "Bae Suzy",
+  firstName: "Suzy",
+  lastName: "Bae",
+  company: "Acme",
+  roleTitle: "Engineer",
+});
+assert.equal(GREET_OVERRIDE.first_name, "Suzy", "an override still wins in the compose form");
 
 console.log("selfcheck: ok");

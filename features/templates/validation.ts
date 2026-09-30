@@ -84,4 +84,6 @@ export const TemplateListSchema = v.object({
   templates: v.array(TemplateJsonSchema),
 });
 
+export const TemplateEnvelopeSchema = v.object({ template: TemplateJsonSchema });
+
 export type ApiTemplate = v.InferOutput<typeof TemplateJsonSchema>;

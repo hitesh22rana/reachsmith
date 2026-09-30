@@ -27,11 +27,12 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { Stepper } from "@/components/ui/stepper";
 import { ReviewList } from "@/components/review-list";
-import { errorMessage } from "@/lib/validators";
 import { buildOutreachBody, targetVariables } from "@/features/outreach/server";
 import type { Placeholder } from "@/features/templates/render";
-import { CHANNEL_LABELS, CHANNEL_OPTIONS, TemplateListSchema } from "@/features/templates/validation";
-import { OutreachCreateSchema, OutreachJsonSchema } from "../validation";
+import { CHANNEL_LABELS, CHANNEL_OPTIONS } from "@/features/templates/validation";
+import { fetchTemplates } from "@/features/templates/client";
+import { createOutreach, markOutreachSent } from "../client";
+import { OutreachCreateSchema } from "../validation";
 import type { OutreachTarget } from "../server";
 
 const OutreachFormSchema = v.omit(OutreachCreateSchema, ["target_id"]);
@@ -51,45 +52,6 @@ const STEPS: { title: string; description: string; fields: FieldName[] }[] = [
 ];
 
 const LAST_STEP = STEPS.length - 1;
-
-async function fetchTemplates() {
-  const response = await fetch("/api/templates");
-  if (!response.ok) {
-    throw new Error(`Failed to load templates (${response.status})`);
-  }
-  const data: unknown = await response.json();
-  return v.parse(TemplateListSchema, data).templates;
-}
-
-async function saveOutreach(
-  targetId: string,
-  data: OutreachFormInput,
-  variables: Record<string, string>,
-  markSent: boolean,
-) {
-  const parsed = v.parse(OutreachCreateSchema, { ...data, target_id: targetId, variables });
-  const created = await fetch("/api/outreach", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(parsed),
-  });
-  if (!created.ok) {
-    const body: unknown = await created.json().catch(() => null);
-    throw new Error(errorMessage(body, `Failed to save outreach (${created.status})`));
-  }
-  const createdBody: unknown = await created.json();
-  const { outreach } = v.parse(v.object({ outreach: OutreachJsonSchema }), createdBody);
-  if (markSent) {
-    const sent = await fetch(`/api/outreach/${outreach.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status: "sent" }),
-    });
-    if (!sent.ok) {
-      throw new Error(`Saved as draft, but marking sent failed (${sent.status})`);
-    }
-  }
-}
 
 function FieldError({ message }: { message: string | undefined }) {
   if (!message) {
@@ -166,7 +128,10 @@ function MessageStep({
                 <SelectItem value="custom">Custom message</SelectItem>
                 {templates.map((item) => (
                   <SelectItem key={item.id} value={item.id}>
-                    {item.name}
+                    {/* Same truncation the trigger above already does. A
+                        template name is a summary, not body copy, so it
+                        ellipsizes rather than wrapping or widening the popup. */}
+                    <span className="min-w-0 flex-1 truncate">{item.name}</span>
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -492,8 +457,17 @@ export function NewOutreachDialog({
   }, [bodyDirty, template, variables, target, setValue]);
 
   const save = useMutation({
-    mutationFn: ({ data, markSent }: { data: OutreachFormInput; markSent: boolean }) =>
-      saveOutreach(target.id, data, variables, markSent),
+    mutationFn: async ({ data, markSent }: { data: OutreachFormInput; markSent: boolean }) => {
+      const parsed = v.parse(OutreachCreateSchema, {
+        ...data,
+        target_id: target.id,
+        variables,
+      });
+      const { outreach } = await createOutreach(parsed);
+      if (markSent) {
+        await markOutreachSent(outreach.id);
+      }
+    },
     onSuccess: () => {
       setServerError(null);
       void queryClient.invalidateQueries({ queryKey: ["outreach"] });
@@ -549,6 +523,18 @@ export function NewOutreachDialog({
     reset();
   }
 
+  // The list below is the dialog's whole field set, and the cache it comes
+  // from is shared with the templates page, so refetch to be sure it matches
+  // the template just saved. One small GET, only when the user opens it.
+  function openDialog(nextOpen: boolean): void {
+    if (nextOpen) {
+      setOpen(true);
+      void templates.refetch();
+      return;
+    }
+    cancel();
+  }
+
   async function copyBody() {
     if (!body) {
       return;
@@ -568,7 +554,7 @@ export function NewOutreachDialog({
   ];
 
   return (
-    <Dialog open={open} onOpenChange={(nextOpen) => (nextOpen ? setOpen(true) : cancel())}>
+    <Dialog open={open} onOpenChange={openDialog}>
       <DialogTrigger render={<Button className="pressable">New outreach</Button>} />
       <DialogContent ref={contentRef} className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
         <DialogHeader>

@@ -33,49 +33,40 @@ import {
   AutocompleteItem,
   AutocompleteList,
 } from "@/components/ui/autocomplete";
-import { errorMessage } from "@/lib/validators";
 import { AudienceListSchema, type ApiAudience } from "@/features/audiences/validation";
 import { PLACEHOLDER_MAX, parsePlaceholders, type Placeholder } from "../render";
+import { DeletedSchema, getJson, sendJson } from "@/lib/api";
 import {
   CHANNEL_LABELS,
   CHANNEL_OPTIONS,
   TemplateCreateSchema,
-  TemplateJsonSchema,
+  TemplateEnvelopeSchema,
   type ApiTemplate,
 } from "../validation";
 
 type TemplateFormInput = v.InferInput<typeof TemplateCreateSchema>;
 type TemplateForm = UseFormReturn<TemplateFormInput>;
 
-async function fetchAudiences(): Promise<ApiAudience[]> {
-  const response = await fetch("/api/audiences");
-  if (!response.ok) {
-    return [];
-  }
-  const data: unknown = await response.json();
-  return v.parse(AudienceListSchema, data).audiences;
+// A failed audience fetch must not break the editor: the field is optional
+// and a missing suggestion list is better than a dialog that will not open.
+function fetchAudiences(): Promise<ApiAudience[]> {
+  return getJson("/api/audiences", AudienceListSchema, "audiences")
+    .then((page) => page.audiences)
+    .catch(() => []);
 }
 
-async function deleteAudience(id: string): Promise<void> {
-  const response = await fetch(`/api/audiences/${id}`, { method: "DELETE" });
-  if (!response.ok) {
-    throw new Error(`Failed to remove audience (${response.status})`);
-  }
+function deleteAudience(id: string): Promise<{ id: string }> {
+  return sendJson("DELETE", `/api/audiences/${id}`, undefined, DeletedSchema, "remove audience");
 }
 
-async function saveTemplate(id: string | null, data: TemplateFormInput): Promise<void> {
-  const parsed = v.parse(TemplateCreateSchema, data);
-  const response = await fetch(id ? `/api/templates/${id}` : "/api/templates", {
-    method: id ? "PATCH" : "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(parsed),
-  });
-  if (!response.ok) {
-    const body: unknown = await response.json().catch(() => null);
-    throw new Error(errorMessage(body, `Failed to save template (${response.status})`));
-  }
-  const body: unknown = await response.json();
-  v.parse(v.object({ template: TemplateJsonSchema }), body);
+function saveTemplate(id: string | null, data: TemplateFormInput) {
+  return sendJson(
+    id ? "PATCH" : "POST",
+    id ? `/api/templates/${id}` : "/api/templates",
+    v.parse(TemplateCreateSchema, data),
+    TemplateEnvelopeSchema,
+    "save template",
+  );
 }
 
 function FieldError({ message }: { message: string | undefined }) {
@@ -214,6 +205,17 @@ function PlaceholderHints({
   );
 }
 
+// A function because useForm reads defaultValues once, at mount.
+function formDefaults(template?: ApiTemplate): TemplateFormInput {
+  return {
+    name: template?.name ?? "",
+    channel: template?.channel ?? "email",
+    audience: template?.audience ?? "",
+    purpose: template?.purpose ?? "",
+    body: template?.body ?? "",
+  };
+}
+
 export function TemplateDialog({ template }: { template?: ApiTemplate }) {
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
@@ -223,13 +225,7 @@ export function TemplateDialog({ template }: { template?: ApiTemplate }) {
   const form = useForm<TemplateFormInput>({
     resolver: valibotResolver(TemplateCreateSchema),
     mode: "onChange",
-    defaultValues: {
-      name: template?.name ?? "",
-      channel: template?.channel ?? "email",
-      audience: template?.audience ?? "",
-      purpose: template?.purpose ?? "",
-      body: template?.body ?? "",
-    },
+    defaultValues: formDefaults(template),
   });
   const {
     register,
@@ -255,23 +251,36 @@ export function TemplateDialog({ template }: { template?: ApiTemplate }) {
 
   const save = useMutation({
     mutationFn: (data: TemplateFormInput) => saveTemplate(template?.id ?? null, data),
-    onSuccess: () => {
+    onSuccess: async () => {
       setServerError(null);
-      void queryClient.invalidateQueries({ queryKey: ["templates"] });
+      // Awaited: the compose dialog derives its whole field set from this
+      // cache, and firing-and-forgetting could hand it a pre-save list.
+      await queryClient.invalidateQueries({ queryKey: ["templates"] });
       // A name typed here that the server had not seen became a new preset
       // row. Without this the suggestions the next dialog opens with are up
       // to staleTime old and will not offer the audience just used.
       void queryClient.invalidateQueries({ queryKey: ["audiences"] });
       setOpen(false);
-      reset();
     },
     onError: (error) => {
       setServerError(error instanceof Error ? error.message : "Failed to save template");
     },
   });
 
+  // Reset on open. Without it the form shows what the record looked like when
+  // the page first rendered, while the card behind it reads fresh from the
+  // query. Off the prop instead, a refetch would eat an in-progress edit.
+  function openDialog(nextOpen: boolean): void {
+    setOpen(nextOpen);
+    if (nextOpen) {
+      reset(formDefaults(template));
+    } else {
+      setServerError(null);
+    }
+  }
+
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={openDialog}>
       <DialogTrigger
         render={
           template ? (
