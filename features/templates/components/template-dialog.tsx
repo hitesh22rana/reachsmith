@@ -275,7 +275,7 @@ export function TemplateDialog({ template }: { template?: ApiTemplate }) {
       <DialogTrigger
         render={
           template ? (
-            <Button variant="ghost" size="sm" className="pressable">
+            <Button variant="ghost" size="sm" className="w-20 pressable">
               Edit
             </Button>
           ) : (
