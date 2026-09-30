@@ -103,7 +103,9 @@ function ResultCard({
   onCopy: () => void;
 }) {
   return (
-    <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border p-4">
+    // The payoff moment: the pipeline settles, "Finding email…" disappears and
+    // this arrives in the same frame. animate-enter is the bridge between them.
+    <div className="animate-enter flex flex-wrap items-center justify-between gap-2 rounded-xl border p-4">
       <div className="min-w-0">
         <p className="truncate text-sm font-medium">{primaryEmail}</p>
         {confidence ? (

@@ -44,7 +44,7 @@ function SkeletonCard({ hidden = false }: { hidden?: boolean }) {
     <Card aria-hidden="true" className={cn("min-h-56 min-w-0 gap-5", hidden && "invisible")}>
       <CardHeader className="gap-4">
         <div className="flex items-start gap-4">
-          <div className="size-12 shrink-0 animate-pulse rounded-full bg-muted" />
+          <div className="size-12 shrink-0 animate-pulse rounded-xl bg-muted" />
           <div className="flex min-w-0 flex-1 flex-col">
             <div className="mb-1 h-4 w-24 animate-pulse rounded bg-muted" />
             <div className="h-6 w-2/3 animate-pulse rounded bg-muted" />
