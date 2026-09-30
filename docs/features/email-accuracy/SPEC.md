@@ -1,41 +1,51 @@
 # Email Accuracy: Feature SPEC
 
 ## Goal
-Find a target's company email with evidence that supports the result. Never turn an unrelated notes address or a public mailbox domain into a company guessing domain. Do not claim that mailbox deliverability proves the mailbox belongs to the target.
 
-## Dependencies and source of truth
-Build on `docs/features/email-pipeline/SPEC.md` and `SPECS.md` §7-8. This feature supersedes their notes-domain fallback, all-at-once verification, and MX-only rejection. Keep the existing schema, enum values, ownership rules, workers, and manual override precedence. No migration or new model is required.
+Offer likely work-email addresses without presenting a guess as a verified mailbox. Keep every generated candidate on the resolved company domain. The owner decides which address, if any, to use for manual outreach.
 
-## Domain and candidate rules
-1. `target.domain` is authoritative when present. Normalize lowercase. Generate and verify company candidates only at this domain.
-2. Otherwise use `target.company_website` only when it is an HTTP(S) URL with a straightforward company hostname. Strip `www`; reject IPs, localhost, public email providers, and hosting/social/link shortener domains. Ambiguous hosts (for example a deep subdomain or public suffix case) require an explicit domain. Do not fetch the site or scrape search results. A website-derived domain is provisional and is not persisted over the user's `domain` field.
-3. With neither trustworthy source, generate no candidates, spend no verifier credits, and tell the user to enter the company's email domain. Never fall back to Gmail or another domain found in notes.
-4. Notes addresses are candidates only if their domain equals the resolved company domain. Other addresses can remain in notes as context but must never be verified or used as pattern evidence. `example@gmail.com` with `domain=acme.com` must yield only `@acme.com` candidates. If both fields are absent, it yields no candidates.
-5. Keep six name patterns and social-handle candidates. Continue using `nameParts()` for name tokens. The model may reorder eligible candidates only; it cannot admit a candidate from another domain.
+## Dependencies
 
-## Verification and selection
-1. Persist the selected rank for each new candidate in the existing `score` column. Verify in that order, one candidate at a time for each target, with a maximum of 10 attempts. Stop launching candidates after the first `valid` and remove the unattempted pending rows. A search-input edit clears prior guesses before regenerating candidates; unrelated edits do not restart the search.
-2. Interpret QuickEmailVerification's `result`, `safe_to_send`, `accept_all`, `disposable`, and `role` fields using their documented boolean representations, including string booleans. `valid` requires an affirmative safe-to-send result and no catch-all, disposable, or role flag. Catch-all is `accept_all`; invalid/disposable is `invalid`; missing or contradictory information is `unknown`. Preserve the raw response in `verification_meta`. Do not label an address as belonging to the target based solely on verifier output.
-3. DNS: a null MX or proven nonexistent domain is invalid; an empty MX answer must check A/AAAA under SMTP's implicit-MX rule; temporary DNS errors remain `unknown` or retry. Never turn a DNS timeout into `invalid`.
-4. A valid winner writes `primary_email` only when `primary_email_source` is not `manual`. Recompute by persisted candidate rank, not static pattern preference or job completion order. A later result cannot replace a better ranked valid candidate. A changed explicit or website-derived domain must not leave an old automatically verified address displayed as a current company result.
-5. Provider network failures retry under the existing bounded BullMQ policy. After final failure, settle the row to `unknown` and continue to the next eligible candidate. The worker rechecks target/guess ownership inside tenant RLS before every write.
+Build on targets and the email-pipeline feature. SPECS.md sections 7 and 8 are the source of truth. This feature replaces the former external verification stage in the baseline schema before deployment.
+
+## Domain boundary
+
+1. The explicit target domain wins.
+2. Otherwise derive a provisional domain only from a straightforward HTTP(S) company website hostname. Strip www; reject IPs, localhost, public mailbox providers, social sites, hosted-page domains, link shorteners, and ambiguous subdomains. Do not fetch or scrape the website.
+3. Without a trustworthy domain, create no suggestions and ask the owner for the company email domain. Never fall back to Gmail or a notes address.
+4. Include an address found in notes only when its domain exactly matches the resolved company domain. A personal address at another domain remains in notes but is neither a suggestion nor pattern evidence.
+5. The six name patterns and social-handle candidates use nameParts() and the resolved company domain. The optional baked Qwen model may reorder eligible candidates; it cannot add an address or change its domain.
+
+## Ranking and storage
+
+- Persist at most ten suggestions per target with email, pattern_used, source, score, and optional context. Higher score means higher selected rank.
+- Only the email-guess BullMQ worker creates suggestion rows. It reloads the target under asUser(userId, ...) and rechecks ownership before writing. Queue payloads carry targetId and userId as scope, not authority.
+- A target edit that submits name, domain, company website, notes, or social URLs clears old suggestions and enqueues a new search. Unrelated edits leave suggestions alone.
+- GET /api/targets/[id]/guesses is scoped to the session owner and returns only rows matching the currently resolved domain, ordered by score descending.
+- No DNS or SMTP probe, verifier API, email-verify queue, validity status, verification metadata, or automatic primary_email selection is used.
 
 ## User-facing behavior
-- When no company domain can be resolved, show "Add the company's email domain to find a work address" instead of "email not found".
-- Distinguish manually entered, verified deliverable, catch-all/uncertain, and invalid statuses. Say "Verified deliverable" rather than "correct email" or "belongs to this person". Verification is mailbox evidence, not identity proof.
-- Keep manual entry available, including personal addresses. A manual address remains an owner decision and is not subject to the company-domain rule.
-- Once settled, keep the candidate list limited to attempted addresses from the resolved company domain. Explain that a website-suggested domain is provisional if surfaced to the user.
 
-## Implementation boundaries
-- Change the existing ranker, guess worker, verification helpers/worker, and email section. Reuse existing `domain`, `company_website`, `score`, `status`, `verification_meta`, and `primary_email_source` fields. No schema migration, new service, custom trained model, or LinkedIn scraping.
-- Every target query and write stays scoped to `user_id` under `asUser()`. Candidate ownership must be checked against the target; mismatches write nothing. API routes preserve 404 for foreign IDs.
-- Keep the baked Qwen ranker as an optional reorder stage with deterministic fallback. Do not fine-tune until measured candidate coverage and ranking errors justify it.
+- Show ranked suggestions with their source or pattern and a Copy action. State clearly that they are unverified.
+- If the website supplied the domain, label it provisional and ask the user to confirm it before outreach.
+- Keep manual email entry available, including personal addresses. A saved primary_email is an owner choice, not a validity claim.
+- Poll briefly while the guess worker generates suggestions; if none appear by the ceiling, show a non-definitive message and the manual entry path. Do not say an email was not found merely because generation or the worker failed.
+- Outreach remains manual: compose, copy, and mark sent or replied. A reply is user-recorded evidence of contact, not a mailbox check performed by the app.
 
-## Acceptance checks
-- Explicit `acme.com` plus notes containing `example@gmail.com` produces no Gmail candidates and no Gmail verifier calls.
-- Gmail-only notes and no company domain or website produce no candidates or verifier calls.
-- `https://www.acme.com/about` without explicit domain produces `@acme.com` candidates; ambiguous/public-platform URLs do not supply a domain.
-- A provider response with string `safe_to_send: "true"` is interpreted correctly; catch-all and role flags prevent a `valid` verdict.
-- No-MX with A/AAAA does not get rejected solely for missing MX. Null MX and NXDOMAIN are invalid; temporary DNS failure is not.
-- Only the next ranked candidate is scheduled after a non-valid result; the first valid candidate stops the chain. The chosen primary follows saved rank and manual overrides survive.
-- A domain edit removes an old automatically selected address from the current result. Jobs from another tenant cannot read or write rows.
+## Schema and cleanup
+
+- Remove email_guesses.status, email_guesses.verification_meta, the email_guess_status enum, and targets.primary_email_source from the existing baseline schema and migration. No new migration file is needed before deployment.
+- Existing local test databases can be reset and migrated from the updated baseline. If adjusted in place, clear any previously automatic primary_email values before dropping provenance; preserve manually entered values.
+- Exclude any legacy off-domain rows from API results. An input edit regenerates rows with current rules.
+- Remove EMAIL_VERIFIER_API_KEY, the verifier queue and worker, provider mapping, verifier-only tests, and claims of automatic verification from product copy and documentation.
+- Better Auth's verifications table and users.email_verified field are authentication data and must remain.
+
+## Acceptance
+
+- With domain acme.com and notes containing example@gmail.com, every suggestion ends in @acme.com.
+- With only a Gmail address in notes and no company domain or website, there are no suggestions.
+- A straightforward company website supplies a provisional domain; a social or mailbox website does not.
+- Suggestions never write target.primary_email. A manually saved address remains after later suggestion refreshes.
+- A fresh database from the baseline has no verifier fields, and existing local test data has no old automatic primary emails.
+- A cross-tenant target ID yields no suggestions or writes. The API returns 404 for a foreign target.
+- No active code reads EMAIL_VERIFIER_API_KEY or starts an email-verify worker.

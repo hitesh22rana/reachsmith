@@ -3,13 +3,13 @@
 ## Goal
 Public marketing page at `/`; the dashboard moves behind auth to `/dashboard` (`SPECS.md` §5.2, §9.1). Logged-out visitors see landing; logged-in visitors go to their dashboard.
 
-Design follows the landing-page-design skill (Part A strategy before Part B visuals). Locked intake decisions: primary action is account creation, top objection is email accuracy, direction is minimal editorial, layout type A (classic hero plus sections: the product is understandable from a dashboard screenshot).
+Design follows the landing-page-design skill (Part A strategy before Part B visuals). Locked intake decisions: primary action is account creation, top objection is confidence in suggested email addresses, direction is minimal editorial, layout type A (classic hero plus sections: the product is understandable from a dashboard screenshot).
 
 ## Dependencies
 Foundation (layout, design system, motion tokens) + auth (session state for the redirect).
 
 ## Scope
-- `/` becomes a public landing page: hero (product name, one-line pitch, Log in / Create account CTAs), feature highlights (targets, templates, outreach, email verification), footer. No app data, no user-specific content.
+- `/` becomes a public landing page: hero (product name, one-line pitch, Log in / Create account CTAs), feature highlights (targets, templates, outreach, unverified email suggestions), footer. No app data, no user-specific content.
 - Move the current dashboard (stat cards, session-aware header) from `/` to `/dashboard`, guarded by `requireUserId()`.
 - Logged-in visit to `/` redirects to `/dashboard`. Post-login/post-signup redirect becomes `/dashboard` (update `auth-form.tsx` + auth SPEC).
 - Reuse Card/Button/motion tokens (`animate-enter`, `pressable`, stagger); honor reduced motion. SEO metadata for `/`.
