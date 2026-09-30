@@ -33,8 +33,8 @@ export const metadata: Metadata = {
     template: "%s | ReachSmith",
   },
   description:
-    "Referral outreach without the spreadsheet. Keep every contact in one place, verify each email, and track every conversation to its outcome.",
-  keywords: ["referral outreach", "job search", "recruiter contacts", "email verification", "job seekers"],
+    "Referral outreach without the spreadsheet. Keep contacts in one place, explore likely work emails, and track every conversation to its outcome.",
+  keywords: ["referral outreach", "job search", "recruiter contacts", "email suggestions", "job seekers"],
   authors: [{ name: "ReachSmith" }],
   creator: "ReachSmith",
   robots: { index: true, follow: true },
@@ -45,13 +45,13 @@ export const metadata: Metadata = {
     url: "/",
     title: "ReachSmith | Referral outreach without the spreadsheet",
     description:
-      "Keep every contact in one place, verify each email before you write, and track every conversation to its outcome.",
+      "Keep every contact in one place, explore likely work emails, and track every conversation to its outcome.",
   },
   twitter: {
     card: "summary_large_image",
     title: "ReachSmith | Referral outreach without the spreadsheet",
     description:
-      "Keep every contact in one place, verify each email before you write, and track every conversation to its outcome.",
+      "Keep every contact in one place, explore likely work emails, and track every conversation to its outcome.",
   },
   manifest: "/manifest.webmanifest",
 };

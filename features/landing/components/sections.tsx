@@ -1,4 +1,4 @@
-import { Inbox, PenLine, Send, ShieldCheck, type LucideIcon } from "lucide-react";
+import { Inbox, PenLine, Search, Send, type LucideIcon } from "lucide-react";
 import { Reveal } from "./reveal";
 import { HowSteps } from "./how-steps";
 
@@ -36,9 +36,9 @@ const BENEFITS: Benefit[] = [
     body: "Templates fill name, company, role, and job link for each contact.",
   },
   {
-    icon: ShieldCheck,
-    title: "Addresses you can trust",
-    body: "Every guess passes mailbox checks and a verification service. Only valid ones get recommended.",
+    icon: Search,
+    title: "Find the best address to try",
+    body: "Get ranked work-email suggestions from the company domain, contact name, notes, and public handles.",
   },
   {
     icon: Send,

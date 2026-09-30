@@ -3,6 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { forUser } from "@/db";
 import { emailGuesses, targets } from "@/db/schema";
 import { getUserId } from "@/lib/auth";
+import { resolveDomain } from "@/lib/email-rank";
 
 interface RouteContext {
   params: Promise<{ id: string }>;
@@ -16,7 +17,7 @@ export async function GET(_request: NextRequest, context: RouteContext): Promise
   const id = (await context.params).id;
   const [target] = await forUser(userId, (db) =>
     db
-      .select({ id: targets.id })
+      .select({ id: targets.id, domain: targets.domain, companyWebsite: targets.companyWebsite })
       .from(targets)
       .where(and(eq(targets.id, id), eq(targets.userId, userId)))
       .limit(1),
@@ -24,6 +25,8 @@ export async function GET(_request: NextRequest, context: RouteContext): Promise
   if (!target) {
     return NextResponse.json({ message: "Not found" }, { status: 404 });
   }
+  const domain = resolveDomain(target.domain, target.companyWebsite);
+  if (!domain) return NextResponse.json({ guesses: [] });
   const rows = await forUser(userId, (db) =>
     db
       .select()
@@ -36,11 +39,10 @@ export async function GET(_request: NextRequest, context: RouteContext): Promise
       .orderBy(desc(emailGuesses.score), desc(emailGuesses.createdAt)),
   );
   return NextResponse.json({
-    guesses: rows.map((row) => ({
+    guesses: rows.filter((row) => row.email.endsWith(`@${domain}`)).map((row) => ({
       email: row.email,
       patternUsed: row.patternUsed,
       source: row.source,
-      status: row.status,
     })),
   });
 }

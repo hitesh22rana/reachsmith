@@ -1,56 +1,42 @@
 # Email Pipeline: SPEC
 
 ## Goal
-Ranked candidates → top-k verification → `target.primary_email` (`SPECS.md` §3.3, §6.5, §7–8). No blind guessing: every verification attempt is budgeted and ordered by evidence.
+
+Generate up to ten ranked, unverified work-email suggestions for a target. SPECS.md sections 7 and 8 and docs/features/email-accuracy/SPEC.md define the current behavior.
 
 ## Dependencies
-Foundation, targets. Trigger is `POST /api/targets` and `PATCH /api/targets/[id]` (names, domain, or notes changed); workers dedupe already-guessed addresses.
 
-## Scope
-- `Target` model (see `docs/features/targets/SPEC.md`): `social_urls` (max 5, plain URLs, no types), explicit optional `domain`, `company_website` kept as a dumb contact link with no pipeline role. No website-based domain derivation.
-- `EmailGuess` model per `SPECS.md` §6.5 plus ranking columns: `source` (`notes | pattern | domain_inferred`), `score` (numeric, higher first), `context` (notes window around an extracted address, nullable). Status enum verbatim. Skip `DomainPattern` (§6.6).
-- `lib/email-patterns.ts`: `generateCandidates({first_name, last_name, domain})` emitting the 6 SPEC patterns (`first.last, f.last, first, first_last, last.first, f_last`), lowercased, syntax-validated.
-- The `{first_name, last_name}` handed to the ranker comes from `nameParts()` in `lib/target-name.ts`, not from a split local to the worker: the stored `first_name`/`last_name` are an override for names that do not split naively, and the fallback splits `full_name`. `features/outreach/server.ts` calls the same helper for `{{first_name}}`, so the guessed addresses and the compose greeting can never disagree about a person's name.
-- `lib/email-rank.ts` (pure, unit-checked): deterministic scorer.
-  - Notes addresses (regex-extracted): base score highest, adjusted by context cues in a ±6-word window (positive: personal, correct, new, updated, reach me at, his/her; negative: example, e.g., like, don't, old, wrong, former, sample) and by name-in-local-part (plus, never a hard gate).
-  - Pattern inference: a notes address parsing as a known pattern boosts that pattern for generated candidates; its domain feeds domain resolution.
-  - Name-pattern candidates: frequency order, scaled by name completeness (full first+last beats first-only).
-  - Social handles: last URL path segments (`github.com/foo` → `foo`) become `{handle}@{domain}` candidates (pattern `handle`, scored below `first.last`, preferred in primary pick); the handle list also feeds the SLM prompt as context. Social URLs contribute no other score.
-- Domain resolution (first hit wins): explicit `target.domain` → domain parsed from a notes-extracted address → no candidates (no rows, UI shows not-found).
-- `lib/queues/`: `email-guess { targetId }`, `email-verify { candidateId }` BullMQ definitions. Payloads carry IDs only; workers re-load and re-verify ownership.
-- `workers/email-guess.ts` (guess starter): load target → resolve domain → extract + generate with evidence bundles → rank (SLM when loaded, deterministic otherwise) → insert rows → enqueue verify jobs in rank order.
-- `workers/email-rank-model.ts` (backend rank stage, `node-llama-cpp`): Qwen2.5-0.5B-Instruct GGUF, one model, one context and one prompt at a time, loaded once for the process from baked weights (`HF_MODEL_CACHE`). Output shape enforced at generation level by a JSON-schema grammar over candidate indices, so unknown IDs are unrepresentable and every response parses. Input: target fields + notes + known social handles + numbered candidate IDs with evidence, via chat template. Omitted candidates keep deterministic spots; any failure falls back to deterministic order silently. The model may only reorder: unknown IDs dropped, omitted candidates keep deterministic positions, any failure falls back to deterministic order silently. The load is memoized on the in-flight promise and every rank call is chained through one queue, because the guess worker runs at concurrency 5: a guard on the resolved session lets five jobs in together and each loads its own copy of the weights.
-- `workers/email-verify.ts` (verify starter): `pending → verifying` → MX check (no MX → `invalid`, no API call) → verifier API → map to `valid|invalid|unknown|accept_all` per §7.4, raw response in `verification_meta` → recompute `target.primary_email` per §7.5 (valid only, `first.last` first; anything else leaves the target untouched, and an owner-set `primary_email_source = 'manual'` is never overwritten). Concurrency 5, rate-limit, exponential-backoff retries. A thrown job settles its row to `unknown` on the `failed` listener, and the verifier call is bounded by a 10s timeout, so no row stays `verifying` forever.
-- `workers/run.ts`: one process hosting both starters (`pnpm worker`).
-- Budget: verify top `min(candidates, 10)` in rank order, stop at the first `valid`.
-- UI (in `/targets/[id]` email section): `processing` ("Finding email…", polls until settled or a 120s ceiling, then shows a still-checking state), `found` (address + provenance from the stored `primary_email_source` marker: verified pattern / notes-sourced / manual / risky catch-all), `not_found` ("try manual entry or LinkedIn DM"). A collapsed "What was tried" table lists attempted addresses with pattern, source, and status. Manual override stays (validated email, writes `primary_email` directly and stamps `primary_email_source = 'manual'`).
-- Production: model weights baked into the worker image at build time (pinned revision); deterministic fallback stays even with baked weights.
+Foundation, auth, targets. Target creation and search-input edits enqueue email-guess with targetId and userId. The worker is a standalone Node process using BullMQ and Redis.
 
-## Security
-- Workers never trust job payloads: reload `target`/`EmailGuess` from DB and confirm `user_id` chain before any read/write; mismatched or missing ownership → drop the job, write nothing. The same chain check guards the `failed`-listener recovery write.
-- Jobs also run inside tenant RLS: `processGuessJob`/`processVerifyJob` wrap their reads and writes in `asUser(job.data.userId, ...)`, and the queue payload carries `userId` for that reason. The payload is a scope, not a grant: RLS can only ever narrow the worker to rows already owned by that user, and the ownership-chain re-check runs on top. A forged payload naming another tenant's target matches zero rows and the job exits.
-- `primary_email` write-back stays inside the target owner's row, and the recompute additionally requires the row not be marked `manual`. Candidate-list/manual-override endpoints are `user_id`-scoped (404 on mismatch).
-- CSRF is applied once in `proxy.ts` (matcher `/api/:path*`) via `isCsrfAttempt` in `lib/csrf.ts`, not repeated per handler, so a new route cannot forget it. Authentication and authorization stay in the handlers: every route still calls `getUserId()` and 404s a foreign id. A Server Action would post to its page route and bypass the matcher, so one must re-check origin itself.
-- The model is resolved from the baked, revision-pinned weights in `HF_MODEL_CACHE` (a directory, resolved with `resolveModelFile(file#rev, dir)`), so the shipped worker makes no model egress at runtime.
-- Verifier API key stays server-side in workers only; rate-limit verify jobs.
-- `GET /api/targets/[id]/guesses` returns this target's candidates ordered by `score DESC, created_at DESC`. The score is what makes the order meaningful: the guess worker inserts a whole ranked batch in one statement, so every candidate in a batch shares a transaction `created_at` and that column alone cannot order them. Bounded at roughly one row per pattern for one domain, so it is never paginated.
+## Candidate generation
 
-## Tasks
-1. Schema changes in `db/schema.ts` (no new schema file): drop `profile_url`/`linkedin_url`/`github_url`, add `social_urls` + `domain`, extend `EmailGuess` with `source`/`score`/`context`; squash migrations to one fresh baseline, wipe local dev DB, re-migrate, re-seed.
-2. `lib/email-rank.ts` + unit check (keyword cues, name signal, pattern boost, ordering).
-3. `lib/queues/` + `POST`/`PATCH` hook wiring (already live; extend trigger to notes/domain changes).
-4. Guess worker + backend SLM rank stage + verifier mapping/primary-pick helpers with direct checks.
-5. Email section UI with processing/found/not-found states plus a collapsed tried-candidates table (no per-row actions).
-6. Worker image bakes the pinned model; compose gains the cache env and offline flag.
+- Resolve the company domain from target.domain, or an eligible company_website hostname. Notes and social profiles never supply the domain. If none is available, write no rows.
+- Use nameParts() to obtain the same given and family names that outreach templates use.
+- Generate the six name patterns: first.last, f.last, first, first_last, last.first, f_last. Include observed social handles at the company domain.
+- Extract note addresses only at the resolved domain. Rank them using nearby positive and negative context cues and name matches; a known name pattern in notes can boost matching generated candidates.
+- Deduplicate, syntax-check, and rank eligible candidates. The locally hosted Qwen 0.5B model may reorder them. It loads once, serializes prompts, and falls back to deterministic ranking on failure. The model only reorders supplied candidate IDs.
+- Store the top ten in email_guesses with source, pattern_used, score, and optional context. No candidate receives a validity or deliverability label.
+
+## Worker and security
+
+- processGuessJob reloads the target in an asUser(userId, ...) transaction under tenant RLS. A missing or cross-tenant target writes nothing.
+- Job payload userId scopes RLS and never substitutes for the ownership check.
+- The worker inserts rows and stops. There is no verifier queue, provider call, SMTP probe, or automatic primary_email update.
+- The model is baked into the worker image at a pinned revision; deterministic fallback works without it.
+- GET /api/targets/[id]/guesses checks the session owner and returns only current-domain candidates ordered by score descending. A foreign ID returns 404.
+- The verifier API key is not an environment variable.
+
+## UI
+
+- Show suggestions in rank order with Copy actions and an explicit unverified label. A website-derived domain is provisional.
+- If no domain can be resolved, ask the user to enter one. If no suggestions appear before the poll ceiling, avoid claiming no mailbox exists.
+- The owner may set primary_email manually. The app never fills it from a guess. Outreach sending remains manual.
 
 ## Acceptance
-- Create target with domain + notes mentioning a personal address → notes address ranks first → verify resolves → valid lands on `target.primary_email`.
-- Notes saying "don't use X" demote X below pattern candidates.
-- No domain anywhere → no rows, UI shows not-found.
-- No-MX domain → `invalid` without API call.
-- Unknown/missing model → deterministic order still verifies correctly.
-- Forged `{ targetId }` / `{ candidateId }` for another user's rows changes nothing.
-- Workers run as one process (`pnpm worker`) hosting both BullMQ workers; no worker code imported by Next.js server.
 
-## Non-goals
-`DomainPattern` learning, enrichment worker, sending, all-MiniLM-L6-v2 (bench warmer for later similarity work, e.g. duplicate-target detection), frontend inference.
+- An out-of-domain address in notes never appears as a candidate or changes the guessed domain.
+- A candidate cannot cross the company-domain boundary even when the model reorders.
+- The first ten persisted rows reflect the selected rank and the list endpoint preserves it.
+- A manual primary email survives a later suggestion refresh.
+- Forged cross-tenant jobs and API IDs reveal or change nothing.
+- pnpm worker starts only email-guess and requires no verifier API key.

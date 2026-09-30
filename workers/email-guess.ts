@@ -5,7 +5,6 @@ import { asUser } from "./db.ts";
 import { emailGuesses, targets } from "../db/schema.ts";
 import { rankCandidates, extractHandles } from "../lib/email-rank.ts";
 import { rankWithModel } from "./email-rank-model.ts";
-import { enqueueEmailVerify } from "../lib/queues/email.ts";
 import { nameParts } from "../lib/target-name.ts";
 
 function redisConnection() {
@@ -16,9 +15,7 @@ function redisConnection() {
   return { url };
 }
 
-// Verify budget: most evidence first, at most 10 attempts, the verify
-// worker stops the line at the first valid candidate.
-const VERIFY_BUDGET = 10;
+const SUGGESTION_LIMIT = 10;
 
 export async function processGuessJob(job: { data: { targetId: string; userId: string } }): Promise<void> {
   // Tenant RLS is scoped by the payload's userId for the whole job. The
@@ -39,6 +36,7 @@ export async function processGuessJob(job: { data: { targetId: string; userId: s
       first_name: firstName,
       last_name: lastName,
       domain: target.domain,
+      company_website: target.companyWebsite,
       notes: target.notes,
       social_urls: target.socialUrls,
     });
@@ -72,27 +70,21 @@ export async function processGuessJob(job: { data: { targetId: string; userId: s
     const ordered = (modelOrder ?? [...byId.keys()])
       .map((id) => byId.get(id))
       .filter((candidate) => candidate !== undefined)
-      .slice(0, VERIFY_BUDGET);
+      .slice(0, SUGGESTION_LIMIT);
 
-    const rows = await db
+    await db
       .insert(emailGuesses)
       .values(
-        ordered.map((candidate) => ({
+        ordered.map((candidate, index) => ({
           userId: target.userId,
           targetId: target.id,
           email: candidate.email,
           patternUsed: candidate.pattern,
           source: candidate.source,
-          score: Math.round(candidate.score),
+          score: SUGGESTION_LIMIT - index,
           context: candidate.context,
         })),
-      )
-      .returning({ id: emailGuesses.id, userId: emailGuesses.userId });
-    // Enqueue outside the transaction would be nicer, but the ids come back
-    // from the insert, so this runs before commit. BullMQ is a separate
-    // service, so a rollback here would only leave an orphan job, and the
-    // ownership-chain re-check in the verify worker drops it.
-    await Promise.all(rows.map((row) => enqueueEmailVerify(row.id, row.userId)));
+      );
   });
 }
 
