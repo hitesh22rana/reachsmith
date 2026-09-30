@@ -154,7 +154,7 @@ export default async function DashboardPage() {
                 {session ? `${greeting}, ${firstName}` : "ReachSmith"}
               </h1>
               <p className="max-w-xl text-sm text-muted-foreground sm:text-base">
-                Organize targets, predict and verify emails, and track outreach.
+                Organize targets, explore likely work emails, and track outreach.
               </p>
             </div>
           </div>

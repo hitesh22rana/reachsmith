@@ -14,7 +14,7 @@ import {
 
 const TITLE = "ReachSmith | Referral outreach without the spreadsheet";
 const DESCRIPTION =
-  "Referral outreach without the spreadsheet. Keep every contact in one place, verify each email, and track every conversation to its outcome.";
+  "Referral outreach without the spreadsheet. Keep contacts in one place, explore likely work emails, and track every conversation to its outcome.";
 
 export const metadata: Metadata = {
   title: TITLE,
