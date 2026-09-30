@@ -281,16 +281,16 @@ Given a target with a name and company:
 1. Determine the company domain.
 2. Generate candidate email addresses using a limited set of common patterns.
 3. Persist the candidates as EmailGuess records with `status = pending`.
-4. Asynchronously verify each candidate via an external email verification API.
+4. Verify candidates in ranked order, one at a time, through an external email verification API.
 5. Mark valid candidates and choose a recommended primary_email for the target.
 
 ### 7.2 Domain determination
 
 Strategies:
 
-- Use an explicit “company website” field if provided by user.
-- If the target has a LinkedIn company page URL or GitHub organization, extract domain when possible (later).
-- As a fallback, user can manually input a domain for the company.
+- Use the owner's explicit `domain` first.
+- Otherwise derive a provisional domain from a straightforward company website URL.
+- Never use an address in notes, a social profile, or a public mailbox domain as the company domain. If neither field supplies a trustworthy domain, ask the owner to enter one.
 
 Out-of-scope for MVP: complex domain lookup from company name alone.
 
@@ -311,14 +311,14 @@ In future, DomainPattern records can reduce this to the most probable 1–2 patt
 
 1. Local / free checks:
    - Basic syntax validation.
-   - DNS lookup for MX records; if none, mark as invalid (early exit).
+   - DNS lookup for MX records; without MX, check A/AAAA as SMTP's implicit-MX fallback. Null MX or proven nonexistence is invalid; transient DNS failures are unknown.
 2. External verification API:
    - For each syntactically valid candidate, call the email verification API.
    - Expected fields in response (varies by provider):
      - Result / status: valid, invalid, unknown, disposable, accept_all, etc.
      - `safe_to_send` or equivalent boolean.
 3. Status mapping:
-   - `valid` + safe_to_send → `status = valid`.
+   - `valid` + affirmative safe_to_send, with no catch-all, role, or disposable flag → `status = valid`.
    - `invalid` → `status = invalid`.
    - `disposable` or similar → `status = invalid` or `unknown` based on policy.
    - `accept_all` → `status = accept_all` (user sees a warning).
@@ -329,15 +329,11 @@ In future, DomainPattern records can reduce this to the most probable 1–2 patt
 Logic:
 
 - Prefer candidates with `status = valid`.
-- If multiple valid:
-  - Prefer patterns with higher global frequency (e.g., `first.last`).
-  - Secondarily, prefer patterns already seen as valid for this domain.
-- If only `accept_all` candidates:
-  - Optionally assign primary_email but label it as “risky / catch-all”.
-- If none valid or acceptable:
-  - Do not set primary_email; UI indicates “email not found – try manual or LinkedIn DM”.
+- Verify in persisted rank order and stop after the first valid result. A later job cannot replace a better ranked valid candidate.
+- Catch-all or uncertain candidates do not automatically set `primary_email`.
+- If none is valid, do not set `primary_email`. Show "email not found" after attempts finish, or ask for the company domain when none could be resolved.
 
-The chosen email is written to `target.primary_email` and surfaced in the UI.
+The chosen email is written to `target.primary_email` and surfaced in the UI as verified deliverable, not as proven to belong to the target. See `docs/features/email-accuracy/SPEC.md` for the complete contract.
 
 **Precedence: an owner's settled override outranks the pipeline.** Every owner-facing
 write stamps `primary_email_source = 'manual'`; the recompute stamps `'verified'`
@@ -355,15 +351,15 @@ marker rather than inferring provenance by matching the address against guesses.
 Planned queues:
 
 - `email-guess`:
-  - Job data: `{ targetId }`
+  - Job data: `{ targetId, userId }`; the worker reloads ownership under tenant RLS.
   - Responsibility:
     - Load target.
     - Derive domain.
     - Generate candidate emails.
     - Insert EmailGuess rows.
-    - Enqueue `email-verify` jobs for each candidate.
+    - Enqueue the highest ranked `email-verify` job.
 - `email-verify`:
-  - Job data: `{ candidateId }`
+  - Job data: `{ candidateId, userId }`; the worker reloads the candidate and target ownership chain.
   - Responsibility:
     - Load EmailGuess row.
     - Run verification (local + external API).
@@ -391,10 +387,10 @@ Later (optional):
 1. User creates/updates a target through Next.js.
 2. Server:
    - Stores target in DB.
-   - Enqueues a job in `email-guess` with `{ targetId }`.
+   - Enqueues a job in `email-guess` with `{ targetId, userId }`.
 3. `email-guess` worker:
    - Generates candidates, writes EmailGuess rows.
-   - Enqueues `email-verify` jobs for each candidate.
+   - Enqueues the first `email-verify` job; each non-valid result schedules the next candidate.
 4. `email-verify` worker:
    - Verifies each candidate and updates status.
    - Optionally updates target.primary_email when a good candidate is found.
