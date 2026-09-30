@@ -27,7 +27,7 @@ export function Faq() {
                 {faq.question}
                 <ChevronDown
                   aria-hidden="true"
-                  className="size-5 shrink-0 text-muted-foreground transition-transform duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] group-open:rotate-180"
+                  className="size-5 shrink-0 text-muted-foreground transition-transform duration-200 ease-drawer group-open:rotate-180"
                 />
               </summary>
               <p className="mt-2 text-sm text-pretty text-muted-foreground">{faq.answer}</p>
