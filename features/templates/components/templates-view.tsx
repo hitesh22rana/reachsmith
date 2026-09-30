@@ -44,8 +44,8 @@ function SkeletonCard() {
       <CardFooter className="justify-between gap-2 bg-transparent py-3">
         <div className="h-4 w-24 animate-pulse rounded bg-muted" />
         <div className="flex items-center gap-1">
-          <div className="h-7 w-14 animate-pulse rounded-lg bg-muted" />
-          <div className="h-7 w-16 animate-pulse rounded-lg bg-muted" />
+          <div className="h-7 w-20 animate-pulse rounded-lg bg-muted" />
+          <div className="h-7 w-20 animate-pulse rounded-lg bg-muted" />
         </div>
       </CardFooter>
     </Card>

@@ -14,6 +14,9 @@ import {
 } from "@/components/ui/alert-dialog";
 
 // Closes on confirm; the caller surfaces any failure underneath.
+// w-20: this button shares a card footer with an Edit or Open button, and a
+// content-sized pair reads as one pill wider than the other. Match the width
+// the caller puts on its sibling, and the centered label lines up with it.
 export function DeleteDialog({
   itemName,
   description,
@@ -34,7 +37,7 @@ export function DeleteDialog({
           <Button
             variant="ghost"
             size="sm"
-            className="text-destructive hover:text-destructive"
+            className="w-20 text-destructive hover:text-destructive"
             aria-label={`Delete ${itemName}`}
           >
             Delete
