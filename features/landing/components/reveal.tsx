@@ -3,6 +3,9 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
+// The motion itself lives in the `.reveal` class in globals.css, so
+// prefers-reduced-motion can reach it: a media query cannot outrank the
+// conditional utility classes this used to compose.
 export function Reveal({
   children,
   className,
@@ -41,12 +44,9 @@ export function Reveal({
   return (
     <div
       ref={ref}
+      data-pending={visible ? undefined : ""}
       style={{ transitionDelay: `${delay}ms` }}
-      className={cn(
-        "transition-[transform,opacity,filter] duration-700 ease-[cubic-bezier(0.32,0.72,0,1)]",
-        visible ? "translate-y-0 blur-0 opacity-100" : "translate-y-16 blur-md opacity-0",
-        className,
-      )}
+      className={cn("reveal", className)}
     >
       {children}
     </div>
