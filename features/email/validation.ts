@@ -1,17 +1,11 @@
 import * as v from "valibot";
 
-export const EmailGuessStatusSchema = v.picklist(
-  ["pending", "verifying", "valid", "invalid", "unknown", "accept_all"],
-  "Pick a valid status",
-);
-
-// Server-to-client guess shape: only what the section renders
-// (email, pattern, provenance, status). IDs and audit fields stay server-side.
+// Server-to-client suggestion shape: only what the section renders.
+// IDs and audit fields stay server-side.
 export const EmailGuessJsonSchema = v.object({
   email: v.string(),
   patternUsed: v.string(),
   source: v.string(),
-  status: EmailGuessStatusSchema,
 });
 
 export const GuessListSchema = v.object({

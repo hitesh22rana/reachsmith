@@ -5,7 +5,6 @@ import { asUser } from "./db.ts";
 import { emailGuesses, targets } from "../db/schema.ts";
 import { rankCandidates, extractHandles } from "../lib/email-rank.ts";
 import { rankWithModel } from "./email-rank-model.ts";
-import { enqueueEmailVerify } from "../lib/queues/email.ts";
 import { nameParts } from "../lib/target-name.ts";
 
 function redisConnection() {
@@ -16,22 +15,20 @@ function redisConnection() {
   return { url };
 }
 
-// Verify budget: most evidence first, at most 10 attempts, the verify
-// worker stops the line at the first valid candidate.
-const VERIFY_BUDGET = 10;
+const SUGGESTION_LIMIT = 10;
 
 export async function processGuessJob(job: { data: { targetId: string; userId: string } }): Promise<void> {
   // Tenant RLS is scoped by the payload's userId for the whole job. The
   // target lookup below is by id alone, so this is what keeps it inside one
   // tenant: a payload naming someone else's target simply matches nothing.
-  const first = await asUser(job.data.userId, async (db) => {
+  await asUser(job.data.userId, async (db) => {
     const [target] = await db
       .select()
       .from(targets)
       .where(eq(targets.id, job.data.targetId))
       .limit(1);
     if (!target) {
-      return null;
+      return;
     }
     const { firstName, lastName } = nameParts(target);
 
@@ -44,17 +41,17 @@ export async function processGuessJob(job: { data: { targetId: string; userId: s
       social_urls: target.socialUrls,
     });
     if (ranked.length === 0) {
-      return null;
+      return;
     }
 
     const existing = await db
-      .select({ id: emailGuesses.id, userId: emailGuesses.userId, email: emailGuesses.email, status: emailGuesses.status, score: emailGuesses.score })
+      .select({ email: emailGuesses.email })
       .from(emailGuesses)
       .where(eq(emailGuesses.targetId, target.id));
     const seen = new Set(existing.map((row) => row.email));
     const fresh = ranked.filter((candidate) => !seen.has(candidate.email));
     if (fresh.length === 0) {
-      return existing.filter((row) => row.status === "pending").sort((a, b) => b.score - a.score)[0] ?? null;
+      return;
     }
 
     // SLM re-rank (backend, baked weights); deterministic order on any failure.
@@ -73,9 +70,9 @@ export async function processGuessJob(job: { data: { targetId: string; userId: s
     const ordered = (modelOrder ?? [...byId.keys()])
       .map((id) => byId.get(id))
       .filter((candidate) => candidate !== undefined)
-      .slice(0, VERIFY_BUDGET);
+      .slice(0, SUGGESTION_LIMIT);
 
-    const rows = await db
+    await db
       .insert(emailGuesses)
       .values(
         ordered.map((candidate, index) => ({
@@ -84,14 +81,11 @@ export async function processGuessJob(job: { data: { targetId: string; userId: s
           email: candidate.email,
           patternUsed: candidate.pattern,
           source: candidate.source,
-          score: VERIFY_BUDGET - index,
+          score: SUGGESTION_LIMIT - index,
           context: candidate.context,
         })),
-      )
-      .returning({ id: emailGuesses.id, userId: emailGuesses.userId });
-    return rows[0] ?? null;
+      );
   });
-  if (first) await enqueueEmailVerify(first.id, first.userId);
 }
 
 export function startGuessWorker(): Worker {
