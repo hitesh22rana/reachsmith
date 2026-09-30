@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { isCrossOrigin, isCsrfAttempt } from "../lib/csrf.ts";
-import { OptionalUrlSchema, TargetPatchSchema } from "../features/targets/validation.ts";
+import { DomainSchema, OptionalUrlSchema, TargetPatchSchema } from "../features/targets/validation.ts";
 import { toTargetPatch } from "../features/targets/server.ts";
 // render.ts only, because it is the one templates module with no imports:
 // everything reached from this script must resolve without tsconfig path
@@ -8,6 +8,8 @@ import { toTargetPatch } from "../features/targets/server.ts";
 import { parsePlaceholders, placeholderError, renderTemplate } from "../features/templates/render.ts";
 import { pickDeclaredVariables, targetVariables } from "../features/outreach/server.ts";
 import { nameParts } from "../lib/target-name.ts";
+import { rankCandidates, resolveDomain } from "../lib/email-rank.ts";
+import { mapResult } from "../workers/verify-helpers.ts";
 import {
   decodeCursor,
   encodeCursor,
@@ -24,6 +26,22 @@ import * as v from "valibot";
 const HOST = "app.example.com";
 const CROSS = "https://evil.example";
 const SAME = `https://${HOST}`;
+
+// A personal address in notes cannot set the company domain or enter the
+// verifier queue. This is the bug that previously generated Gmail guesses.
+assert.equal(rankCandidates({ first_name: "Ada", last_name: "Lovelace", notes: "Personal: example@gmail.com" }).length, 0);
+assert.ok(rankCandidates({ first_name: "Ada", last_name: "Lovelace", domain: "acme.com", notes: "Personal: example@gmail.com" })
+  .every((candidate) => candidate.email.endsWith("@acme.com")));
+assert.equal(resolveDomain(null, "https://www.acme.com/about"), "acme.com");
+assert.equal(resolveDomain(null, "https://github.com/acme"), null);
+assert.equal(resolveDomain(null, "https://gmail.com"), null);
+const websiteCandidates = rankCandidates({ first_name: "Ada", last_name: "Lovelace", company_website: "https://www.acme.com/about" });
+assert.ok(websiteCandidates.length > 0 && websiteCandidates.every((candidate) => candidate.email.endsWith("@acme.com")));
+assert.equal(mapResult({ result: "valid", safe_to_send: "true" }), "valid");
+assert.equal(mapResult({ result: "valid", safe_to_send: "true", accept_all: "true" }), "accept_all");
+assert.equal(mapResult({ result: "valid", safe_to_send: "true", role: "true" }), "unknown");
+assert.equal(v.safeParse(DomainSchema, "acme..com").success, false);
+assert.equal(v.safeParse(DomainSchema, "-acme.com").success, false);
 
 // CSRF: only a present-and-foreign Origin is rejected.
 assert.equal(isCrossOrigin(null, HOST), false, "missing Origin allowed (non-browser client)");
