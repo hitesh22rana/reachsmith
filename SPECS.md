@@ -154,7 +154,7 @@ For a selected contact:
     - `/targets` – list of targets.
     - `/targets/[id]` – target details.
     - `/templates` – template list and CRUD.
-    - `/outreach` – pipeline view (all outreach records).
+    - `/outreach` – pipeline view (outreach records, loaded a page at a time).
   - API routes / server actions:
     - `POST /api/targets` – create target; enqueue enrichment/email guess jobs.
     - `GET /api/targets` – list targets.
@@ -190,8 +190,7 @@ Represents a target contact (recruiter, HR, employee, etc.).
 - `id`
 - `user_id` (owner)
 - `full_name`
-- `first_name`
-- `last_name`
+- `first_name` / `last_name` are an optional override, not a second copy of the full name: the UI asks only for the full name, and the split used for email patterns and `{{first_name}}` is derived from it unless someone corrects it (`docs/features/targets/SPEC.md`).
 - `company`
 - `role_title`
 - `primary_email` (nullable, derived from verification or manual input)

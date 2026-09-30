@@ -140,8 +140,14 @@ export const TargetJsonSchema = v.object({
   updatedAt: v.pipe(v.string(), v.isoTimestamp()),
 });
 
+// nextCursor is null on the last page, and its non-null-ness is the only
+// "is there more" signal; a total would cost the scan pagination removed.
 export const TargetListSchema = v.object({
   targets: v.array(TargetJsonSchema),
+  nextCursor: v.nullable(v.string()),
 });
 
 export type ApiTarget = v.InferOutput<typeof TargetJsonSchema>;
+export const TargetEnvelopeSchema = v.object({ target: TargetJsonSchema });
+
+export type TargetPage = v.InferOutput<typeof TargetListSchema>;

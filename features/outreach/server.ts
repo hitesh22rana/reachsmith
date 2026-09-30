@@ -1,10 +1,11 @@
-// Relative and with the extension so scripts/selfcheck.ts can import this
-// file under node --experimental-strip-types, which resolves no path aliases.
+// Relative with the extension: selfcheck.ts imports this under
+// node --experimental-strip-types, which resolves no path aliases.
 import {
   renderTemplate,
   TARGET_VAR_NAMES,
   type TemplateVars,
 } from "../templates/render.ts";
+import { nameParts } from "../../lib/target-name.ts";
 import type { NewOutreach, Outreach } from "@/db/schema";
 import type { OutreachCreateInput } from "./validation";
 
@@ -12,6 +13,9 @@ import type { OutreachCreateInput } from "./validation";
 // the compose form and the renderer agree on what a `source: "target"`
 // placeholder means.
 export interface OutreachTarget {
+  // So a target with no name override still prefills {{first_name}}, the way
+  // the email pipeline already derived it. See nameParts.
+  fullName: string;
   firstName: string | null;
   lastName?: string | null;
   company: string | null;
@@ -26,8 +30,8 @@ const TARGET_VAR_VALUES: Record<
   (typeof TARGET_VAR_NAMES)[number],
   (target: OutreachTarget) => string | null | undefined
 > = {
-  first_name: (target) => target.firstName,
-  last_name: (target) => target.lastName,
+  first_name: (target) => nameParts(target).firstName,
+  last_name: (target) => nameParts(target).lastName,
   company: (target) => target.company,
   role_title: (target) => target.roleTitle,
   // Not the target's role: templates have always fallen back to it when the

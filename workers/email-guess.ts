@@ -6,6 +6,7 @@ import { emailGuesses, targets } from "../db/schema.ts";
 import { rankCandidates, extractHandles } from "../lib/email-rank.ts";
 import { rankWithModel } from "./email-rank-model.ts";
 import { enqueueEmailVerify } from "../lib/queues/email.ts";
+import { nameParts } from "../lib/target-name.ts";
 
 function redisConnection() {
   const url = process.env.REDIS_URL;
@@ -32,9 +33,7 @@ export async function processGuessJob(job: { data: { targetId: string; userId: s
     if (!target) {
       return;
     }
-    const nameParts = target.fullName.trim().split(/\s+/);
-    const firstName = target.firstName ?? nameParts[0];
-    const lastName = target.lastName ?? nameParts.slice(1).join(" ");
+    const { firstName, lastName } = nameParts(target);
 
     const ranked = rankCandidates({
       first_name: firstName,

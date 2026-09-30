@@ -30,6 +30,17 @@ const VariablesSchema = v.optional(
   {},
 );
 
+export type OutreachStatus = v.InferOutput<typeof OutreachStatusSchema>;
+
+export const STATUS_LABELS: Record<OutreachStatus, string> = {
+  draft: "Draft",
+  sent: "Sent",
+  replied: "Replied",
+  rejected: "Rejected",
+  no_response: "No response",
+  success: "Success",
+};
+
 export const OutreachCreateSchema = v.object({
   target_id: v.pipe(v.string(), v.minLength(1, "Target is required")),
   template_id: v.optional(v.nullable(v.pipe(v.string(), v.minLength(1)))),
@@ -44,7 +55,6 @@ export const OutreachPatchSchema = v.object({
 });
 
 export type OutreachCreateInput = v.InferOutput<typeof OutreachCreateSchema>;
-export type OutreachPatchInput = v.InferOutput<typeof OutreachPatchSchema>;
 
 // Server-to-client outreach shape (dates cross as ISO strings),
 // with the target's name alongside for list views. No user_id, target_id,
@@ -63,6 +73,10 @@ export const OutreachJsonSchema = v.object({
 
 export const OutreachListSchema = v.object({
   outreach: v.array(OutreachJsonSchema),
+  nextCursor: v.nullable(v.string()),
 });
 
 export type ApiOutreach = v.InferOutput<typeof OutreachJsonSchema>;
+export const OutreachEnvelopeSchema = v.object({ outreach: OutreachJsonSchema });
+
+export type OutreachPage = v.InferOutput<typeof OutreachListSchema>;

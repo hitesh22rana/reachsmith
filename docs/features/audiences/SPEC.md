@@ -14,7 +14,7 @@ Foundation (+ auth for `user_id`, same stub rule as targets). Consumed by templa
 - `POST`/`PATCH /api/templates` take `audience` as free text and resolve-or-create the row in the same statement, so the editor never creates-then-selects. A known name reuses the row, a new one inserts it.
 - Validation: `features/audiences/validation.ts` with `AudienceCreateSchema`, `AudienceJsonSchema`, `AudienceListSchema` (singular `audiences` key, per the `docs/README.md` list convention), same four-layer shape as templates.
 - UI: the template editor's audience field is a free-text input with a native `datalist` over `GET /api/audiences`, so the browser draws the suggestions and any typed name is still accepted; the value is the plain name, not an id. A selected preset of the caller's own shows a "Remove from your presets" button (the built-in defaults have no row and offer none). `/templates` cards show the name or nothing.
-- Schema is applied by editing the existing baseline in place; no new migration file (no users yet). `drizzle/0002_tenant_rls.sql` also gains `audiences` in its explicit `ENABLE`/`FORCE ROW LEVEL SECURITY` + `tenant_isolation` list, which drizzle-kit will not emit for you.
+- Schema is applied by editing the existing baseline in place; no new migration file (no users yet). `drizzle/0001_tenant_rls.sql` also gains `audiences` in its explicit `ENABLE`/`FORCE ROW LEVEL SECURITY` + `tenant_isolation` list, which drizzle-kit will not emit for you.
 
 ## Security
 - Every query filters by session `user_id`; `DELETE /api/audiences/[id]` 404s on owner mismatch; no client-supplied `user_id`.

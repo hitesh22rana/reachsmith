@@ -101,6 +101,12 @@ export default async function TargetDetailPage({
 
       <section aria-label="Email candidates" className="animate-enter rounded-2xl border bg-card p-6">
         <TargetEmailSection
+          // Keyed by the record: a soft navigation to another target
+          // re-renders this page instead of remounting, and this section
+          // holds per-person state — a stale poll-ceiling flag stops polling
+          // a fresh target early, and a stale manual-email draft gets
+          // written onto the wrong person.
+          key={target.id}
           targetId={target.id}
           primaryEmail={target.primaryEmail}
           primaryEmailSource={target.primaryEmailSource}
@@ -109,8 +115,10 @@ export default async function TargetDetailPage({
 
       <section aria-label="Outreach history" className="animate-enter rounded-2xl border bg-card p-6">
         <TargetOutreachSection
+          key={target.id}
           target={{
             id: target.id,
+            fullName: target.fullName,
             firstName: target.firstName,
             lastName: target.lastName,
             company: target.company,

@@ -27,11 +27,8 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { Stepper } from "@/components/ui/stepper";
 import { ReviewList } from "@/components/review-list";
-import { errorMessage } from "@/lib/validators";
-import {
-  TargetCreateSchema,
-  TargetJsonSchema,
-} from "../validation";
+import { sendJson } from "@/lib/api";
+import { TargetCreateSchema, TargetEnvelopeSchema } from "../validation";
 
 type TargetFormInput = v.InferInput<typeof TargetCreateSchema>;
 type FieldName = keyof TargetFormInput;
@@ -41,7 +38,9 @@ const STEPS: { title: string; description: string; fields: FieldName[] }[] = [
   {
     title: "Basics",
     description: "Who they are",
-    fields: ["full_name", "first_name", "last_name", "company", "role_title"],
+    // No first/last name: the full name is the only one a user should type.
+    // The edit dialog is where a name that does not split gets an override.
+    fields: ["full_name", "company", "role_title"],
   },
   {
     title: "Contact",
@@ -72,18 +71,8 @@ const SOURCE_LABELS = {
   other: "Other",
 } as const;
 
-async function createTarget(data: TargetFormInput): Promise<void> {
-  const response = await fetch("/api/targets", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(data),
-  });
-  if (!response.ok) {
-    const body: unknown = await response.json().catch(() => null);
-    throw new Error(errorMessage(body, `Failed to create target (${response.status})`));
-  }
-  const body: unknown = await response.json();
-  v.parse(v.object({ target: TargetJsonSchema }), body);
+function createTarget(data: TargetFormInput) {
+  return sendJson("POST", "/api/targets", data, TargetEnvelopeSchema, "create target");
 }
 
 function FieldError({ message }: { message: string | undefined }) {
@@ -122,18 +111,6 @@ function BasicsStep({ form }: { form: StepForm }) {
           {...register("full_name")}
         />
         <FieldError message={errors.full_name?.message} />
-      </div>
-      <div className="grid grid-cols-2 gap-4">
-        <div className="flex flex-col gap-1.5">
-          <Label htmlFor="target-first-name">First name</Label>
-          <Input id="target-first-name" autoComplete="off" {...register("first_name")} />
-          <FieldError message={errors.first_name?.message} />
-        </div>
-        <div className="flex flex-col gap-1.5">
-          <Label htmlFor="target-last-name">Last name</Label>
-          <Input id="target-last-name" autoComplete="off" {...register("last_name")} />
-          <FieldError message={errors.last_name?.message} />
-        </div>
       </div>
       <div className="grid grid-cols-2 gap-4">
         <div className="flex flex-col gap-1.5">
@@ -276,8 +253,6 @@ export function AddTargetDialog() {
     mode: "onChange",
     defaultValues: {
       full_name: "",
-      first_name: "",
-      last_name: "",
       company: "",
       role_title: "",
       primary_email: "",
@@ -316,13 +291,16 @@ export function AddTargetDialog() {
     setServerError(null);
   }
 
+  // Reset on both edges: the dialog hides rather than unmounts, so ESC or a
+  // backdrop click used to leave a half-typed target for the next open.
   function openDialog(nextOpen: boolean): void {
-    setOpen(nextOpen);
     if (nextOpen) {
+      setOpen(true);
       setStep(0);
-    } else {
-      setServerError(null);
+      reset();
+      return;
     }
+    cancel();
   }
 
   async function onValid(data: TargetFormInput): Promise<void> {

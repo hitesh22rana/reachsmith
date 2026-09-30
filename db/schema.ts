@@ -1,4 +1,4 @@
-import { relations, sql } from "drizzle-orm";
+import { sql } from "drizzle-orm";
 import {
   pgTable,
   text,
@@ -84,25 +84,6 @@ export const verifications = pgTable(
   (table) => [index("verifications_identifier_idx").on(table.identifier)],
 );
 
-export const usersRelations = relations(users, ({ many }) => ({
-  sessions: many(sessions),
-  accounts: many(accounts),
-}));
-
-export const sessionsRelations = relations(sessions, ({ one }) => ({
-  user: one(users, {
-    fields: [sessions.userId],
-    references: [users.id],
-  }),
-}));
-
-export const accountsRelations = relations(accounts, ({ one }) => ({
-  user: one(users, {
-    fields: [accounts.userId],
-    references: [users.id],
-  }),
-}));
-
 export const sourceTypeEnum = pgEnum("source_type", [
   "linkedin",
   "github",
@@ -127,6 +108,11 @@ export const targets = pgTable(
     userId: text("user_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
+    // Three name columns, one fact. full_name is the name and the only one
+    // the UI asks for; first_name/last_name are an optional override for
+    // names that do not split naively (Bae Suzy, van der Berg, Cher, J.
+    // Smith), null on most rows, and never kept in sync with full_name.
+    // Both consumers resolve them through lib/target-name.ts.
     fullName: text("full_name").notNull(),
     firstName: text("first_name"),
     lastName: text("last_name"),
@@ -155,7 +141,10 @@ export const targets = pgTable(
       .$onUpdate(() => /* @__PURE__ */ new Date())
       .notNull(),
   },
-  (table) => [index("targets_user_id_idx").on(table.userId)],
+  // Leads with user_id so it still serves every user_id-only lookup, then
+  // (created_at, id) so a keyset cursor scan needs no sort. Ascending:
+  // Postgres reads an index backwards for ORDER BY ... DESC anyway.
+  (table) => [index("targets_user_id_created_at_id_idx").on(table.userId, table.createdAt, table.id)],
 );
 
 export type Target = typeof targets.$inferSelect;
@@ -187,7 +176,6 @@ export const audiences = pgTable(
 );
 
 export type Audience = typeof audiences.$inferSelect;
-export type NewAudience = typeof audiences.$inferInsert;
 
 // One entry per {{placeholder}} found in a template body, stored so the
 // compose form does not re-parse the body to know what to ask for. Written
@@ -268,7 +256,9 @@ export const outreaches = pgTable(
       .$onUpdate(() => /* @__PURE__ */ new Date())
       .notNull(),
   },
-  (table) => [index("outreaches_user_id_idx").on(table.userId)],
+  // Keyset index; see targets. No (user_id, status, ...): the status filter
+  // is a cheap post-filter over the user_id prefix at this volume.
+  (table) => [index("outreaches_user_id_created_at_id_idx").on(table.userId, table.createdAt, table.id)],
 );
 
 export type Outreach = typeof outreaches.$inferSelect;
@@ -315,4 +305,3 @@ export const emailGuesses = pgTable(
 );
 
 export type EmailGuess = typeof emailGuesses.$inferSelect;
-export type NewEmailGuess = typeof emailGuesses.$inferInsert;

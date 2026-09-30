@@ -1,26 +1,19 @@
 {
-  "version": 7,
+  "version": "7",
   "dialect": "postgresql",
   "entries": [
     {
       "idx": 0,
       "version": "7",
-      "when": 1790286888522,
-      "tag": "0000_needy_korvac",
+      "when": 1790752312110,
+      "tag": "0000_baseline",
       "breakpoints": true
     },
     {
       "idx": 1,
       "version": "7",
-      "when": 1790688719193,
-      "tag": "0001_blue_skreet",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "7",
-      "when": 1790771852044,
-      "tag": "0002_tenant_rls",
+      "when": 1790752312111,
+      "tag": "0001_tenant_rls",
       "breakpoints": true
     }
   ]

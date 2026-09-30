@@ -1,5 +1,5 @@
 {
-  "id": "00000000-0000-0000-0000-000000000000",
+  "id": "5b7676c9-3f3f-4a34-8f87-204a3bfd37db",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -313,6 +313,21 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
+        },
+        "email_guesses_user_id_idx": {
+          "name": "email_guesses_user_id_idx",
+          "columns": [
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {
@@ -440,11 +455,23 @@
         }
       },
       "indexes": {
-        "outreaches_user_id_idx": {
-          "name": "outreaches_user_id_idx",
+        "outreaches_user_id_created_at_id_idx": {
+          "name": "outreaches_user_id_created_at_id_idx",
           "columns": [
             {
               "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -655,6 +682,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "primary_email_source": {
+          "name": "primary_email_source",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "source_type": {
           "name": "source_type",
           "type": "source_type",
@@ -723,11 +756,23 @@
         }
       },
       "indexes": {
-        "targets_user_id_idx": {
-          "name": "targets_user_id_idx",
+        "targets_user_id_created_at_id_idx": {
+          "name": "targets_user_id_created_at_id_idx",
           "columns": [
             {
               "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"

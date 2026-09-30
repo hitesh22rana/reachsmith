@@ -9,7 +9,8 @@ import * as v from "valibot";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { TargetJsonSchema, TargetPatchSchema } from "../validation";
+import { sendJson } from "@/lib/api";
+import { TargetEnvelopeSchema, TargetPatchSchema } from "../validation";
 
 const NotesSchema = v.object({
   notes: v.optional(v.string()),
@@ -17,18 +18,14 @@ const NotesSchema = v.object({
 
 type NotesInput = v.InferOutput<typeof NotesSchema>;
 
-async function saveNotes(id: string, data: NotesInput): Promise<void> {
-  const parsed = v.parse(TargetPatchSchema, data);
-  const response = await fetch(`/api/targets/${id}`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(parsed),
-  });
-  if (!response.ok) {
-    throw new Error(`Failed to save notes (${response.status})`);
-  }
-  const body: unknown = await response.json();
-  v.parse(v.object({ target: TargetJsonSchema }), body);
+function saveNotes(id: string, data: NotesInput) {
+  return sendJson(
+    "PATCH",
+    `/api/targets/${id}`,
+    v.parse(TargetPatchSchema, data),
+    TargetEnvelopeSchema,
+    "save notes",
+  );
 }
 
 export function NotesForm({ id, notes }: { id: string; notes: string | null }) {
@@ -43,7 +40,10 @@ export function NotesForm({ id, notes }: { id: string; notes: string | null }) {
     formState: { isSubmitting },
   } = useForm<NotesInput>({
     resolver: valibotResolver(NotesSchema),
-    defaultValues: { notes: notes ?? "" },
+    // values, not defaultValues: always mounted with no open to reset on, and
+    // the edit dialog above edits the same column, so saving there used to
+    // leave this textarea stale. Re-syncs on a real server change only.
+    values: { notes: notes ?? "" },
   });
 
   const save = useMutation({

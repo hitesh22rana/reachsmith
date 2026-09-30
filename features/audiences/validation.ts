@@ -11,7 +11,6 @@ export const AudienceCreateSchema = v.object({
   ),
 });
 
-export type AudienceCreateInput = v.InferOutput<typeof AudienceCreateSchema>;
 
 // Server-to-client audience shape. id is null for the built-in defaults,
 // which are a constant and not rows, so there is nothing to delete.

@@ -1,32 +1,26 @@
 "use client";
 
 import Link from "next/link";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import * as v from "valibot";
+import { useMutation, useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, ArrowUpRight, Mail, Users } from "lucide-react";
+import { DeletedSchema, getJson, sendJson } from "@/lib/api";
 import { buttonVariants } from "@/components/ui/button-variants";
+import { LoadMore } from "@/components/load-more";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/empty-state";
 import { DeleteDialog } from "@/components/delete-dialog";
 import { AddTargetDialog } from "./add-target-dialog";
-import { TargetListSchema, type ApiTarget } from "../validation";
+import { TargetListSchema, type TargetPage } from "../validation";
 import { cn, initials } from "@/lib/utils";
 
-async function fetchTargets(): Promise<ApiTarget[]> {
-  const response = await fetch("/api/targets");
-  if (!response.ok) {
-    throw new Error(`Failed to load targets (${response.status})`);
-  }
-  const data: unknown = await response.json();
-  return v.parse(TargetListSchema, data).targets;
+function fetchTargets(cursor: string | undefined): Promise<TargetPage> {
+  const params = cursor ? `?cursor=${encodeURIComponent(cursor)}` : "";
+  return getJson(`/api/targets${params}`, TargetListSchema, "targets");
 }
 
-async function deleteTarget(id: string): Promise<void> {
-  const response = await fetch(`/api/targets/${id}`, { method: "DELETE" });
-  if (!response.ok) {
-    throw new Error(`Failed to delete target (${response.status})`);
-  }
+function deleteTarget(id: string): Promise<{ id: string }> {
+  return sendJson("DELETE", `/api/targets/${id}`, undefined, DeletedSchema, "delete target");
 }
 
 const SOURCE_LABELS = {
@@ -79,7 +73,15 @@ function SkeletonCards() {
 
 export function TargetsView() {
   const queryClient = useQueryClient();
-  const targets = useQuery({ queryKey: ["targets"], queryFn: fetchTargets });
+  const targets = useInfiniteQuery({
+    queryKey: ["targets"],
+    queryFn: ({ pageParam }) => fetchTargets(pageParam),
+    initialPageParam: undefined as string | undefined,
+    // undefined is how useInfiniteQuery is told there is no next page.
+    getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
+  });
+  const items = targets.data?.pages.flatMap((page) => page.targets) ?? [];
+  const loaded = targets.data ? items.length : null;
 
   const remove = useMutation({
     mutationFn: deleteTarget,
@@ -103,7 +105,10 @@ export function TargetsView() {
         <div className="space-y-1">
           <h1 className="text-3xl font-semibold tracking-tight">Targets</h1>
           <p className="text-muted-foreground">
-            {targets.data ? `${targets.data.length} contacts` : "People you want to reach."}
+            {loaded === null
+              ? "People you want to reach."
+              : // "+" so the count never claims rows the user has not loaded.
+                `${loaded}${targets.hasNextPage ? "+" : ""} contacts`}
           </p>
         </div>
         <AddTargetDialog />
@@ -115,16 +120,16 @@ export function TargetsView() {
           Could not load targets. Check the connection and try again.
         </p>
       ) : null}
-      {targets.data && targets.data.length === 0 ? (
+      {loaded === 0 ? (
         <EmptyState
           icon={Users}
           title="No targets yet"
           description="Add recruiters, hiring managers, and employees you want to reach."
         />
       ) : null}
-      {targets.data && targets.data.length > 0 ? (
+      {items.length > 0 ? (
         <div className="grid gap-4 md:grid-cols-2">
-          {targets.data.map((target) => (
+          {items.map((target) => (
             <Card
               key={target.id}
               className="min-h-56 min-w-0 gap-5 transition-shadow duration-200 hover:ring-foreground/20"
@@ -179,10 +184,16 @@ export function TargetsView() {
               </CardFooter>
             </Card>
           ))}
-          {RESERVED_SLOTS.slice(0, Math.max(0, 3 - targets.data.length)).map((slot) => (
+          {RESERVED_SLOTS.slice(0, Math.max(0, 3 - items.length)).map((slot) => (
             <SkeletonCard key={slot} hidden />
           ))}
         </div>
+      ) : null}
+      {targets.hasNextPage ? (
+        <LoadMore
+          pending={targets.isFetchingNextPage}
+          onClick={() => void targets.fetchNextPage()}
+        />
       ) : null}
       {remove.isError ? (
         <p role="alert" className="text-sm text-destructive">

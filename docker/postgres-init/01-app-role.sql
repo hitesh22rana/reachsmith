@@ -4,7 +4,7 @@
 -- ordinary role to connect as, and that is the role the tenant policies
 -- actually constrain.
 --
--- The production equivalent is created by drizzle/0002_tenant_rls.sql; this
+-- The production equivalent is created by drizzle/0001_tenant_rls.sql; this
 -- file only adds LOGIN and a throwaway password, which does not belong in a
 -- migration.
 DO $$

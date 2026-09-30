@@ -121,7 +121,11 @@ function SelectItem({
       )}
       {...props}
     >
-      <SelectPrimitive.ItemText className="flex flex-1 shrink-0 gap-2 whitespace-nowrap">
+      {/* min-w-0, not shrink-0: a flex item's default min-width:auto refuses to
+          go below its content, so with shrink-0 a long item (a template name)
+          forced the row wider than the popup and got clipped. Shrinkable, the
+          row ellipsizes via a truncating child instead. */}
+      <SelectPrimitive.ItemText className="flex min-w-0 flex-1 gap-2 whitespace-nowrap">
         {children}
       </SelectPrimitive.ItemText>
       <SelectPrimitive.ItemIndicator

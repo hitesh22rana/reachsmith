@@ -32,16 +32,21 @@ export default async function DashboardPage() {
   const [
     [targetRow],
     [templateRow],
-    [outreachRow],
+    statusGroups,
     newTargets,
     newTemplates,
-    statusRows,
     recentOutreach,
   ] = await forUser(userId, (db) =>
     Promise.all([
       db.select({ count: count() }).from(targets).where(eq(targets.userId, userId)),
       db.select({ count: count() }).from(templates).where(eq(templates.userId, userId)),
-      db.select({ count: count() }).from(outreaches).where(eq(outreaches.userId, userId)),
+      // One row per status, not every outreach row shipped to JS to be
+      // counted there. The total is their sum, retiring a second count().
+      db
+        .select({ status: outreaches.status, count: count() })
+        .from(outreaches)
+        .where(eq(outreaches.userId, userId))
+        .groupBy(outreaches.status),
       db
         .select({
           id: targets.id,
@@ -61,10 +66,6 @@ export default async function DashboardPage() {
         .orderBy(desc(templates.createdAt))
         .limit(5),
       db
-        .select({ status: outreaches.status })
-        .from(outreaches)
-        .where(eq(outreaches.userId, userId)),
-      db
         .select({
           id: outreaches.id,
           status: outreaches.status,
@@ -74,19 +75,19 @@ export default async function DashboardPage() {
         })
         .from(outreaches)
         .where(eq(outreaches.userId, userId))
-      .orderBy(desc(outreaches.lastStatusChangeAt))
-      .limit(5),
+        .orderBy(desc(outreaches.createdAt), desc(outreaches.id))
+        .limit(5),
     ]),
   );
 
   const targetCount = targetRow?.count ?? 0;
   const templateCount = templateRow?.count ?? 0;
-  const outreachCount = outreachRow?.count ?? 0;
 
   const statusCounts: Record<string, number> = {};
-  for (const row of statusRows) {
-    statusCounts[row.status] = (statusCounts[row.status] ?? 0) + 1;
+  for (const group of statusGroups) {
+    statusCounts[group.status] = group.count;
   }
+  const outreachCount = statusGroups.reduce((sum, group) => sum + group.count, 0);
 
   const outreachTargetIds = [...new Set(recentOutreach.map((o) => o.targetId))];
   const outreachTargets =

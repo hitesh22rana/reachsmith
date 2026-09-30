@@ -19,6 +19,13 @@ CREATE TABLE "accounts" (
 	"updated_at" timestamp NOT NULL
 );
 --> statement-breakpoint
+CREATE TABLE "audiences" (
+	"id" text PRIMARY KEY NOT NULL,
+	"user_id" text NOT NULL,
+	"name" text NOT NULL,
+	"created_at" timestamp DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
 CREATE TABLE "email_guesses" (
 	"id" text PRIMARY KEY NOT NULL,
 	"user_id" text NOT NULL,
@@ -71,6 +78,7 @@ CREATE TABLE "targets" (
 	"company" text,
 	"role_title" text,
 	"primary_email" text,
+	"primary_email_source" text,
 	"source_type" "source_type" DEFAULT 'manual' NOT NULL,
 	"enrichment_status" "enrichment_status" DEFAULT 'not_started' NOT NULL,
 	"notes" text,
@@ -81,13 +89,6 @@ CREATE TABLE "targets" (
 	"extra_enrichment" jsonb,
 	"created_at" timestamp DEFAULT now() NOT NULL,
 	"updated_at" timestamp DEFAULT now() NOT NULL
-);
---> statement-breakpoint
-CREATE TABLE "audiences" (
-	"id" text PRIMARY KEY NOT NULL,
-	"user_id" text NOT NULL,
-	"name" text NOT NULL,
-	"created_at" timestamp DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
 CREATE TABLE "templates" (
@@ -136,10 +137,11 @@ ALTER TABLE "templates" ADD CONSTRAINT "templates_user_id_users_id_fk" FOREIGN K
 ALTER TABLE "templates" ADD CONSTRAINT "templates_audience_id_audiences_id_fk" FOREIGN KEY ("audience_id") REFERENCES "public"."audiences"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 CREATE INDEX "accounts_user_id_idx" ON "accounts" USING btree ("user_id");--> statement-breakpoint
 CREATE INDEX "audiences_user_id_idx" ON "audiences" USING btree ("user_id");--> statement-breakpoint
-CREATE UNIQUE INDEX "audiences_user_id_name_key" ON "audiences" USING btree ("user_id", lower("name"));--> statement-breakpoint
+CREATE UNIQUE INDEX "audiences_user_id_name_key" ON "audiences" USING btree ("user_id",lower("name"));--> statement-breakpoint
 CREATE INDEX "email_guesses_target_id_idx" ON "email_guesses" USING btree ("target_id");--> statement-breakpoint
-CREATE INDEX "outreaches_user_id_idx" ON "outreaches" USING btree ("user_id");--> statement-breakpoint
+CREATE INDEX "email_guesses_user_id_idx" ON "email_guesses" USING btree ("user_id");--> statement-breakpoint
+CREATE INDEX "outreaches_user_id_created_at_id_idx" ON "outreaches" USING btree ("user_id","created_at","id");--> statement-breakpoint
 CREATE INDEX "sessions_user_id_idx" ON "sessions" USING btree ("user_id");--> statement-breakpoint
-CREATE INDEX "targets_user_id_idx" ON "targets" USING btree ("user_id");--> statement-breakpoint
+CREATE INDEX "targets_user_id_created_at_id_idx" ON "targets" USING btree ("user_id","created_at","id");--> statement-breakpoint
 CREATE INDEX "templates_user_id_idx" ON "templates" USING btree ("user_id");--> statement-breakpoint
 CREATE INDEX "verifications_identifier_idx" ON "verifications" USING btree ("identifier");

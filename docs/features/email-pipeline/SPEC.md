@@ -10,6 +10,7 @@ Foundation, targets. Trigger is `POST /api/targets` and `PATCH /api/targets/[id]
 - `Target` model (see `docs/features/targets/SPEC.md`): `social_urls` (max 5, plain URLs, no types), explicit optional `domain`, `company_website` kept as a dumb contact link with no pipeline role. No website-based domain derivation.
 - `EmailGuess` model per `SPECS.md` §6.5 plus ranking columns: `source` (`notes | pattern | domain_inferred`), `score` (numeric, higher first), `context` (notes window around an extracted address, nullable). Status enum verbatim. Skip `DomainPattern` (§6.6).
 - `lib/email-patterns.ts`: `generateCandidates({first_name, last_name, domain})` emitting the 6 SPEC patterns (`first.last, f.last, first, first_last, last.first, f_last`), lowercased, syntax-validated.
+- The `{first_name, last_name}` handed to the ranker comes from `nameParts()` in `lib/target-name.ts`, not from a split local to the worker: the stored `first_name`/`last_name` are an override for names that do not split naively, and the fallback splits `full_name`. `features/outreach/server.ts` calls the same helper for `{{first_name}}`, so the guessed addresses and the compose greeting can never disagree about a person's name.
 - `lib/email-rank.ts` (pure, unit-checked): deterministic scorer.
   - Notes addresses (regex-extracted): base score highest, adjusted by context cues in a ±6-word window (positive: personal, correct, new, updated, reach me at, his/her; negative: example, e.g., like, don't, old, wrong, former, sample) and by name-in-local-part (plus, never a hard gate).
   - Pattern inference: a notes address parsing as a known pattern boosts that pattern for generated candidates; its domain feeds domain resolution.
@@ -32,6 +33,7 @@ Foundation, targets. Trigger is `POST /api/targets` and `PATCH /api/targets/[id]
 - CSRF is applied once in `proxy.ts` (matcher `/api/:path*`) via `isCsrfAttempt` in `lib/csrf.ts`, not repeated per handler, so a new route cannot forget it. Authentication and authorization stay in the handlers: every route still calls `getUserId()` and 404s a foreign id. A Server Action would post to its page route and bypass the matcher, so one must re-check origin itself.
 - The model is resolved from the baked, revision-pinned weights in `HF_MODEL_CACHE` (a directory, resolved with `resolveModelFile(file#rev, dir)`), so the shipped worker makes no model egress at runtime.
 - Verifier API key stays server-side in workers only; rate-limit verify jobs.
+- `GET /api/targets/[id]/guesses` returns this target's candidates ordered by `score DESC, created_at DESC`. The score is what makes the order meaningful: the guess worker inserts a whole ranked batch in one statement, so every candidate in a batch shares a transaction `created_at` and that column alone cannot order them. Bounded at roughly one row per pattern for one domain, so it is never paginated.
 
 ## Tasks
 1. Schema changes in `db/schema.ts` (no new schema file): drop `profile_url`/`linkedin_url`/`github_url`, add `social_urls` + `domain`, extend `EmailGuess` with `source`/`score`/`context`; squash migrations to one fresh baseline, wipe local dev DB, re-migrate, re-seed.

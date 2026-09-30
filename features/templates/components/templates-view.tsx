@@ -1,29 +1,18 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import * as v from "valibot";
 import { Mail } from "lucide-react";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { BackLink } from "@/components/back-link";
 import { EmptyState } from "@/components/empty-state";
 import { DeleteDialog } from "@/components/delete-dialog";
 import { TemplateDialog } from "./template-dialog";
-import { CHANNEL_LABELS, TemplateListSchema, type ApiTemplate } from "../validation";
+import { fetchTemplates } from "../client";
+import { DeletedSchema, sendJson } from "@/lib/api";
+import { CHANNEL_LABELS } from "../validation";
 
-async function fetchTemplates(): Promise<ApiTemplate[]> {
-  const response = await fetch("/api/templates");
-  if (!response.ok) {
-    throw new Error(`Failed to load templates (${response.status})`);
-  }
-  const data: unknown = await response.json();
-  return v.parse(TemplateListSchema, data).templates;
-}
-
-async function deleteTemplate(id: string): Promise<void> {
-  const response = await fetch(`/api/templates/${id}`, { method: "DELETE" });
-  if (!response.ok) {
-    throw new Error(`Failed to delete template (${response.status})`);
-  }
+function deleteTemplate(id: string): Promise<{ id: string }> {
+  return sendJson("DELETE", `/api/templates/${id}`, undefined, DeletedSchema, "delete template");
 }
 
 function SkeletonCard() {
