@@ -24,14 +24,14 @@ export async function processGuessJob(job: { data: { targetId: string; userId: s
   // Tenant RLS is scoped by the payload's userId for the whole job. The
   // target lookup below is by id alone, so this is what keeps it inside one
   // tenant: a payload naming someone else's target simply matches nothing.
-  await asUser(job.data.userId, async (db) => {
+  const first = await asUser(job.data.userId, async (db) => {
     const [target] = await db
       .select()
       .from(targets)
       .where(eq(targets.id, job.data.targetId))
       .limit(1);
     if (!target) {
-      return;
+      return null;
     }
     const { firstName, lastName } = nameParts(target);
 
@@ -39,21 +39,22 @@ export async function processGuessJob(job: { data: { targetId: string; userId: s
       first_name: firstName,
       last_name: lastName,
       domain: target.domain,
+      company_website: target.companyWebsite,
       notes: target.notes,
       social_urls: target.socialUrls,
     });
     if (ranked.length === 0) {
-      return;
+      return null;
     }
 
     const existing = await db
-      .select({ email: emailGuesses.email })
+      .select({ id: emailGuesses.id, userId: emailGuesses.userId, email: emailGuesses.email, status: emailGuesses.status, score: emailGuesses.score })
       .from(emailGuesses)
       .where(eq(emailGuesses.targetId, target.id));
     const seen = new Set(existing.map((row) => row.email));
     const fresh = ranked.filter((candidate) => !seen.has(candidate.email));
     if (fresh.length === 0) {
-      return;
+      return existing.filter((row) => row.status === "pending").sort((a, b) => b.score - a.score)[0] ?? null;
     }
 
     // SLM re-rank (backend, baked weights); deterministic order on any failure.
@@ -77,23 +78,20 @@ export async function processGuessJob(job: { data: { targetId: string; userId: s
     const rows = await db
       .insert(emailGuesses)
       .values(
-        ordered.map((candidate) => ({
+        ordered.map((candidate, index) => ({
           userId: target.userId,
           targetId: target.id,
           email: candidate.email,
           patternUsed: candidate.pattern,
           source: candidate.source,
-          score: Math.round(candidate.score),
+          score: VERIFY_BUDGET - index,
           context: candidate.context,
         })),
       )
       .returning({ id: emailGuesses.id, userId: emailGuesses.userId });
-    // Enqueue outside the transaction would be nicer, but the ids come back
-    // from the insert, so this runs before commit. BullMQ is a separate
-    // service, so a rollback here would only leave an orphan job, and the
-    // ownership-chain re-check in the verify worker drops it.
-    await Promise.all(rows.map((row) => enqueueEmailVerify(row.id, row.userId)));
+    return rows[0] ?? null;
   });
+  if (first) await enqueueEmailVerify(first.id, first.userId);
 }
 
 export function startGuessWorker(): Worker {

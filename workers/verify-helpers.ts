@@ -1,48 +1,29 @@
-import { and, eq, sql } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 import type { WorkerDb } from "./db.ts";
 import { emailGuesses, targets } from "../db/schema.ts";
 
-// §7.5 preference order: most frequent pattern first; observed social
-// handles outrank derived patterns below first.last.
-export const PATTERN_PRIORITY = [
-  "first.last",
-  "handle",
-  "f.last",
-  "first",
-  "first_last",
-  "last.first",
-  "f_last",
-];
-
 export interface VerifierResponse {
   result?: string;
-  safe_to_send?: number | boolean;
+  safe_to_send?: number | boolean | string;
+  accept_all?: number | boolean | string;
+  disposable?: number | boolean | string;
+  role?: number | boolean | string;
   [key: string]: unknown;
 }
 
 export type TerminalStatus = "valid" | "invalid" | "unknown" | "accept_all";
 
-// §7.4 mapping: valid + safe_to_send → valid; invalid/disposable → invalid;
-// catch-all → accept_all; everything else → unknown.
+// Provider flags can be string booleans. Only an affirmative safe-to-send
+// result without catch-all, role, or disposable evidence becomes valid.
 export function mapResult(data: VerifierResponse): TerminalStatus {
+  const yes = (value: unknown) => value === true || value === 1 || value === "true" || value === "1";
   const result = (data.result ?? "").toLowerCase();
+  if (result === "invalid" || result === "disposable" || yes(data.disposable)) return "invalid";
+  if (result === "accept_all" || result === "catch_all" || yes(data.accept_all)) return "accept_all";
   if (result === "valid") {
-    return data.safe_to_send === 1 || data.safe_to_send === true ? "valid" : "accept_all";
-  }
-  if (result === "invalid" || result === "disposable") {
-    return "invalid";
-  }
-  if (result === "accept_all" || result === "catch_all") {
-    return "accept_all";
+    return yes(data.safe_to_send) && !yes(data.role) ? "valid" : "unknown";
   }
   return "unknown";
-}
-
-// Unranked patterns sort last, and sort is stable, so the first guess
-// written for a pattern keeps primary_email.
-function patternRank(pattern: string): number {
-  const index = PATTERN_PRIORITY.indexOf(pattern);
-  return index === -1 ? PATTERN_PRIORITY.length : index;
 }
 
 // Only a valid candidate moves primary_email; anything else leaves the
@@ -58,10 +39,9 @@ export async function recomputePrimaryEmail(db: WorkerDb, targetId: string): Pro
     .from(emailGuesses)
     .where(
       and(eq(emailGuesses.targetId, targetId), eq(emailGuesses.status, "valid")),
-    );
-  const best = guesses.sort(
-    (a, b) => patternRank(a.patternUsed) - patternRank(b.patternUsed),
-  )[0];
+    )
+    .orderBy(desc(emailGuesses.score), desc(emailGuesses.createdAt));
+  const best = guesses[0];
   if (!best) {
     return;
   }

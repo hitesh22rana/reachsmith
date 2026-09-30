@@ -36,7 +36,10 @@ const guessQueue = lazyQueue<GuessJob>("email-guess");
 const verifyQueue = lazyQueue<VerifyJob>("email-verify");
 
 export function enqueueEmailGuess(targetId: string, userId: string): Promise<unknown> {
-  return guessQueue().add("guess", { targetId, userId });
+  return guessQueue().add("guess", { targetId, userId }, {
+    attempts: 3,
+    backoff: { type: "exponential", delay: 5000 },
+  });
 }
 
 export function enqueueEmailVerify(candidateId: string, userId: string): Promise<unknown> {
