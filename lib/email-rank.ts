@@ -215,7 +215,7 @@ export function rankCandidates(input: {
     });
   }
 
-  // Without a company domain there are no company addresses to verify.
+  // Without a company domain there are no work addresses to suggest.
   if (!domain) {
     return bestFirst(ranked);
   }

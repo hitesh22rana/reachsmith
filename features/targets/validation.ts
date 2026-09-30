@@ -127,7 +127,6 @@ export const TargetJsonSchema = v.object({
   company: v.nullable(v.string()),
   roleTitle: v.nullable(v.string()),
   primaryEmail: v.nullable(v.string()),
-  primaryEmailSource: v.nullable(v.picklist(["manual", "verified"])),
   sourceType: SourceTypeSchema,
   enrichmentStatus: v.picklist(["not_started", "pending", "success", "failed"]),
   notes: v.nullable(v.string()),

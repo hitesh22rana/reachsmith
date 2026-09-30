@@ -106,7 +106,6 @@ export default async function TargetDetailPage({
           key={`${target.id}:${target.updatedAt.toISOString()}`}
           targetId={target.id}
           primaryEmail={target.primaryEmail}
-          primaryEmailSource={target.primaryEmailSource}
           domain={target.domain}
           companyWebsite={target.companyWebsite}
           searchVersion={target.updatedAt.toISOString()}

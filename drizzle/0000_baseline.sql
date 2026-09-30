@@ -1,5 +1,4 @@
 CREATE TYPE "public"."channel" AS ENUM('email', 'linkedin_dm', 'other');--> statement-breakpoint
-CREATE TYPE "public"."email_guess_status" AS ENUM('pending', 'verifying', 'valid', 'invalid', 'unknown', 'accept_all');--> statement-breakpoint
 CREATE TYPE "public"."enrichment_status" AS ENUM('not_started', 'pending', 'success', 'failed');--> statement-breakpoint
 CREATE TYPE "public"."outreach_status" AS ENUM('draft', 'sent', 'replied', 'rejected', 'no_response', 'success');--> statement-breakpoint
 CREATE TYPE "public"."source_type" AS ENUM('linkedin', 'github', 'website', 'manual', 'other');--> statement-breakpoint
@@ -35,8 +34,6 @@ CREATE TABLE "email_guesses" (
 	"source" text DEFAULT 'pattern' NOT NULL,
 	"score" integer DEFAULT 0 NOT NULL,
 	"context" text,
-	"status" "email_guess_status" DEFAULT 'pending' NOT NULL,
-	"verification_meta" jsonb,
 	"created_at" timestamp DEFAULT now() NOT NULL,
 	"updated_at" timestamp DEFAULT now() NOT NULL
 );
@@ -78,7 +75,6 @@ CREATE TABLE "targets" (
 	"company" text,
 	"role_title" text,
 	"primary_email" text,
-	"primary_email_source" text,
 	"source_type" "source_type" DEFAULT 'manual' NOT NULL,
 	"enrichment_status" "enrichment_status" DEFAULT 'not_started' NOT NULL,
 	"notes" text,

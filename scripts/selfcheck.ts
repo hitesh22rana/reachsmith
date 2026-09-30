@@ -9,7 +9,6 @@ import { parsePlaceholders, placeholderError, renderTemplate } from "../features
 import { pickDeclaredVariables, targetVariables } from "../features/outreach/server.ts";
 import { nameParts } from "../lib/target-name.ts";
 import { rankCandidates, resolveDomain } from "../lib/email-rank.ts";
-import { mapResult } from "../workers/verify-helpers.ts";
 import {
   decodeCursor,
   encodeCursor,
@@ -28,7 +27,7 @@ const CROSS = "https://evil.example";
 const SAME = `https://${HOST}`;
 
 // A personal address in notes cannot set the company domain or enter the
-// verifier queue. This is the bug that previously generated Gmail guesses.
+// suggestions. This is the bug that previously generated Gmail guesses.
 assert.equal(rankCandidates({ first_name: "Ada", last_name: "Lovelace", notes: "Personal: example@gmail.com" }).length, 0);
 assert.ok(rankCandidates({ first_name: "Ada", last_name: "Lovelace", domain: "acme.com", notes: "Personal: example@gmail.com" })
   .every((candidate) => candidate.email.endsWith("@acme.com")));
@@ -37,9 +36,6 @@ assert.equal(resolveDomain(null, "https://github.com/acme"), null);
 assert.equal(resolveDomain(null, "https://gmail.com"), null);
 const websiteCandidates = rankCandidates({ first_name: "Ada", last_name: "Lovelace", company_website: "https://www.acme.com/about" });
 assert.ok(websiteCandidates.length > 0 && websiteCandidates.every((candidate) => candidate.email.endsWith("@acme.com")));
-assert.equal(mapResult({ result: "valid", safe_to_send: "true" }), "valid");
-assert.equal(mapResult({ result: "valid", safe_to_send: "true", accept_all: "true" }), "accept_all");
-assert.equal(mapResult({ result: "valid", safe_to_send: "true", role: "true" }), "unknown");
 assert.equal(v.safeParse(DomainSchema, "acme..com").success, false);
 assert.equal(v.safeParse(DomainSchema, "-acme.com").success, false);
 
@@ -117,19 +113,18 @@ assert.equal(v.safeParse(OptionalUrlSchema, "http://example.com").success, true,
 assert.equal(v.safeParse(OptionalUrlSchema, "").success, true, "empty allowed");
 assert.equal(v.safeParse(OptionalUrlSchema, undefined).success, true, "undefined allowed");
 
-// Provenance: any owner-side write claims the column; clearing drops the marker.
+// Manually entered addresses remain the only source of primary_email.
 const set = toTargetPatch(v.parse(TargetPatchSchema, { primary_email: "a@b.com" }));
 assert.equal(set.primaryEmail, "a@b.com", "owner value stored");
-assert.equal(set.primaryEmailSource, "manual", "owner write marked manual");
 assert.equal(
-  toTargetPatch(v.parse(TargetPatchSchema, { primary_email: "" })).primaryEmailSource,
+  toTargetPatch(v.parse(TargetPatchSchema, { primary_email: "" })).primaryEmail,
   null,
-  "clearing the email drops the marker so the pipeline may propose again",
+  "owner can clear the saved address",
 );
 assert.equal(
-  toTargetPatch(v.parse(TargetPatchSchema, { company: "Acme" })).primaryEmailSource,
+  toTargetPatch(v.parse(TargetPatchSchema, { company: "Acme" })).primaryEmail,
   undefined,
-  "unrelated patch leaves the marker alone",
+  "unrelated patch leaves the saved address alone",
 );
 
 // Placeholders: any snake_case name is a variable, and nothing else is.

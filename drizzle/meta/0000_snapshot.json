@@ -269,20 +269,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "status": {
-          "name": "status",
-          "type": "email_guess_status",
-          "typeSchema": "public",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'pending'"
-        },
-        "verification_meta": {
-          "name": "verification_meta",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": false
-        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp",
@@ -682,12 +668,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "primary_email_source": {
-          "name": "primary_email_source",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
         "source_type": {
           "name": "source_type",
           "type": "source_type",
@@ -1068,18 +1048,6 @@
         "email",
         "linkedin_dm",
         "other"
-      ]
-    },
-    "public.email_guess_status": {
-      "name": "email_guess_status",
-      "schema": "public",
-      "values": [
-        "pending",
-        "verifying",
-        "valid",
-        "invalid",
-        "unknown",
-        "accept_all"
       ]
     },
     "public.enrichment_status": {

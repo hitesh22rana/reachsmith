@@ -26,7 +26,6 @@ export async function PATCH(request: NextRequest, context: RouteContext): Promis
       .update(targets)
       .set({
         primaryEmail: parsed.data.email,
-        primaryEmailSource: "manual",
         updatedAt: new Date(),
       })
       .where(and(eq(targets.id, id), eq(targets.userId, userId)))

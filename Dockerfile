@@ -1,5 +1,5 @@
 # One image, three jobs: `web` (Next.js standalone), `worker` (BullMQ email
-# workers), and `builder` reused as a one-shot migrator. Pick with
+# suggestion worker), and `builder` reused as a one-shot migrator. Pick with
 # `docker build --target <web|worker>` or via compose profiles.
 #
 # The rank model is baked in at build time (pinned revision, no runtime

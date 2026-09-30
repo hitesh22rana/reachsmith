@@ -1,4 +1,4 @@
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { NextResponse, type NextRequest } from "next/server";
 import { forUser } from "@/db";
 import { emailGuesses, targets } from "@/db/schema";
@@ -57,10 +57,6 @@ export async function PATCH(request: NextRequest, context: RouteContext): Promis
         .update(targets)
         .set({
           ...patch,
-          ...(refreshGuess && patch.primaryEmail === undefined ? {
-            primaryEmail: sql<string | null>`case when ${targets.primaryEmailSource} = 'verified' then null else ${targets.primaryEmail} end`,
-            primaryEmailSource: sql<"manual" | "verified" | null>`case when ${targets.primaryEmailSource} = 'verified' then null else ${targets.primaryEmailSource} end`,
-          } : {}),
           updatedAt: new Date(),
         })
         .where(and(eq(targets.id, id), eq(targets.userId, userId)))
