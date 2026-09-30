@@ -48,8 +48,11 @@ export function StatCards({ stats }: { stats: Record<string, number> }) {
       {SECTIONS.map((section, index) => (
         <Card
           key={section.title}
-          className="animate-enter group transition-[transform,box-shadow] duration-200 ease-out hover:-translate-y-0.5 hover:shadow-md"
-          style={{ animationDelay: `${(index + 1) * 70}ms` }}
+          // transform only: box-shadow in the transition is a paint-only
+          // property, and a drop shadow is a second elevation cue fighting a
+          // 2px lift on a page this frequent.
+          className="animate-enter transition-transform duration-150 ease-out-strong hover:-translate-y-0.5"
+          style={{ animationDelay: `${(index + 1) * 60}ms` }}
         >
           <CardHeader>
             <div className="flex items-center justify-between">
@@ -69,10 +72,7 @@ export function StatCards({ stats }: { stats: Record<string, number> }) {
               className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline"
             >
               {section.linkLabel}
-              <ArrowRight
-                className="size-4 transition-transform duration-200 ease-out group-hover:translate-x-0.5"
-                aria-hidden="true"
-              />
+              <ArrowRight className="size-4" aria-hidden="true" />
             </Link>
           </CardFooter>
         </Card>

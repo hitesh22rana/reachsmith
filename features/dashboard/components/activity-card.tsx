@@ -28,7 +28,7 @@ function timeAgo(date: Date): string {
 
 export function ActivityCard({ activity }: { activity: ActivityItem[] }) {
   return (
-    <Card className="animate-enter lg:col-span-3" style={{ animationDelay: "280ms" }}>
+    <Card className="animate-enter lg:col-span-3" style={{ animationDelay: "160ms" }}>
       <CardHeader>
         <CardTitle>Recent activity</CardTitle>
         <CardDescription>Targets, templates, and outreach, newest first.</CardDescription>
@@ -50,7 +50,7 @@ export function ActivityCard({ activity }: { activity: ActivityItem[] }) {
               <li key={item.key}>
                 <Link
                   href={item.href}
-                  className="flex items-center gap-3 rounded-xl px-2 py-2.5 transition-colors duration-150 ease-out hover:bg-muted/60"
+                  className="flex items-center gap-3 rounded-xl px-2 py-2.5 transition-colors duration-150 hover:bg-muted/60"
                 >
                   {item.face ? (
                     <BlobatarAvatar name={item.face} size={34} />
