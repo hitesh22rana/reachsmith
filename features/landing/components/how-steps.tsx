@@ -20,8 +20,8 @@ const STEPS: Step[] = [
   },
   {
     icon: Send,
-    title: "Verify, send, track",
-    body: "Confirm the address, send from your own inbox, and log replies and referrals.",
+    title: "Copy, send, track",
+    body: "Copy your message, send it from your own inbox, and log replies and referrals.",
   },
 ];
 

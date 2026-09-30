@@ -7,7 +7,7 @@ ReachSmith is a personal outreach and contact engine focused on job hunting, ref
 - Collect and organize target contacts (recruiters, HRs, employees, hiring managers).
 - Enrich those contacts from public profiles (e.g., LinkedIn, GitHub) and manual data.
 - Generate personalized outreach messages from reusable templates.
-- Predict and verify email addresses using patterns and verification APIs.
+- Suggest likely work email addresses from names, domains, and context without claiming verification.
 - Track outreach status, follow-ups, and outcomes over time.
 
 The initial goal is to build a functional MVP in a private GitHub repository, with a clear path to evolve into a hosted service later.
@@ -24,7 +24,7 @@ The initial goal is to build a functional MVP in a private GitHub repository, wi
   - Have a single place to track who they reached out to and what happened.
 - Implement an asynchronous pipeline to:
   - Generate likely email candidates from known patterns.
-  - Verify candidate emails via a third‑party API.
+  - Rank likely work email addresses without an external verifier.
 - Provide a clean, responsive UI with good defaults, using shadcn/ui and open-source components.
 - Use Next.js as both frontend and backend, and a managed SQL database.
 
@@ -70,16 +70,15 @@ User can:
   - MVP favors manual input plus optional third-party enrichment APIs.
   - Future phases might add browser-extension–based scraping (user-initiated).
 
-### 3.3 Email pattern guessing and verification
+### 3.3 Email pattern suggestions
 
 - Given:
   - Contact’s full name.
   - Company / domain (derived from company website, or manually provided).
 - ReachSmith:
   - Generates a small set of candidate emails using common patterns.
-  - Verifies candidates asynchronously via an external email verification API.
-  - Picks the “best” candidate (e.g., safe_to_send, not disposable, not invalid).
-  - Stores verification results and highlights confidence in the UI.
+  - Ranks up to ten company-domain suggestions using notes, patterns, social handles, and the optional local model.
+  - Labels suggestions as unverified and lets the user copy or manually save an address for outreach.
 
 ### 3.4 Outreach template management
 
@@ -127,7 +126,7 @@ For a selected contact:
 
 - Someone who wants to experiment with email pattern guessing and enrichment.
 - Comfortable customizing ReachSmith and trying experimental features.
-- May connect their own enrichment / verification APIs.
+- May connect optional enrichment APIs in a later phase.
 
 ---
 
@@ -140,7 +139,7 @@ For a selected contact:
 - **ORM**: Drizzle (for schema, migrations, and type-safe access).
 - **Styling/UI**: Tailwind CSS + shadcn/ui components.
 - **Background jobs**: BullMQ + Redis (e.g., Upstash or any hosted Redis).
-- **Email verification**: External API (e.g., QuickEmailVerification or similar free-tier provider).
+- **Email suggestions**: BullMQ worker with deterministic ranking and an optional locally hosted Qwen reranker; no external verifier.
 - **Auth**: Better Auth with email/password.
 - **Validation**: Valibot with feature-owned schemas shared between forms and API routes; forms via react-hook-form + Valibot resolver.
 - **Client data**: TanStack Query; server components fetch directly.
@@ -164,7 +163,6 @@ For a selected contact:
     - `PATCH /api/templates/[id]` – update template.
 - Background workers:
   - `email-guess` queue worker.
-  - `email-verify` queue worker.
   - (Later) `enrich-profile` worker.
 
 ---
@@ -193,8 +191,9 @@ Represents a target contact (recruiter, HR, employee, etc.).
 - `first_name` / `last_name` are an optional override, not a second copy of the full name: the UI asks only for the full name, and the split used for email patterns and `{{first_name}}` is derived from it unless someone corrects it (`docs/features/targets/SPEC.md`).
 - `company`
 - `role_title`
-- `primary_email` (nullable, derived from verification or manual input)
-- `primary_email_source` (nullable `manual | verified`; records which of the two authorized writers settled the column, so a later valid guess cannot clobber an owner decision)
+- `primary_email` (nullable, set by the owner for outreach; never filled by the suggestion worker)
+- `domain` (nullable company email domain, used for suggestions)
+- `company_website` (nullable, can supply a provisional domain)
 - `profile_url` (e.g., LinkedIn/GitHub URL)
 - `source_type` (enum: `linkedin`, `github`, `website`, `manual`, `other`)
 - `enrichment_status` (enum: `not_started`, `pending`, `success`, `failed`)
@@ -252,156 +251,46 @@ Represents a candidate email address generated for a target.
 - `target_id`
 - `email`
 - `pattern_used` (e.g., `first.last`, `f_last`, `first`, etc.)
-- `status` (enum: `pending`, `verifying`, `valid`, `invalid`, `unknown`, `accept_all`)
-- `verification_meta` (JSON; full API response from verifier)
+- `source` (`notes` or `pattern`)
+- `score` (integer rank, higher first)
+- `context` (nullable evidence snippet)
 - `created_at`
 - `updated_at`
 
-### 6.6 DomainPattern (optional, later optimization)
-
-Stores discovered email patterns per domain to reduce guessing.
-
-- `id`
-- `user_id` (optional: can be global or per user)
-- `domain` (e.g., `example.com`)
-- `pattern` (`first.last`, `f_last`, etc.)
-- `confidence` (numeric score)
-- `evidence_count` (how many successful addresses support this pattern)
-- `created_at`
-- `updated_at`
-
----
-
-## 7. Email Guessing & Verification Pipeline
+## 7. Company Email Suggestions
 
 ### 7.1 Overview
 
-Given a target with a name and company:
-
-1. Determine the company domain.
-2. Generate candidate email addresses using a limited set of common patterns.
-3. Persist the candidates as EmailGuess records with `status = pending`.
-4. Asynchronously verify each candidate via an external email verification API.
-5. Mark valid candidates and choose a recommended primary_email for the target.
+Given a target's name and company domain, generate up to ten ranked work-email suggestions. Suggestions are unverified. The system does not claim that a mailbox exists, accepts messages, or belongs to the target. Only the user can save a `primary_email` for outreach. See `docs/features/email-accuracy/SPEC.md` for the current contract.
 
 ### 7.2 Domain determination
 
-Strategies:
+- Use the owner's explicit `domain` first.
+- Otherwise use a straightforward company website hostname as a provisional domain. Reject public email, social, hosting, link-shortener, IP, localhost, and ambiguous hostnames; require an explicit domain in those cases.
+- Notes addresses and social profiles never supply the company domain. No domain means no suggestions and an actionable prompt to enter one. There is no Gmail fallback.
 
-- Use an explicit “company website” field if provided by user.
-- If the target has a LinkedIn company page URL or GitHub organization, extract domain when possible (later).
-- As a fallback, user can manually input a domain for the company.
+### 7.3 Candidate generation and ranking
 
-Out-of-scope for MVP: complex domain lookup from company name alone.
+- Generate the six name patterns: `first.last`, `f.last`, `first`, `first_last`, `last.first`, and `f_last`.
+- Include social-handle candidates and notes addresses only at the resolved company domain.
+- Use `nameParts()` for the same name tokens used in outreach greetings.
+- Rank from notes context, pattern frequency, and other available evidence. The baked Qwen model may reorder eligible candidates; deterministic ordering is the fallback. The model cannot introduce an address outside the company domain.
+- Persist the top ten in `email_guesses` with source, pattern, context, and rank in `score`. Do not assign validity or deliverability status.
 
-### 7.3 Pattern generation
+### 7.4 User decision
 
-For a given `{first_name, last_name, domain}`, generate a small set of candidates from common global patterns:
-
-- `first.last@domain`
-- `f.last@domain`
-- `first@domain`
-- `first_last@domain`
-- `last.first@domain`
-- `f_last@domain`
-
-In future, DomainPattern records can reduce this to the most probable 1–2 patterns for known domains.
-
-### 7.4 Verification layers
-
-1. Local / free checks:
-   - Basic syntax validation.
-   - DNS lookup for MX records; if none, mark as invalid (early exit).
-2. External verification API:
-   - For each syntactically valid candidate, call the email verification API.
-   - Expected fields in response (varies by provider):
-     - Result / status: valid, invalid, unknown, disposable, accept_all, etc.
-     - `safe_to_send` or equivalent boolean.
-3. Status mapping:
-   - `valid` + safe_to_send → `status = valid`.
-   - `invalid` → `status = invalid`.
-   - `disposable` or similar → `status = invalid` or `unknown` based on policy.
-   - `accept_all` → `status = accept_all` (user sees a warning).
-   - `unknown` → `status = unknown`.
-
-### 7.5 Picking a primary email
-
-Logic:
-
-- Prefer candidates with `status = valid`.
-- If multiple valid:
-  - Prefer patterns with higher global frequency (e.g., `first.last`).
-  - Secondarily, prefer patterns already seen as valid for this domain.
-- If only `accept_all` candidates:
-  - Optionally assign primary_email but label it as “risky / catch-all”.
-- If none valid or acceptable:
-  - Do not set primary_email; UI indicates “email not found – try manual or LinkedIn DM”.
-
-The chosen email is written to `target.primary_email` and surfaced in the UI.
-
-**Precedence: an owner's settled override outranks the pipeline.** Every owner-facing
-write stamps `primary_email_source = 'manual'`; the recompute stamps `'verified'`
-and its `WHERE` clause excludes rows already marked `manual`, so a later valid
-candidate never silently overwrites a decision the user made. Clearing the field
-clears the marker and lets the pipeline propose again. The UI reads the stored
-marker rather than inferring provenance by matching the address against guesses.
+- Show the ranked suggestions with a copy action and an explicit "not verified" label.
+- Allow manual entry of any email, including a personal address, into `target.primary_email`. This is an owner selection, not a verification result.
+- The user sends outreach manually and tracks the outcome. A reply can be recorded through outreach status; copying or saving an address never proves deliverability.
 
 ---
 
 ## 8. Asynchronous Processing with BullMQ
 
-### 8.1 Queues
-
-Planned queues:
-
-- `email-guess`:
-  - Job data: `{ targetId }`
-  - Responsibility:
-    - Load target.
-    - Derive domain.
-    - Generate candidate emails.
-    - Insert EmailGuess rows.
-    - Enqueue `email-verify` jobs for each candidate.
-- `email-verify`:
-  - Job data: `{ candidateId }`
-  - Responsibility:
-    - Load EmailGuess row.
-    - Run verification (local + external API).
-    - Update `status` and `verification_meta`.
-    - If valid, consider setting target.primary_email.
-
-Later (optional):
-
-- `enrich-profile`:
-  - For profile enrichment via external APIs.
-- `send-email`:
-  - To send emails via SMTP/third-party providers, if implemented.
-
-### 8.2 Worker process
-
-- One Node process hosting both BullMQ workers (not part of Next.js web server).
-- Connects to Redis with BullMQ.
-- Configuration per queue:
-  - Concurrency per queue (e.g., 5–10).
-  - Rate limiting to respect external API limits.
-  - Retries with exponential backoff.
-
-### 8.3 Data flow
-
-1. User creates/updates a target through Next.js.
-2. Server:
-   - Stores target in DB.
-   - Enqueues a job in `email-guess` with `{ targetId }`.
-3. `email-guess` worker:
-   - Generates candidates, writes EmailGuess rows.
-   - Enqueues `email-verify` jobs for each candidate.
-4. `email-verify` worker:
-   - Verifies each candidate and updates status.
-   - Optionally updates target.primary_email when a good candidate is found.
-5. UI:
-   - Polls or revalidates data to show:
-     - “Email guessing…” while jobs are running.
-     - Final result and confidence once done.
+- `POST /api/targets` enqueues `email-guess { targetId, userId }`. A target edit affecting email-search inputs clears and regenerates its suggestions; unrelated edits do not restart the search.
+- The standalone `email-guess` worker reloads the target under `asUser(userId, ...)`, checks ownership, resolves the domain, ranks candidates, and stores up to ten suggestions. It runs outside Next.js and uses Redis/BullMQ.
+- The queue payload scopes RLS but does not authorize the job. A missing or cross-tenant target yields no writes.
+- The UI polls briefly while suggestions are generated, then shows the ranked list. No external verifier API, SMTP probe, `email-verify` queue, or automatic `primary_email` write is part of the MVP.
 
 ---
 
@@ -453,13 +342,13 @@ Behavior:
 Sections:
 
 - Header:
-  - Name, role, company, primary_email or “Finding email…”.
+  - Name, role, company, and any manually saved primary_email.
   - “Edit target” dialog covering every field.
 - Contact info:
   - Profile links, notes, enrichment info.
-- Email guessing section:
-  - Show candidates and statuses (optional advanced view).
-  - Allow user to override and pick “correct” email if necessary.
+- Email suggestions section:
+  - Show ranked company-domain suggestions with a copy action.
+  - Allow the user to save an email manually for outreach.
 - Outreach history (live):
   - List of Outreach records with status, sent date, copy button, and inline status change.
 - “New Outreach” button:
@@ -496,7 +385,7 @@ Sections:
   - Avoid large-scale LinkedIn scraping from server-side.
   - Prefer enrichment APIs or user-run browser extensions.
 - Rate-limit:
-  - Email verification and any enrichment to avoid abuse and IP blocking.
+- Any future enrichment or email sending to avoid abuse and IP blocking.
 
 ---
 
@@ -510,15 +399,14 @@ Sections:
 - Outreach creation (generate messages, copy to clipboard).
 - Outreach status tracking.
 - Simple UI using Next.js + shadcn/ui.
-- Basic EmailGuess table and pipelines wired, but can start with manual email input.
+- Basic EmailGuess suggestion table and worker, with manual email input.
 
-### 11.2 Phase 2 – Email guessing & verification
+### 11.2 Phase 2 – Email suggestions
 
 - Implement EmailGuess model.
 - Implement BullMQ + Redis.
-- Implement `email-guess` and `email-verify` queues.
-- Integrate with a free-tier email verification API.
-- Surface primary_email and candidate status in UI.
+- Implement the `email-guess` queue and local ranking model with deterministic fallback.
+- Surface ranked, unverified suggestions and the manually selected `primary_email` in the UI.
 
 ### 11.3 Phase 3 – Enrichment & integrations
 
@@ -555,6 +443,6 @@ Sections:
 - Prefer one clear owner for each behavior (DRY), small focused modules where behavior warrants it (SOLID), and no empty directories or speculative layers (YAGNI).
 
 - Config:
-  - `.env` for database URL, Redis URL, and verifier API keys.
+  - `.env` for database URL, Redis URL, and Better Auth secrets.
   - `README.md` for quickstart and local dev setup.
   - `SPEC.md` (this file) to describe the platform.

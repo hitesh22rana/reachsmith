@@ -2,7 +2,7 @@ export const FAQS = [
   {
     question: "How accurate are the predicted emails?",
     answer:
-      "Predictions are educated guesses until verified. Each candidate passes mailbox checks and a verification service. Only valid ones get recommended. Domains that accept all mail get flagged as risky, and you can set any address by hand.",
+      "ReachSmith ranks work-email possibilities using the company domain, name patterns, notes, and public handles. They are suggestions rather than confirmed mailboxes, so review the address before sending. You can also enter one you already know.",
   },
   {
     question: "Does ReachSmith send email for me?",

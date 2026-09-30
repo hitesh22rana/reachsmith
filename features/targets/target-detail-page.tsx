@@ -101,15 +101,14 @@ export default async function TargetDetailPage({
 
       <section aria-label="Email candidates" className="animate-enter rounded-2xl border bg-card p-6">
         <TargetEmailSection
-          // Keyed by the record: a soft navigation to another target
-          // re-renders this page instead of remounting, and this section
-          // holds per-person state — a stale poll-ceiling flag stops polling
-          // a fresh target early, and a stale manual-email draft gets
-          // written onto the wrong person.
-          key={target.id}
+          // Reset record state on navigation and restart polling after an
+          // edit launches a fresh email search.
+          key={`${target.id}:${target.updatedAt.toISOString()}`}
           targetId={target.id}
           primaryEmail={target.primaryEmail}
-          primaryEmailSource={target.primaryEmailSource}
+          domain={target.domain}
+          companyWebsite={target.companyWebsite}
+          searchVersion={target.updatedAt.toISOString()}
         />
       </section>
 

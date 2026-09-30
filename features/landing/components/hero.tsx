@@ -13,20 +13,20 @@ interface MockRow {
 }
 
 const ROWS: MockRow[] = [
-  { name: "Maya Chen", company: "Vantech", role: "Backend engineer", state: "Valid", tone: "bg-green-500/10 text-green-700 dark:text-green-400" },
-  { name: "Daniel Okafor", company: "Corelink", role: "Recruiter", state: "Verifying", tone: "bg-amber-500/10 text-amber-700 dark:text-amber-400" },
-  { name: "Sofia Marino", company: "Brightline", role: "Hiring manager", state: "Risky", tone: "bg-destructive/10 text-destructive" },
+  { name: "Maya Chen", company: "Vantech", role: "Backend engineer", state: "Top match", tone: "bg-amber-500/10 text-amber-700 dark:text-amber-400" },
+  { name: "Daniel Okafor", company: "Corelink", role: "Recruiter", state: "Suggested", tone: "bg-amber-500/10 text-amber-700 dark:text-amber-400" },
+  { name: "Sofia Marino", company: "Brightline", role: "Hiring manager", state: "Added by you", tone: "bg-muted text-muted-foreground" },
 ];
 
 function DashboardMock() {
   return (
     <figure className="overflow-hidden rounded-2xl border bg-card text-left shadow-lg">
       <figcaption className="sr-only">
-        Preview of the ReachSmith dashboard showing target contacts with verified email states
+        Preview of the ReachSmith dashboard showing target contacts with suggested email addresses
       </figcaption>
       <div
         role="img"
-        aria-label="Preview of the ReachSmith dashboard showing contacts with verified email states"
+        aria-label="Preview of the ReachSmith dashboard showing contacts with suggested email addresses"
         className="overflow-hidden text-left"
       >
         <div className="flex items-center gap-1.5 border-b px-4 py-3" aria-hidden="true">
@@ -74,8 +74,8 @@ export function Hero() {
       </Reveal>
       <Reveal delay={120}>
         <p className="mx-auto mt-6 max-w-170 text-lg text-pretty text-muted-foreground">
-          Referral outreach with every contact in one place, every email verified,
-          every conversation tracked.
+          Keep every contact in one place, find likely work emails, and track every
+          conversation from first message to reply.
         </p>
       </Reveal>
       <Reveal delay={200}>

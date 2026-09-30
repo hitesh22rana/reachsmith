@@ -3,8 +3,8 @@
  * pipeline and the `{{first_name}}` prefill must never disagree.
  *
  * `firstName`/`lastName` are an override for names that do not split naively
- * (`Bae Suzy`, `van der Berg`, `Cher`, `J. Smith`) — null on most rows, not a
- * second copy of the name. No imports, so both the Next app and the
+ * (`Bae Suzy`, `van der Berg`, `Cher`, `J. Smith`). They are null on most
+ * rows, not a second copy of the name. No imports, so both the Next app and the
  * standalone workers can load it.
  */
 
