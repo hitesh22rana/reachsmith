@@ -63,7 +63,7 @@ export const DomainSchema = v.optional(
         v.trim(),
         v.maxLength(253, "Must be 253 characters or fewer"),
         v.regex(
-          /^[a-z0-9.-]+\.[a-z]{2,}$/i,
+          /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,}$/i,
           "Enter a domain like company.com",
         ),
       ),

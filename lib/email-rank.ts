@@ -157,16 +157,31 @@ function bestFirst(candidates: RankedCandidate[]): RankedCandidate[] {
     .sort((a, b) => b.score - a.score);
 }
 
-// Explicit domain wins; otherwise the first notes address donates its
-// domain; otherwise there is nothing to generate from.
+// Only an explicit domain or a straightforward company website can supply
+// the company domain. Notes addresses never determine where we guess.
 export function resolveDomain(
   explicit: string | null | undefined,
-  noteEmails: { domain: string }[],
+  website: string | null | undefined,
 ): string | null {
   if (explicit?.trim()) {
     return explicit.trim().toLowerCase();
   }
-  return noteEmails[0]?.domain ?? null;
+  if (!website) return null;
+  try {
+    const url = new URL(website);
+    if (url.protocol !== "https:" && url.protocol !== "http:") return null;
+    const host = url.hostname.toLowerCase().replace(/^www\./, "");
+    const blocked = new Set([
+      "gmail.com", "outlook.com", "yahoo.com", "hotmail.com",
+      "linkedin.com", "github.com", "facebook.com", "instagram.com",
+      "x.com", "twitter.com", "linktr.ee", "bit.ly", "vercel.app",
+      "netlify.app", "wordpress.com", "wixsite.com",
+    ]);
+    if (host.split(".").length !== 2 || blocked.has(host) || !/^[a-z0-9-]+\.[a-z]{2,}$/.test(host)) return null;
+    return host;
+  } catch {
+    return null;
+  }
 }
 
 // Full ranked set: notes addresses first by evidence, then name patterns.
@@ -176,14 +191,16 @@ export function rankCandidates(input: {
   first_name?: string | undefined;
   last_name?: string | undefined;
   domain?: string | null | undefined;
+  company_website?: string | null | undefined;
   notes?: string | null | undefined;
   social_urls?: string[] | null | undefined;
 }): RankedCandidate[] {
   const noteEmails = extractNoteEmails(input.notes);
-  const domain = resolveDomain(input.domain, noteEmails);
+  const domain = resolveDomain(input.domain, input.company_website);
   const ranked: RankedCandidate[] = [];
 
   for (const note of noteEmails) {
+    if (note.domain !== domain) continue;
     const pattern = inferPattern(note.email, input.first_name, input.last_name);
     const local = note.email.split("@")[0] ?? "";
     const nameHit =
@@ -198,8 +215,7 @@ export function rankCandidates(input: {
     });
   }
 
-  // Without a domain there is nothing to generate from, so the notes
-  // addresses are the whole result.
+  // Without a company domain there are no company addresses to verify.
   if (!domain) {
     return bestFirst(ranked);
   }
@@ -219,6 +235,7 @@ export function rankCandidates(input: {
   }
   const inferred = new Set(
     noteEmails
+      .filter((note) => note.domain === domain)
       .map((note) => inferPattern(note.email, input.first_name, input.last_name))
       .filter((pattern): pattern is EmailPattern => pattern !== null),
   );
