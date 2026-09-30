@@ -352,13 +352,22 @@ export function AddTargetDialog() {
           </DialogDescription>
         </DialogHeader>
         <Stepper steps={STEPS} current={step} onSelect={setStep} />
-        <h3 ref={stepHeadingRef} tabIndex={-1} className="text-base font-semibold outline-none">
-          {step === LAST_STEP ? "Review your target" : STEPS[step]?.title}
-        </h3>
         <form onSubmit={submitStep} className="flex flex-col gap-4" noValidate>
-          {STEP_CONTENT.map((StepContent, index) =>
-            index === step ? <StepContent key={STEPS[index]?.title} form={form} /> : null,
-          )}
+          {/* Keyed on the step so the heading and the fields arrive together
+              instead of swapping in place. The form itself stays mounted, which
+              is what keeps react-hook-form's field values across a step
+              change, and gap-4 restores the spacing the fragment steps used to
+              get from the form. */}
+          <div key={`heading-${step}`} className="animate-enter">
+            <h3 ref={stepHeadingRef} tabIndex={-1} className="text-base font-semibold outline-none">
+              {step === LAST_STEP ? "Review your target" : STEPS[step]?.title}
+            </h3>
+          </div>
+          <div key={step} className="animate-enter flex flex-col gap-4">
+            {STEP_CONTENT.map((StepContent, index) =>
+              index === step ? <StepContent key={STEPS[index]?.title} form={form} /> : null,
+            )}
+          </div>
 
           {serverError ? (
             <p role="alert" className="text-sm text-destructive">
