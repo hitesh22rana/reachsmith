@@ -86,7 +86,10 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       <body className="min-h-full flex flex-col overflow-x-clip">
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(siteSchema).replace(/</g, "\\u003c") }} />
         <noscript>
-          <style>{`.translate-y-16{transform:none!important}.blur-md{filter:none!important}.opacity-0{opacity:1!important}`}</style>
+          {/* The scroll reveal is JS-driven, so with no script it would leave
+              every landing section at its hidden state. Name the class it
+              writes, not the utilities it composes. */}
+          <style>{`.reveal{transform:none!important;filter:none!important;opacity:1!important}`}</style>
         </noscript>
         <Providers>{children}</Providers>
       </body>

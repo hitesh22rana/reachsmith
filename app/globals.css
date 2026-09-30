@@ -4,6 +4,15 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* Touch keeps :hover latched on the last-tapped element, so a hover affordance
+   (a lifted card, a tinted row) stays on screen after the finger lifts. Gate the
+   variant on a real pointer: on touch, :active is the feedback channel instead. */
+@custom-variant hover (@media (hover: hover) and (pointer: fine));
+
+/* Not in Tailwind's set, and the translucent floating chrome is exactly the case
+   it exists for: a see-through panel sitting over body text. */
+@custom-variant reduced-transparency (@media (prefers-reduced-transparency: reduce));
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -131,7 +140,14 @@
 
 @theme {
   --ease-out-strong: cubic-bezier(0.23, 1, 0.32, 1);
-  --animate-enter: enter 250ms var(--ease-out-strong) both;
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+  --animate-enter: enter 200ms var(--ease-out-strong) both;
+
+  /* tw-animate-css runs every `data-open:animate-in` / `data-closed:animate-out`
+     popup on `var(--tw-ease, ease)`, which is the built-in `ease`: the weakest
+     curve in the browser, on the select, autocomplete, dialog and alert dialog.
+     Point it at the token so they stop feeling like a different product. */
+  --tw-ease: var(--ease-out-strong);
 
   @keyframes enter {
     from {
@@ -154,6 +170,20 @@
     transform: scale(0.97);
     transition-duration: 100ms;
   }
+  /* Landing scroll reveal. The travel, the blur and the fade share one
+     transition so they cannot desync, and the hidden state is a data attribute
+     so the reduced-motion block below can reach it (a media query cannot
+     reliably outrank a conditionally-applied utility class). */
+  .reveal {
+    transition-property: transform, opacity, filter;
+    transition-duration: 700ms;
+    transition-timing-function: var(--ease-drawer);
+  }
+  .reveal[data-pending] {
+    transform: translateY(4rem);
+    filter: blur(12px);
+    opacity: 0;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -169,5 +199,17 @@
   .pressable:active,
   [data-slot="button"]:active {
     transform: none;
+  }
+  /* Gentler, not zero: the section still fades in. What goes is the 4rem slide
+     and the 12px un-blur, the two things that move a whole viewport, and the
+     stagger delays, which are pure decoration. */
+  .reveal {
+    transition-duration: 200ms;
+    transition-delay: 0ms;
+    transition-timing-function: linear;
+  }
+  .reveal[data-pending] {
+    transform: none;
+    filter: none;
   }
 }
