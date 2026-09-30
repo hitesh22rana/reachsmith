@@ -33,10 +33,13 @@ function SkeletonCard() {
         <div className="h-6 w-2/3 animate-pulse rounded bg-muted" />
         <div className="h-5 w-1/2 animate-pulse rounded bg-muted" />
       </CardHeader>
-      <CardContent className="flex flex-1 flex-col text-sm">
-        <div className="h-5 w-full animate-pulse rounded bg-muted" />
-        <div className="h-5 w-11/12 animate-pulse rounded bg-muted" />
-        <div className="h-5 w-2/3 animate-pulse rounded bg-muted" />
+      {/* gap-1 with h-4 bars, not h-5 with no gap: both come to the same 20px
+          pitch the real text occupies (text-sm line box), so the card does not
+          change height when the body replaces the placeholder. */}
+      <CardContent className="flex flex-1 flex-col gap-1 text-sm">
+        <div className="h-4 w-full animate-pulse rounded bg-muted" />
+        <div className="h-4 w-11/12 animate-pulse rounded bg-muted" />
+        <div className="h-4 w-2/3 animate-pulse rounded bg-muted" />
       </CardContent>
       <CardFooter className="justify-between gap-2 bg-transparent py-3">
         <div className="h-4 w-24 animate-pulse rounded bg-muted" />

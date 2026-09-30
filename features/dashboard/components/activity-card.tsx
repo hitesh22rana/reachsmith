@@ -45,7 +45,7 @@ export function ActivityCard({ activity }: { activity: ActivityItem[] }) {
             </Link>
           </div>
         ) : (
-          <ul className="-mx-2 flex flex-col">
+          <ul className="-mx-2 flex flex-col gap-1">
             {activity.map((item) => (
               <li key={item.key}>
                 <Link
@@ -55,7 +55,7 @@ export function ActivityCard({ activity }: { activity: ActivityItem[] }) {
                   {item.face ? (
                     <BlobatarAvatar name={item.face} size={34} />
                   ) : (
-                    <span className="flex size-[34px] shrink-0 items-center justify-center rounded-full bg-muted">
+                    <span className="flex size-8.5 shrink-0 items-center justify-center rounded-full bg-muted">
                       <Mail className="size-4 text-muted-foreground" aria-hidden="true" />
                     </span>
                   )}
