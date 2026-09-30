@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import * as v from "valibot";
@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { getJson, sendJson } from "@/lib/api";
 import { TargetEnvelopeSchema } from "@/features/targets/validation";
 import { GuessListSchema, PrimaryEmailSchema, type ApiEmailGuess } from "../validation";
+import { resolveDomain } from "@/lib/email-rank";
 
 const TRIED_STYLES: Record<ApiEmailGuess["status"], string> = {
   pending: "text-amber-600 dark:text-amber-400",
@@ -77,7 +78,22 @@ function savePrimaryEmail(targetId: string, email: string) {
 }
 
 function settled(guesses: ApiEmailGuess[] | undefined): boolean {
-  return !!guesses && guesses.every((guess) => guess.status !== "pending" && guess.status !== "verifying");
+  return !!guesses?.length && guesses.every((guess) => guess.status !== "pending" && guess.status !== "verifying");
+}
+
+function emailViewState(
+  guesses: ApiEmailGuess[] | undefined,
+  primaryEmail: string | null,
+  needsDomain: boolean,
+  pastDeadline: boolean,
+) {
+  const hasValid = !!guesses?.some((guess) => guess.status === "valid");
+  const finished = settled(guesses);
+  return {
+    running: !needsDomain && !pastDeadline && (!finished || (hasValid && !primaryEmail)),
+    empty: !!guesses && !primaryEmail && !hasValid && (needsDomain || finished || pastDeadline),
+    showTried: !!guesses?.length && (finished || pastDeadline),
+  };
 }
 
 // Poll ceiling. The pipeline caps verify at 10 candidates and retries 3x, so
@@ -182,7 +198,7 @@ function confidenceFor(
   }
   const match = guesses?.find((guess) => guess.email === primaryEmail);
   if (match?.status === "valid") {
-    return `Verified · pattern ${match.patternUsed}`;
+    return `Verified deliverable · ${match.patternUsed} pattern · person match unconfirmed`;
   }
   if (match?.status === "accept_all") {
     return "Catch-all domain · risky";
@@ -197,10 +213,12 @@ function StatusHeader({
   running,
   empty,
   timedOut,
+  needsDomain,
 }: {
   running: boolean;
   empty: boolean;
   timedOut: boolean;
+  needsDomain: boolean;
 }) {
   return (
     <div>
@@ -212,7 +230,7 @@ function StatusHeader({
       ) : null}
       {empty ? (
         <p className="mt-1 text-sm text-muted-foreground">
-          Email not found – try manual entry or LinkedIn DM.
+          {needsDomain ? "Add the company’s email domain to find a work address." : "Email not found. Try manual entry or LinkedIn DM."}
         </p>
       ) : null}
       {timedOut ? (
@@ -229,12 +247,21 @@ export function TargetEmailSection({
   targetId,
   primaryEmail,
   primaryEmailSource,
+  domain,
+  companyWebsite,
+  searchVersion,
 }: {
   targetId: string;
   primaryEmail: string | null;
   primaryEmailSource: "manual" | "verified" | null;
+  domain: string | null;
+  companyWebsite: string | null;
+  searchVersion: string;
 }) {
   const queryClient = useQueryClient();
+  const router = useRouter();
+  const refreshed = useRef(false);
+  const needsDomain = !resolveDomain(domain, companyWebsite);
   const [copiedEmail, setCopiedEmail] = useState<string | null>(null);
   const [pastDeadline, setPastDeadline] = useState(false);
   useEffect(() => {
@@ -242,17 +269,19 @@ export function TargetEmailSection({
     return () => clearTimeout(timer);
   }, []);
   const guesses = useQuery({
-    queryKey: ["guesses", targetId],
+    queryKey: ["guesses", targetId, searchVersion],
     queryFn: () => fetchGuesses(targetId),
     refetchInterval: (query) =>
-      settled(query.state.data) || pastDeadline ? false : POLL_INTERVAL_MS,
+      needsDomain || settled(query.state.data) || pastDeadline ? false : POLL_INTERVAL_MS,
   });
+  useEffect(() => {
+    if (!refreshed.current && !primaryEmail && guesses.data?.some((guess) => guess.status === "valid")) {
+      refreshed.current = true;
+      router.refresh();
+    }
+  }, [guesses.data, primaryEmail, router]);
 
-  const running = !pastDeadline && (guesses.isPending || (!!guesses.data && !settled(guesses.data)));
-  // Settled with no winner (all invalid/unknown, nothing set) is the same
-  // "not found" state as zero guesses: the section must never go silent.
-  const empty =
-    !!guesses.data && (settled(guesses.data) || pastDeadline) && !primaryEmail;
+  const { running, empty, showTried } = emailViewState(guesses.data, primaryEmail, needsDomain, pastDeadline);
 
   async function copyEmail() {
     if (!primaryEmail) {
@@ -264,7 +293,7 @@ export function TargetEmailSection({
 
   return (
     <div className="flex flex-col gap-4">
-      <StatusHeader running={running} empty={empty} timedOut={pastDeadline} />
+      <StatusHeader running={running} empty={empty} timedOut={pastDeadline && !needsDomain} needsDomain={needsDomain} />
 
       {primaryEmail ? (
         <ResultCard
@@ -280,7 +309,7 @@ export function TargetEmailSection({
           Could not load candidates. Check the connection and try again.
         </p>
       ) : null}
-      {guesses.data && guesses.data.length > 0 && (settled(guesses.data) || pastDeadline) ? (
+      {guesses.data && showTried ? (
         <div className="animate-enter">
           <TriedList guesses={guesses.data} />
         </div>
