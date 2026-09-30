@@ -578,33 +578,42 @@ export function NewOutreachDialog({
           </DialogDescription>
         </DialogHeader>
         <Stepper steps={STEPS} current={step} onSelect={setStep} />
-        <h3 ref={stepHeadingRef} tabIndex={-1} className="text-base font-semibold outline-none">
-          {step === LAST_STEP ? "Review your outreach" : STEPS[step]?.title}
-        </h3>
         <form
           onSubmit={submitStep}
           className="flex flex-col gap-4"
           noValidate
         >
-          <StepContent
-            step={step}
-            form={form}
-            templates={templates.data ?? []}
-            templatesPending={templates.isPending}
-            placeholders={placeholders}
-            variables={variables}
-            body={body}
-            bodyDirty={bodyDirty}
-            copied={copiedBody === body}
-            reviewItems={reviewItems}
-            onPick={pickTemplate}
-            onVarChange={(name, value) =>
-              setVariables((current) => ({ ...current, [name]: value }))
-            }
-            onBodyChange={() => setBodyDirty(true)}
-            onReapply={() => setBodyDirty(false)}
-            onCopy={() => void copyBody()}
-          />
+          {/* Keyed on the step so the heading and the fields arrive together
+              instead of swapping in place. The form itself stays mounted, which
+              is what keeps react-hook-form's field values across a step change,
+              and gap-4 restores the spacing the fragment steps used to get from
+              the form. */}
+          <div key={`heading-${step}`} className="animate-enter">
+            <h3 ref={stepHeadingRef} tabIndex={-1} className="text-base font-semibold outline-none">
+              {step === LAST_STEP ? "Review your outreach" : STEPS[step]?.title}
+            </h3>
+          </div>
+          <div key={step} className="animate-enter flex flex-col gap-4">
+            <StepContent
+              step={step}
+              form={form}
+              templates={templates.data ?? []}
+              templatesPending={templates.isPending}
+              placeholders={placeholders}
+              variables={variables}
+              body={body}
+              bodyDirty={bodyDirty}
+              copied={copiedBody === body}
+              reviewItems={reviewItems}
+              onPick={pickTemplate}
+              onVarChange={(name, value) =>
+                setVariables((current) => ({ ...current, [name]: value }))
+              }
+              onBodyChange={() => setBodyDirty(true)}
+              onReapply={() => setBodyDirty(false)}
+              onCopy={() => void copyBody()}
+            />
+          </div>
 
           {serverError ? (
             <p role="alert" className="text-sm text-destructive">
