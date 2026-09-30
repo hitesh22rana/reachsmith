@@ -19,7 +19,7 @@ export function PipelineCard({
   statusCounts: Record<string, number>;
 }) {
   return (
-    <Card className="animate-enter lg:col-span-2" style={{ animationDelay: "350ms" }}>
+    <Card className="animate-enter lg:col-span-2" style={{ animationDelay: "200ms" }}>
       <CardHeader>
         <div className="flex items-start justify-between gap-3">
           <div>
