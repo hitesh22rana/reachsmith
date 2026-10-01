@@ -1,5 +1,5 @@
 # Local Postgres + Redis for development. No secrets here are real.
-# Production stack (app + workers, model baked into the worker image):
+# Production stack (app + deterministic suggestion worker):
 #   docker compose --profile prod up --build
 # Dev default (`docker compose up`) stays Postgres + Redis only.
 # Both stores publish on 127.0.0.1 only: a short-syntax port binds 0.0.0.0,
