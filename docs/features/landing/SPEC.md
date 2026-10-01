@@ -9,21 +9,25 @@ Design follows the landing-page-design skill (Part A strategy before Part B visu
 Foundation (layout, design system, motion tokens) + auth (session state for the redirect).
 
 ## Scope
+
 - `/` becomes a public landing page: hero (product name, one-line pitch, Log in / Create account CTAs), feature highlights (targets, templates, outreach, unverified email suggestions), footer. No app data, no user-specific content.
 - Move the current dashboard (stat cards, session-aware header) from `/` to `/dashboard`, guarded by `requireUserId()`.
-- Logged-in visit to `/` redirects to `/dashboard`. Post-login/post-signup redirect becomes `/dashboard` (update `auth-form.tsx` + auth SPEC).
+- Logged-in visit to `/` redirects to `/dashboard`. Login redirects to `/dashboard`; signup continues at `/login?new=1` without auto sign-in (see auth SPEC).
 - Reuse Card/Button/motion tokens (`animate-enter`, `pressable`, stagger); honor reduced motion. SEO metadata for `/`.
 - Skill compliance notes: hero heading uses the skill's text gradient (the only allowed gradient); spacing uses only skill table steps (all valid Tailwind steps); Lucide stays as the icon set for app-wide consistency (not a banned set); FAQ leads with the accuracy objection and risk reversal leans on confidence labels plus manual override (no auto-send). Deliberate deviations, user-approved: the B11 tagline section was removed (it restated the hero sub), Problem and Accuracy sections were removed (redundant with hero, Benefits, and FAQ), How it works is a vertical stepper with filled numbered nodes, `/` is indexed (see `seo` feature), and the header is static on mobile with a floating menu panel to avoid hero overlap on reload.
 
 ## Security
+
 - Landing renders zero user data and calls no authenticated endpoints. `/dashboard` enforces the same session guard as other app routes.
 
 ## Tasks
+
 1. Move dashboard page to `app/dashboard/page.tsx` + guard.
 2. Build public landing at `app/page.tsx` (server component, session checked only for the redirect).
 3. Point post-login redirects at `/dashboard`; add `/dashboard` to guarded routes.
 
 ## Acceptance
+
 - Logged-out `/` shows landing with CTAs; no dashboard content or user data leaks.
 - Logged-in `/` redirects to `/dashboard`; logged-out `/dashboard` redirects to `/login`.
 - `typecheck`, `lint`, `build` green.
