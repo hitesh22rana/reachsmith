@@ -83,6 +83,41 @@ const givenFirst = rankCandidates({ first_name: "Ada", last_name: "Lovelace", do
 assert.equal(givenFirst[0]?.email, "ada@acme.com", "tuned priorities favor the given-name pattern");
 assert.equal(rankCandidates({ first_name: "Ada", last_name: "Lovelace", domain: "acme.com", notes: "My email is ada.lovelace@acme.com" })[0]?.email, "ada.lovelace@acme.com", "direct notes evidence still overrides global priorities");
 
+// Biography names are observed inputs, not a nickname dictionary. Exercise the
+// public ranker so extraction, deduplication and domain isolation stay together.
+for (const [first, last, notes, expected] of [
+  ["Rosalind", "Rivera", 'Rosalind "Rose" Rivera is a software engineer.', "rose"],
+  ["Robert", "Walsh", "Bob Walsh is a software engineer.", "bob"],
+  ["Samantha", "Bell", "Sammy is a consultant.", "sammy"],
+  ["Patricia", "Bell", "Patricia Bell is a consultant. Pat works with nonprofit boards.", "pat"],
+  ["Erin", "Mason", "Erin Nicole Mason is an engineer.", "enm"],
+  ["Michi", "a Russo", "Gian-Matteo (Michi) advises companies.", "gmarusso"],
+]) {
+  const candidates = rankCandidates({ first_name: first, last_name: last, domain: "acme.com", notes });
+  assert.ok(candidates.some((candidate) => candidate.email === `${expected}@acme.com`), `uses observed biography name ${expected}`);
+  assert.ok(candidates.every((candidate) => candidate.email.endsWith("@acme.com")));
+  assert.equal(new Set(candidates.map((candidate) => candidate.email)).size, candidates.length);
+}
+const observedShortName = rankCandidates({ first_name: "Robert", last_name: "Walsh", domain: "acme.com", notes: "Bob Walsh is a software engineer." });
+assert.equal(observedShortName[0]?.email, "bob@acme.com", "observed short name outranks the unshortened given name");
+assert.equal(rankCandidates({ first_name: "Robert", last_name: "Walsh", domain: "acme.com", notes: "Bob Walsh is a software engineer. My email is rwalsh@acme.com" })[0]?.email, "rwalsh@acme.com", "direct address evidence still outranks a biography name");
+const unrelatedBio = rankCandidates({ first_name: "Rosalind", last_name: "Rivera", domain: "acme.com", notes: 'Alice "Allie" Cooper is a colleague. Rosalind "Rose" Jenkins is another colleague. Bob Rivera is her manager.' });
+assert.ok(!unrelatedBio.some((candidate) => /^(allie|rose|bob)@/.test(candidate.email)), "unrelated people do not supply aliases");
+assert.ok(!rankCandidates({ first_name: "William", last_name: "Walsh", domain: "acme.com", notes: "William is an engineer." }).some((candidate) => candidate.email === "bill@acme.com"), "unobserved nicknames are not invented");
+for (const [website, domain] of [
+  ["https://pages.acme.com/download", "acme.com"],
+  ["https://careers.acme.co.uk/", "acme.co.uk"],
+  ["https://co.uk", null],
+  ["https://team.github.io/", null],
+  ["https://pages.wordpress.com/", null],
+  ["https://www.instagram.com/person", null],
+  ["https://mail.gmail.com/", null],
+  ["https://127.0.0.1/", null],
+  ["https://localhost/", null],
+  ["https://acme.invalid/", null],
+]) assert.equal(resolveDomain(null, website), domain, `company website boundary: ${website}`);
+assert.equal(resolveDomain("dept.acme.com", "https://pages.acme.com"), "dept.acme.com", "explicit email domain wins over website inference");
+
 // CSRF: only a present-and-foreign Origin is rejected.
 assert.equal(isCrossOrigin(null, HOST), false, "missing Origin allowed (non-browser client)");
 assert.equal(isCrossOrigin(SAME, HOST), false, "same origin allowed");
