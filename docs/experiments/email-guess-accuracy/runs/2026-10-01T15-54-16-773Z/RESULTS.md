@@ -316,3 +316,228 @@ Re-run the evaluated Git revision with the recorded input checksums. Only this f
 ## Limits
 
 This is a diagnostic baseline on published contact directories, not a representative production benchmark or a deliverability check. Website/domain mismatches and missing candidate patterns require domain or candidate-generation changes. Use an independent holdout after tuning.
+
+## Per-target miss analysis
+
+Diagnosis added on 2026-10-01 using the unchanged seed, schema, and production source checksums recorded above. An in-memory replay reproduced all five hit counts. Published answers are scoring labels only; case IDs and evidence URLs were excluded from pipeline inputs. Source links below refer to the seed snapshot, not newly verified biographies. Original metrics and evaluated revision remain unchanged.
+
+### What lowers accuracy
+
+There are **84 full-list misses** and **80 additional cases where the correct address is generated below rank 1**. Together these account for all 164 first-choice misses.
+
+| Primary full-list failure | Cases | Interpretation |
+| --- | --- | --- |
+| Missing domain and website | 54 | No company domain to generate addresses against. |
+| Website rejected | 2 | One company subdomain and one social website. |
+| Resolved domain differs from answer domain | 9 | Website host is not necessarily the email domain. |
+| Correct domain, missing local part | 19 | Observed names, unusual abbreviations, or unprovided aliases/name details. |
+
+Domain input or resolution accounts for **65/84 full-list misses (77.38%)**. Correcting domains does not guarantee all 65 become hits: some may also have name-pattern gaps. Among the 224 cases whose resolved domain matches the published answer domain, full-list accuracy is **205/224 (91.52%)**. This is a diagnostic subset, not a replacement for the overall **205/289 (70.93%)** score.
+
+### Correct domain, missing local part: every target
+
+Five misses have short names explicitly used in their biography inputs; two more have fuller name details there. These are useful context-processing opportunities. The ranker currently extracts email addresses from Notes, but does not turn biographical names into name variants. Two cases suggest unusual abbreviations, and ten have unconfirmed short names, opaque aliases, unexplained initials, or absent surname details. Those ten can be deferred from implementation without removing them from evaluation. Categories describe evidence available in the seed snapshot; they do not prove how the person chose the address.
+
+| Target / source | Name | Published address | Diagnosis |
+| --- | --- | --- | --- |
+| [w3c_dom](https://www.w3.org/staff/#dom) | Dominique Hazaël-Massieux | dom@w3.org | Unconfirmed short name: dom is not explicitly stated as an alias. Notes contain a /People/Dom/ URL hint and the social handle dontcallmedom; those do not independently confirm the email short name. |
+| [w3c_chu](https://www.w3.org/staff/#chu) | Chunming Hu | hucm@w3.org | Unusual abbreviation: hucm appears to combine surname Hu with given-name syllable initials cm. That syllable split is not explicitly supplied; confirm independently before adding a rule. |
+| [w3c_alex](https://www.w3.org/staff/#alex) | Alexandra Lacourba | alex@w3.org | Unconfirmed short name: Notes use Alexandra. Alex is inferred from the answer, not explicitly supplied as a name. |
+| [w3c_dsr](https://www.w3.org/staff/#dsr) | Dave Raggett | dsr@w3.org | Unexplained initial: Dave Raggett does not supply the additional s in dsr. Do not invent a middle name. |
+| [w3c_mike](https://www.w3.org/staff/#mike) | Michael[tm] Smith (sideshowbarker) | mike@w3.org | Unconfirmed short name: Inputs name Michael[tm] Smith (sideshowbarker). Mike is not stated in the biography. |
+| [eff_rindala_alajaji](https://www.eff.org/about/staff) | Rindala Alajaji | rin@eff.org | Observed short name: Biography explicitly says Rindala "Rin" Alajaji. Notes name extraction could supply Rin. |
+| [eff_william_budington](https://www.eff.org/about/staff) | William Budington | bill@eff.org | Observed short name: Biography identifies Bill Budington. Bill is already in Notes. |
+| [eff_sarah_hamid](https://www.eff.org/about/staff) | Sarah Hamid | stsnv@eff.org | Opaque alias: Notes include Sarah T. Hamid, but do not explain the remaining characters in stsnv. |
+| [eff_jacob_hoffman_andrews](https://www.eff.org/about/staff) | Jacob Hoffman-Andrews | jsha@eff.org | Unexplained initial: Jacob Hoffman-Andrews does not supply the additional s in jsha. |
+| [eff_maggie_kazmierczak](https://www.eff.org/about/staff) | Magdalena Kazmierczak | maggie@eff.org | Observed short name: Biography calls her Maggie. Maggie is already in Notes. |
+| [fsfe_lohmus](https://fsfe.org/about/people/index.en.html#lohmus) | Heiki Lõhmus | repentinus@fsfe.org | Opaque alias: repentinus is absent from normal pipeline inputs. An evidence URL containing it is withheld and cannot supply a candidate. |
+| [fsfe_albers](https://fsfe.org/about/people/index.en.html#albers) | Erik Albers | eal@fsfe.org | Unusual abbreviation: eal resembles first initial plus two surname letters. This is an unsupported abbreviation, rather than clear evidence of a nickname. |
+| [fsfe_sander](https://fsfe.org/about/people/index.en.html#sander) | Alexander Sander | alex.sander@fsfe.org | Unconfirmed short name: Notes use Alexander. Alex is inferred from the answer, not explicitly supplied. |
+| [boardsource_erin_gordon](https://boardsource.org/user-profile/72604d32e953f05ed9e1a7ced3e28113b202a5ae) | Erin Gordon | eng@thewayfind.com | Fuller name in biography: Biography names Erin Nicole Gordon. The additional given name supports initials eng; it is absent from the form name. |
+| [boardsource_david_sternberg](https://boardsource.org/user-profile/dave-loringsternberg.com) | David Sternberg | dave@loringsternberg.com | Unconfirmed short name: Notes use David. Dave appears in the answer and withheld evidence URL, not as an input alias. |
+| [boardsource_patricia_mccowan](https://boardsource.org/user-profile/pmccowan-sprynet.com) | Patricia McCowan | pat@xanthusconsulting.com | Observed short name: Biography repeatedly calls her Pat. Pat is already in Notes. |
+| [alliance_alexandra_howson](https://apps.acehp.org/consultantdirectory/details.cfm?localID=8340) | Alexandra Howson | alex@alexhowson.com | Observed short name: Biography says Alex hosts Write Medicine. Alex is already in Notes. |
+| [cooley_mischi_a_marca](https://www.cooley.com/people/mischi-a-marca) | Mischi a Marca | gmamarca@cooley.com | Fuller name in biography: Biography says Gian-Michele (Mischi). Using that observed name also needs a compound given-name initials plus surname pattern for gmamarca. |
+| [cooley_vanessa_agudelo](https://www.cooley.com/people/vanessa-agudelo) | Vanessa Agudelo | vagudelogomez@cooley.com | Unprovided surname detail: gomez could be an additional surname, but it is absent from the name and biography. Do not add it from the answer. |
+
+### Resolved domain differs from published domain: every target
+
+Collect or verify the email domain independently. Do not populate seed domains by splitting the expected answer. Eddrick Martin's website spelling is an apparent mismatch that needs source verification; several others may legitimately use different website and email domains.
+
+| Target / source | Name | Website input | Resolved domain | Published address |
+| --- | --- | --- | --- | --- |
+| [ct_susan_nock](https://ctgardenclubs.org/speakers/susan-nock-thistle-containers/) | Susan Nock | https://www.susannockgardendesign.com/ | susannockgardendesign.com | susan@thistlecontainers.com |
+| [boardsource_stephanie_cooper](https://boardsource.org/user-profile/103eaead9afdad42399df5b124ba627e9956209e) | Stephanie Cooper | http://www.cooperconsulting.online/ | cooperconsulting.online | stephanie@cooperconsultingservices.net |
+| [boardsource_eddrick_martin](https://boardsource.org/user-profile/eddrick.martin) | Eddrick Martin | https://elevatedmometnum.com | elevatedmometnum.com | emartin@elevatedmomentum.com |
+| [boardsource_linda_jenkins](https://boardsource.org/user-profile/lindajenkins-jenkinscg.com) | Linda Jenkins | https://jenkinscg.com | jenkinscg.com | lindajenkins@jenkinsconsultinggroup032.onmicrosoft.com |
+| [boardsource_mari_aguirre_rodriguez](https://boardsource.org/user-profile/mari-optinexperts.com) | Mari Aguirre Rodriguez | http://www.goodgovernancecoach.com | goodgovernancecoach.com | mari@optinexperts.com |
+| [boardsource_natasha_dresner](https://boardsource.org/user-profile/natasha-hgf.org) | Natasha Dresner | https://jcamp180.org/ | jcamp180.org | natasha@hgf.org |
+| [boardsource_toni_capra](https://boardsource.org/user-profile/tcapra-consultarepartners.com) | Toni Capra | http://cpnonprofits.com | cpnonprofits.com | toni@consultarepartners.com |
+| [boardsource_timothy_figley](https://boardsource.org/user-profile/tim-timothyfigley.com) | Timothy Figley | http://teamswork.net | teamswork.net | tim@timothyfigley.com |
+| [alliance_anne_symons](https://apps.acehp.org/consultantdirectory/details.cfm?localID=1549) | Anne Symons | http://www.accreditationoutcomessolutions.com/ | accreditationoutcomessolutions.com | anne@accredoutcomes.com |
+
+### Rejected websites: every target
+
+Aaron Stroman's company subdomain fails the current two-label host rule. A future resolver could use proper registrable-domain handling, or the target can supply an independently confirmed explicit domain. Anita Misra-Press supplies an Instagram website; rejection is appropriate and the company email domain is missing. Relaxing the social-host filter would generate Instagram addresses, not fix the input.
+
+| Target / source | Name | Website input | Published address |
+| --- | --- | --- | --- |
+| [boardsource_aaron_stroman](https://boardsource.org/user-profile/1f39e826990e3b49725079e994446ca2040a26dc) | Aaron Stroman | https://pages.stromanconsulting.com/download-request | aaron@stromanconsulting.com |
+| [alliance_anita_misra_press](https://apps.acehp.org/consultantdirectory/details.cfm?localID=16304) | Anita Misra-Press | https://www.instagram.com/nature_empath/?hl=en | anita@anitamisra.com |
+
+### Missing domain and website: every target
+
+Both domain fields are absent for these targets: 47 IEEE, four BoardSource, and three Alliance cases. A company name alone does not supply a domain in the current pipeline. Keep these in the overall denominator and collect domain inputs from independent company sources before re-evaluating.
+
+| Target / source | Name | Company input | Published address |
+| --- | --- | --- | --- |
+| [ieee_mukta_farooq](https://eds.ieee.org/education/distinguished-lecturer-mini-colloquia-program/distinguished-lecturer-listing) | Mukta Farooq | IBM Research | mukta.ghate.farooq@ibm.com |
+| [ieee_rajiv_joshi](https://eds.ieee.org/education/distinguished-lecturer-mini-colloquia-program/distinguished-lecturer-listing) | Rajiv Joshi | IBM T.J. Watson Research Center | rvjoshi@us.ibm.com |
+| [ieee_ioannis_john_kymissis](https://eds.ieee.org/education/distinguished-lecturer-mini-colloquia-program/distinguished-lecturer-listing) | Ioannis (John) Kymissis | Columbia University | johnkym@ee.columbia.edu |
+| [ieee_jesus_del_alamo](https://eds.ieee.org/education/distinguished-lecturer-mini-colloquia-program/distinguished-lecturer-listing) | Jesus del Alamo | MIT, USA | alamo@mit.edu |
+| [ieee_shimeng_yu](https://eds.ieee.org/education/distinguished-lecturer-mini-colloquia-program/distinguished-lecturer-listing) | Shimeng Yu | Georgia Institute of Technology | shimeng.yu@ece.gatech.edu |
+| [ieee_jiann_shiun_peter_yuan](https://eds.ieee.org/education/distinguished-lecturer-mini-colloquia-program/distinguished-lecturer-listing) | Jiann-Shiun (Peter) Yuan | University of Central Florida | yuanj@mail.ucf.edu |
+| [ieee_vikram_l_dalal](https://eds.ieee.org/education/distinguished-lecturer-mini-colloquia-program/distinguished-lecturer-listing) | Vikram L. Dalal | Iowa state University | vdalal@iastate.edu |
+| [ieee_patrick_fay](https://eds.ieee.org/education/distinguished-lecturer-mini-colloquia-program/distinguished-lecturer-listing) | Patrick Fay | University of Notre Dame | pfay@nd.edu |
+| [ieee_deji_akinwande](https://eds.ieee.org/education/distinguished-lecturer-mini-colloquia-program/distinguished-lecturer-listing) | Deji Akinwande | University of Texas at Austin | deji@ece.utexas.edu |
+| [ieee_kaustav_banerjee](https://eds.ieee.org/education/distinguished-lecturer-mini-colloquia-program/distinguished-lecturer-listing) | Kaustav Banerjee | University of California | kaustav@ece.ucsb.edu |
+| [ieee_albert_wang](https://eds.ieee.org/education/distinguished-lecturer-mini-colloquia-program/distinguished-lecturer-listing) | Albert Wang | University of California, Dept. of Electrical and Computer Engineering | aw@ece.ucr.edu |
+| [ieee_anthony_yen](https://eds.ieee.org/education/distinguished-lecturer-mini-colloquia-program/distinguished-lecturer-listing) | Anthony Yen | ASML Technology Development Center | tony.yen@asml.com |
+| [ieee_jamal_deen](https://eds.ieee.org/education/distinguished-lecturer-mini-colloquia-program/distinguished-lecturer-listing) | Jamal Deen | McMaster University | jamal@mcmaster.ca |
+| [ieee_joachim_n_burghartz](https://eds.ieee.org/education/distinguished-lecturer-mini-colloquia-program/distinguished-lecturer-listing) | Joachim N. Burghartz | Institute for Microelectronics Stuttgart (IMS CHIPS) | burghartz@ims-chips.de |
+| [ieee_nazek_el_atab](https://eds.ieee.org/education/distinguished-lecturer-mini-colloquia-program/distinguished-lecturer-listing) | Nazek El-Atab | KAUST, Saudi Arabia | nazek.elatab@kaust.edu.sa |
+| [ieee_elena_gnani](https://eds.ieee.org/education/distinguished-lecturer-mini-colloquia-program/distinguished-lecturer-listing) | Elena Gnani | University of Bologna | elena.gnani@unibo.it |
+| [ieee_tibor_grasser](https://eds.ieee.org/education/distinguished-lecturer-mini-colloquia-program/distinguished-lecturer-listing) | Tibor Grasser | Technische Universitat Wien | grasser@iue.tuwien.ac.at |
+| [ieee_benjamin_iniguez](https://eds.ieee.org/education/distinguished-lecturer-mini-colloquia-program/distinguished-lecturer-listing) | Benjamin Iniguez | University Rovira i Virgili | benjamin.iniguez@urv.cat |
+| [ieee_lluis_f_marsal](https://eds.ieee.org/education/distinguished-lecturer-mini-colloquia-program/distinguished-lecturer-listing) | Lluis F. Marsal | University Rovira i Virgili | lluis.marsal@urv.cat |
+| [ieee_enrique_miranda](https://eds.ieee.org/education/distinguished-lecturer-mini-colloquia-program/distinguished-lecturer-listing) | Enrique Miranda | Universitat Autonoma de Barcelona | enrique.miranda@uab.cat |
+| [ieee_arokia_nathan](https://eds.ieee.org/education/distinguished-lecturer-mini-colloquia-program/distinguished-lecturer-listing) | Arokia Nathan | Darwin College, University of Cambridge | an299@cam.ac.uk |
+| [ieee_mikael_ostling](https://eds.ieee.org/education/distinguished-lecturer-mini-colloquia-program/distinguished-lecturer-listing) | Mikael Ostling | KTH, Royal Institute of Technology | mostling@kth.se |
+| [ieee_claudio_paoloni](https://eds.ieee.org/education/distinguished-lecturer-mini-colloquia-program/distinguished-lecturer-listing) | Claudio Paoloni | Lancaster University | c.paoloni@lancaster.ac.uk |
+| [ieee_angele_h_m_e_reinders](https://eds.ieee.org/education/distinguished-lecturer-mini-colloquia-program/distinguished-lecturer-listing) | Angele H.M.E. Reinders | University of Twente | a.h.m.e.reinders@utwente.nl |
+| [ieee_enrico_sangiorgi](https://eds.ieee.org/education/distinguished-lecturer-mini-colloquia-program/distinguished-lecturer-listing) | Enrico Sangiorgi | University of Bologna, DEIS | e.sangiorgi@unibo.it |
+| [ieee_frank_schwierz](https://eds.ieee.org/education/distinguished-lecturer-mini-colloquia-program/distinguished-lecturer-listing) | Frank Schwierz | Technische Universitaet Ilmenau | frank.schwierz@tu-ilmenau.de |
+| [ieee_radu_sporea](https://eds.ieee.org/education/distinguished-lecturer-mini-colloquia-program/distinguished-lecturer-listing) | Radu Sporea | University of Surrey | r.a.sporea@surrey.ac.uk |
+| [ieee_merlyne_de_souza](https://eds.ieee.org/education/distinguished-lecturer-mini-colloquia-program/distinguished-lecturer-listing) | Merlyne de Souza | The University of Sheffield | m.desouza@sheffield.ac.uk |
+| [ieee_alba_avila](https://eds.ieee.org/education/distinguished-lecturer-mini-colloquia-program/distinguished-lecturer-listing) | Alba Avila | Universidad de los Andes | a-avila@uniandes.edu.co |
+| [ieee_victor_grimblatt](https://eds.ieee.org/education/distinguished-lecturer-mini-colloquia-program/distinguished-lecturer-listing) | Victor Grimblatt | Synopsys | victor.grimblatt@synopsys.com |
+| [ieee_edmundo_a_gutierrez_d](https://eds.ieee.org/education/distinguished-lecturer-mini-colloquia-program/distinguished-lecturer-listing) | Edmundo A. Gutierrez-D. | National Institute for Astrophysics, Optics and Electronics | edmundo@inaoep.mx |
+| [ieee_joao_martino](https://eds.ieee.org/education/distinguished-lecturer-mini-colloquia-program/distinguished-lecturer-listing) | Joao Martino | University of Sao Paulo | martino@usp.br |
+| [ieee_felix_palumbo](https://eds.ieee.org/education/distinguished-lecturer-mini-colloquia-program/distinguished-lecturer-listing) | Felix Palumbo | Allegro MicroSystems | fpalumbo@allegromicro.com |
+| [ieee_marcelo_pavanello](https://eds.ieee.org/education/distinguished-lecturer-mini-colloquia-program/distinguished-lecturer-listing) | Marcelo Pavanello | Centro Universitario FEI, Sao Paulo, Brazil | pavanello@fei.edu.br |
+| [ieee_yang_chai](https://eds.ieee.org/education/distinguished-lecturer-mini-colloquia-program/distinguished-lecturer-listing) | Yang Chai | The Hong Kong Polytechnic University | ychai@polyu.edu.hk |
+| [ieee_mansun_j_chan](https://eds.ieee.org/education/distinguished-lecturer-mini-colloquia-program/distinguished-lecturer-listing) | Mansun J. Chan | HKUST | mchan@ust.hk |
+| [ieee_yogesh_singh_chauhan](https://eds.ieee.org/education/distinguished-lecturer-mini-colloquia-program/distinguished-lecturer-listing) | Yogesh Singh Chauhan | Indian Institute of Technology | chauhan@iitk.ac.in |
+| [ieee_steve_s_chung](https://eds.ieee.org/education/distinguished-lecturer-mini-colloquia-program/distinguished-lecturer-listing) | Steve S. Chung | National Chiao Tung University | schung@cc.nctu.edu.tw |
+| [ieee_abhisek_dixit](https://eds.ieee.org/education/distinguished-lecturer-mini-colloquia-program/distinguished-lecturer-listing) | Abhisek Dixit | Indian Institute of Technology Delhi | adixit@ee.iitd.ac.in |
+| [ieee_xiaojun_guo](https://eds.ieee.org/education/distinguished-lecturer-mini-colloquia-program/distinguished-lecturer-listing) | Xiaojun Guo | Shanghai Jiao Tong University | x.guo@sjtu.edu.cn |
+| [ieee_anisul_haque](https://eds.ieee.org/education/distinguished-lecturer-mini-colloquia-program/distinguished-lecturer-listing) | Anisul Haque | East West University | ahaque@ewubd.edu |
+| [ieee_tuo_hung_alex_hou](https://eds.ieee.org/education/distinguished-lecturer-mini-colloquia-program/distinguished-lecturer-listing) | Tuo-Hung (Alex) Hou | NYCU, Dept. of Elec. Eng. | thhou@mail.nctu.edu.tw |
+| [ieee_ru_huang](https://eds.ieee.org/education/distinguished-lecturer-mini-colloquia-program/distinguished-lecturer-listing) | Ru Huang | Peking University | ruhuang@pku.edu.cn |
+| [ieee_tian_ling_ren](https://eds.ieee.org/education/distinguished-lecturer-mini-colloquia-program/distinguished-lecturer-listing) | Tian-Ling Ren | Tsinghua University | rentl@tsinghua.edu.cn |
+| [ieee_mayank_shrivastava](https://eds.ieee.org/education/distinguished-lecturer-mini-colloquia-program/distinguished-lecturer-listing) | Mayank Shrivastava | Indian Institute of Science Bangalore | mayank@iisc.ac.in |
+| [ieee_hei_wong](https://eds.ieee.org/education/distinguished-lecturer-mini-colloquia-program/distinguished-lecturer-listing) | Hei Wong | City University of Hong Kong | eehwong@cityu.edu.hk |
+| [ieee_huaqiang_wu](https://eds.ieee.org/education/distinguished-lecturer-mini-colloquia-program/distinguished-lecturer-listing) | Huaqiang Wu | Tsinghua University | wuhq@tsinghua.edu.cn |
+| [boardsource_bill_musick](https://boardsource.org/user-profile/bmusick-integriti3d.com) | Bill Musick | (absent) | bmusick@integriti3d.com |
+| [boardsource_mark_marion](https://boardsource.org/user-profile/mmarion-ntca.org) | Mark Marion | (absent) | mmarion@ntca.org |
+| [boardsource_sara_levin](https://boardsource.org/user-profile/sara.levin) | Sara Levin | Ardea Strategies | sara@ardeastrategies.com |
+| [boardsource_susan_taylor](https://boardsource.org/user-profile/susan.taylor) | Susan Taylor | Boys & Girls Clubs of America | staylor@bgca.org |
+| [alliance_christine_welniak](https://apps.acehp.org/consultantdirectory/details.cfm?localID=14738) | Christine Welniak | (absent) | cwelniak@upsidecomm.com |
+| [alliance_andrew_bowser](https://apps.acehp.org/consultantdirectory/details.cfm?localID=8593) | Andrew Bowser | IconCME Freelance | abowser@iconcme.com |
+| [alliance_claudia_prahst](https://apps.acehp.org/consultantdirectory/details.cfm?localID=17835) | Claudia Prahst | (absent) | claudia@cpmedicalwriting.com |
+
+### Generated but not first: every target
+
+These are ranking misses, not missing candidates: **46 at ranks 2–3, 11 at ranks 4–5, 22 at ranks 6–10, and one at rank 15**. The rank-15 case is Gabriel Ku Wei Bin. Adding more patterns alone cannot move these existing answers to first place. The table shows the published answer's current rank and pattern, alongside the current first guess.
+
+| Target / source | Name | Published address | Rank | Match pattern | First guess |
+| --- | --- | --- | --- | --- | --- |
+| [fsfe_ku](https://fsfe.org/about/people/index.en.html#ku) | Gabriel Ku Wei Bin | gabriel.ku@fsfe.org | 15 | first.last | gabriel@fsfe.org |
+| [cooley_mateus_kaba_aboud](https://www.cooley.com/people/mateus-kaba-aboud) | Mateus Kaba Aboud | maboud@cooley.com | 10 | flast | mateus@cooley.com |
+| [orrick_jesse_paul_albani](https://www.orrick.com/en/People/B/1/7/Jesse-Paul-Albani) | Jesse Paul Albani | jalbani@orrick.com | 10 | flast | jesse@orrick.com |
+| [boardsource_marty_martin](https://boardsource.org/user-profile/marty_martin) | Marty Martin | marty_martin@martinlegalhelp.com | 9 | first_last | marty@martinlegalhelp.com |
+| [eff_elizabeth_lisa_femia](https://www.eff.org/about/staff) | Elizabeth (Lisa) Femia | lfemia@eff.org | 9 | flast | elizabeth@eff.org |
+| [w3c_rishida](https://www.w3.org/staff/#rishida) | Richard Ishida | ishida@w3.org | 9 | last | richard@w3.org |
+| [w3c_rswick](https://www.w3.org/staff/#rswick) | Ralph Swick | swick@w3.org | 9 | last | ralph@w3.org |
+| [boardsource_makiyah_moody](https://boardsource.org/user-profile/moody-lapiana.org) | Makiyah Moody | moody@kairosheartconsulting.com | 8 | last | makiyah@kairosheartconsulting.com |
+| [boardsource_rena_henderson_mason](https://boardsource.org/user-profile/rhmason-boldagenda.net) | Rena Henderson Mason | rhmason@boldagenda.net | 8 | fmlast | rena@boldagenda.net |
+| [eff_david_sobel](https://www.eff.org/about/staff) | David Sobel | sobel@eff.org | 8 | last | david@eff.org |
+| [eff_shirin_mori](https://www.eff.org/about/staff) | Shirin Mori | mori@eff.org | 8 | last | shirin@eff.org |
+| [w3c_ran](https://www.w3.org/staff/#ran) | Ruoxi Ran | ran@w3.org | 8 | last | ruoxi@w3.org |
+| [boardsource_eric_ewald](https://boardsource.org/user-profile/erice-ewald.com) | Eric Ewald | erice@ewald.com | 7 | firstl | eric@ewald.com |
+| [boardsource_mary_dell_hayes](https://boardsource.org/user-profile/mary%20dell.hayes) | Mary Dell Hayes | marydellhayes@stopgapsolutionsmd.com | 7 | firstlast | mary@stopgapsolutionsmd.com |
+| [eff_cooper_quintin](https://www.eff.org/about/staff) | Cooper Quintin | cooperq@eff.org | 7 | firstl | cooper@eff.org |
+| [eff_david_greene](https://www.eff.org/about/staff) | David Greene | davidg@eff.org | 7 | firstl | david@eff.org |
+| [eff_hayley_tsukayama](https://www.eff.org/about/staff) | Hayley Tsukayama | hayleyt@eff.org | 7 | firstl | hayley@eff.org |
+| [eff_will_greenberg](https://www.eff.org/about/staff) | Will Greenberg | willg@eff.org | 7 | firstl | will@eff.org |
+| [fsfe_diekershoff](https://fsfe.org/about/people/index.en.html#diekershoff) | Tobias Diekershoff | tobiasd@fsfe.org | 7 | firstl | tobias@fsfe.org |
+| [w3c_angel](https://www.w3.org/staff/#angel) | An Qi (Angel) Li | angel@w3.org | 6 | first | an@w3.org |
+| [w3c_fd](https://www.w3.org/staff/#fd) | François Daoust | fd@w3.org | 6 | initials | francois@w3.org |
+| [w3c_mcf](https://www.w3.org/staff/#mcf) | Marie-Claire Forgue | mcf@w3.org | 6 | initials | marieclaire@w3.org |
+| [w3c_plehegar](https://www.w3.org/staff/#plehegar) | Philippe Le Hegaret | plh@w3.org | 6 | initials | philippe@w3.org |
+| [eff_f_mario_trujillo](https://www.eff.org/about/staff) | F. Mario Trujillo | mario@eff.org | 5 | first | f@eff.org |
+| [fsfe_kirschner](https://fsfe.org/about/people/index.en.html#kirschner) | Matthias Kirschner | mk@fsfe.org | 5 | initials | matthias@fsfe.org |
+| [w3c_ejfraser](https://www.w3.org/staff/#ejfraser) | Emma Fraser | ef@w3.org | 5 | initials | emma@w3.org |
+| [w3c_hoschka](https://www.w3.org/staff/#hoschka) | Philipp Hoschka | ph@w3.org | 5 | initials | philipp@w3.org |
+| [w3c_ijacobs](https://www.w3.org/staff/#ijacobs) | Ian Jacobs | ij@w3.org | 5 | initials | ian@w3.org |
+| [afp_michael_stein](https://afpgoldengate.org/consultant-directory/name/laguna-creek-consulting/) | Michael Stein | mstein@lagunacreekconsulting.com | 4 | flast | michael@lagunacreekconsulting.com |
+| [boardsource_mary_kay_delvo](https://boardsource.org/user-profile/mary%20kay.delvo) | Mary Kay Delvo | marykay@inspiringsight.com | 4 | first | mary@inspiringsight.com |
+| [eff_dave_maass](https://www.eff.org/about/staff) | Dave Maass | dm@eff.org | 4 | initials | dave@eff.org |
+| [fsfe_greve](https://fsfe.org/about/people/index.en.html#greve) | Georg C. F. Greve | greve@fsfe.org | 4 | handle | georg@fsfe.org |
+| [fsfe_rikken](https://fsfe.org/about/people/index.en.html#rikken) | Nico Rikken | nico.rikken@fsfe.org | 4 | first.last | nico@fsfe.org |
+| [w3c_p20n](https://www.w3.org/staff/#p20n) | Pierre-Antoine Champin | pierre-antoine@w3.org | 4 | first | pierreantoine@w3.org |
+| [eff_carlos_wertheman](https://www.eff.org/about/staff) | Carlos Wertheman | carlos.wertheman@eff.org | 3 | first.last | carlos@eff.org |
+| [eff_sara_romero](https://www.eff.org/about/staff) | Sara Romero | sara.romero@eff.org | 3 | first.last | sara@eff.org |
+| [eff_veridiana_alimonti](https://www.eff.org/about/staff) | Veridiana Alimonti | veridiana.alimonti@eff.org | 3 | first.last | veridiana@eff.org |
+| [fsfe_lasota](https://fsfe.org/about/people/index.en.html#lasota) | Lucas Lasota | lucas.lasota@fsfe.org | 3 | first.last | lucas@fsfe.org |
+| [fsfe_mehl](https://fsfe.org/about/people/index.en.html#mehl) | Max Mehl | max.mehl@fsfe.org | 3 | first.last | max@fsfe.org |
+| [fsfe_schiessle](https://fsfe.org/about/people/index.en.html#schiessle) | Björn Schießle | schiessle@fsfe.org | 3 | handle | bjorn@fsfe.org |
+| [ibm_sikhar_patranabis](https://research.ibm.com/people/sikhar-patranabis) | Sikhar Patranabis | sikhar.patranabis@ibm.com | 3 | first.last | sikhar@ibm.com |
+| [w3c_dmontalvo](https://www.w3.org/staff/#dmontalvo) | Daniel Montalvo | dmontalvo@w3.org | 3 | flast | daniel@w3.org |
+| [w3c_kahan](https://www.w3.org/staff/#kahan) | José Kahan | jose.kahan@w3.org | 3 | first.last | jose@w3.org |
+| [alliance_alexander_miceli](https://apps.acehp.org/consultantdirectory/details.cfm?localID=16950) | Alexander Miceli | amiceli@domanieducation.com | 2 | flast | alexander@domanieducation.com |
+| [alliance_sarah_porter](https://apps.acehp.org/consultantdirectory/details.cfm?localID=15442) | Sarah Porter | sporter@aoeconsulting.com | 2 | flast | sarah@aoeconsulting.com |
+| [boardsource_camilo_villalpando](https://boardsource.org/user-profile/49d1f3df03a8708f22063181799b612bac4f839a) | Camilo Villalpando | cvillalpando@acls.org | 2 | flast | camilo@acls.org |
+| [boardsource_carrie_alexander](https://boardsource.org/user-profile/48c9ecebe2807e70d7c29ef7958243131d59e48b) | Carrie Alexander | calexander@edgilitytalent.com | 2 | flast | carrie@edgilitytalent.com |
+| [boardsource_clare_jordan](https://boardsource.org/user-profile/cjordan-5328) | Clare Jordan | cjordan@capdev.com | 2 | flast | clare@capdev.com |
+| [boardsource_janetta_cravens](https://boardsource.org/user-profile/jcravens-okcnp.org) | Janetta Cravens | jcravens@cospireconsulting.com | 2 | flast | janetta@cospireconsulting.com |
+| [boardsource_kim_andrews](https://boardsource.org/user-profile/kim.andrews) | Kim Andrews | kandrews@kimtentional.com | 2 | flast | kim@kimtentional.com |
+| [boardsource_laura_orr](https://boardsource.org/user-profile/3ed7152c1b9dc78e43ecf7b30fa2939f57256ff8) | Laura Orr | lorr@wittkieffer.com | 2 | flast | laura@wittkieffer.com |
+| [boardsource_lynda_jeffries](https://boardsource.org/user-profile/lynda.jeffries) | Lynda Jeffries | ljeffries@theleadershipgroup.com | 2 | flast | lynda@theleadershipgroup.com |
+| [boardsource_tracy_vanderneck](https://boardsource.org/user-profile/tvanderneck-phil-com.com) | Tracy Vanderneck | tvanderneck@phil-com.com | 2 | flast | tracy@phil-com.com |
+| [cooley_etenish_abebe](https://www.cooley.com/people/etenish-abebe) | Etenish Abebe | eabebe@cooley.com | 2 | flast | etenish@cooley.com |
+| [cooley_isha_agarwal](https://www.cooley.com/people/isha-agarwal) | Isha Agarwal | iagarwal@cooley.com | 2 | flast | isha@cooley.com |
+| [cooley_jamin_agosti](https://www.cooley.com/people/jamin-agosti) | Jamin Agosti | jagosti@cooley.com | 2 | flast | jamin@cooley.com |
+| [cooley_peter_adams](https://www.cooley.com/people/peter-adams) | Peter Adams | padams@cooley.com | 2 | flast | peter@cooley.com |
+| [cooley_sarah_ackohen](https://www.cooley.com/people/sarah-ackohen) | Sarah Ackohën | sackohen@cooley.com | 2 | flast | sarah@cooley.com |
+| [cooley_stephen_abreu](https://www.cooley.com/people/stephen-abreu) | Stephen Abreu | sabreu@cooley.com | 2 | flast | stephen@cooley.com |
+| [eff_aaron_mackey](https://www.eff.org/about/staff) | Aaron Mackey | amackey@eff.org | 2 | flast | aaron@eff.org |
+| [eff_jennifer_lynch](https://www.eff.org/about/staff) | Jennifer Lynch | jlynch@eff.org | 2 | flast | jennifer@eff.org |
+| [eff_josh_richman_0](https://www.eff.org/about/staff) | Josh Richman | jrichman@eff.org | 2 | flast | josh@eff.org |
+| [eff_lena_cohen](https://www.eff.org/about/staff) | Lena Cohen | lcohen@eff.org | 2 | flast | lena@eff.org |
+| [fenwick_andrew_t_albertson](https://www.fenwick.com/people/andrew-t-albertson) | Andrew T. Albertson | aalbertson@fenwick.com | 2 | flast | andrew@fenwick.com |
+| [fenwick_gregory_p_adams](https://www.fenwick.com/people/gregory-p-adams) | Gregory P. Adams | gadams@fenwick.com | 2 | flast | gregory@fenwick.com |
+| [fenwick_irene_aguirre](https://www.fenwick.com/people/irene-aguirre) | Irene Aguirre | iaguirre@fenwick.com | 2 | flast | irene@fenwick.com |
+| [fenwick_payam_ahmadi](https://www.fenwick.com/people/payam-ahmadi) | Payam Ahmadi | pahmadi@fenwick.com | 2 | flast | payam@fenwick.com |
+| [fenwick_rosan_l_agbajoh](https://www.fenwick.com/people/rosan-l-agbajoh) | Rosan L. Agbajoh | ragbajoh@fenwick.com | 2 | flast | rosan@fenwick.com |
+| [fsfe_bakker](https://fsfe.org/about/people/index.en.html#bakker) | Carmen Bianca Bakker | carmenbianca@fsfe.org | 2 | handle | carmen@fsfe.org |
+| [orrick_adetola_tola_ajayi](https://www.orrick.com/en/People/D/B/8/Tola-Ajayi) | Adetola (Tola) Ajayi | aajayi@orrick.com | 2 | flast | adetola@orrick.com |
+| [orrick_ali_abugheida](https://www.orrick.com/en/People/B/8/9/Ali-Abugheida) | Ali Abugheida | aabugheida@orrick.com | 2 | flast | ali@orrick.com |
+| [orrick_dawit_aklilu](https://www.orrick.com/en/People/C/C/B/Dawit-Aklilu) | Dawit Aklilu | daklilu@orrick.com | 2 | flast | dawit@orrick.com |
+| [orrick_helen_aki](https://www.orrick.com/en/People/4/8/D/Helen-Aki) | Helen Aki | haki@orrick.com | 2 | flast | helen@orrick.com |
+| [orrick_joseph_adamson](https://www.orrick.com/en/People/B/A/5/Joseph-Adamson) | Joseph Adamson | jadamson@orrick.com | 2 | flast | joseph@orrick.com |
+| [orrick_neetu_ahlawat](https://www.orrick.com/en/People/3/2/8/Neetu-Ahlawat) | Neetu Ahlawat | nahlawat@orrick.com | 2 | flast | neetu@orrick.com |
+| [orrick_vedika_ahlgren](https://www.orrick.com/en/People/3/4/F/Vedika-Ahlgren) | Vedika Ahlgren | vahlgren@orrick.com | 2 | flast | vedika@orrick.com |
+| [w3c_jean_gui](https://www.w3.org/staff/#jean-gui) | Jean-Guilhem Rouel | jean-gui@w3.org | 2 | handle | jeanguilhem@w3.org |
+| [w3c_kfranqueiro](https://www.w3.org/staff/#kfranqueiro) | Ken Franqueiro | kfranqueiro@w3.org | 2 | handle | ken@w3.org |
+| [w3c_xfq](https://www.w3.org/staff/#xfq) | Fuqiao Xue | xfq@w3.org | 2 | handle | fuqiao@w3.org |
+| [w3c_ylafon](https://www.w3.org/staff/#ylafon) | Yves Lafon | ylafon@w3.org | 2 | handle | yves@w3.org |
+
+### Priorities for improving robustness
+
+1. Collect independently supported company email domains for missing and mismatched inputs; handle company subdomains without accepting social hosts as company domains.
+2. Use explicitly observed short names and fuller names in biography context, with constrained extraction and suitable compound-name initials patterns. Avoid inventing nicknames or surnames from expected addresses.
+3. Improve ordering using independently supported organization naming conventions. All five Fenwick answers and all eight Orrick answers are already generated, while none ranks first; this illustrates why global pattern expansion is insufficient. Learn and validate such conventions on separate data rather than encoding answers from this evaluation.
+4. Defer speculative nickname dictionaries and opaque aliases. Keep their misses visible in headline accuracy; any future scoped metric must state its exclusion rule and denominator.
+
+No candidate rules, ranking weights, or seed inputs changed in this diagnosis. Proposed recovery opportunities still need implementation and an independent holdout before claiming an accuracy gain.
