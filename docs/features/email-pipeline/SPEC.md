@@ -10,11 +10,12 @@ Foundation, auth, targets. Target creation and search-input edits enqueue email-
 
 ## Candidate generation
 
-- Resolve the company domain from target.domain, or an eligible company_website hostname. Notes and social profiles never supply the domain. If none is available, write no rows.
+- Resolve the company domain from target.domain, or the provisional registrable domain of an eligible company_website, using the Public Suffix List. Notes and social profiles never supply the domain. If none is available, write no rows.
 - Use nameParts() to obtain the same given and family names that outreach templates use.
-- Generate the name patterns: `first.last`, `f.last`, `first`, `first_last`, `last.first`, `f_last`, `flast`, `last`, `firstlast`, `firstl`, `fl`, `initials`, `fmlast`, `first.l`, and `lastf`. Fold accents and offer observed aliases, hyphenated given names, and alternatives for compound names and middle initials. Keep name overrides and outreach greetings unchanged.
+- Generate the name patterns: `first.last`, `f.last`, `first`, `first_last`, `last.first`, `f_last`, `flast`, `last`, `firstlast`, `firstl`, `fl`, `initials`, `fmlast`, `first.l`, `lastf`, and `initialslast` (compound given-name initials plus the full surname). Fold accents and offer observed aliases, hyphenated given names, and alternatives for compound names and middle initials. Keep name overrides and outreach greetings unchanged.
+- Extract observed biography aliases and fuller names under SPECS.md section 7.3. Preserve source snippets as candidate context; use those names only for email interpretations, without changing stored names or greetings. No nickname dictionary is used.
 - Extract note addresses only at the resolved domain. Rank them using nearby positive and negative context cues and name matches; a known name pattern in notes can boost matching generated candidates.
-- Deduplicate, syntax-check, and rank eligible candidates deterministically. Global priorities favor given-name-only and initial/surname patterns, tuned on the diagnostic seeds. Alternative name interpretations receive a score penalty; direct notes evidence and observed handles keep their precedence. Keep the strongest pattern score for duplicate name candidates.
+- Deduplicate, syntax-check, and rank eligible candidates deterministically. Global priorities favor given-name-only and initial/surname patterns, tuned on the diagnostic seeds. Alternative name interpretations receive a score penalty; observed short given names in biographies can outrank the unshortened given-name guess. Direct address evidence remains strongest, and observed handles retain their fixed score. Keep the strongest pattern score for duplicate name candidates.
 - Store every candidate in email_guesses with source, pattern_used, score, and optional context. No candidate receives a validity or deliverability label.
 
 ## Worker and security
