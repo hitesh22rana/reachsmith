@@ -40,3 +40,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Detailed email accuracy snapshots stay local.
+/docs/experiments/email-guess-accuracy/runs/*/results.json
