@@ -1,4 +1,4 @@
-import { cleanPart, generateCandidates, type EmailPattern } from "./email-patterns.ts";
+import { cleanPart, generateCandidates, type EmailPattern, type EmailCandidate } from "./email-patterns.ts";
 
 export type CandidateSource = "notes" | "pattern";
 
@@ -12,18 +12,29 @@ export interface RankedCandidate {
 
 const EMAIL_RE = /[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/gi;
 
-// Fixed baseline priorities; appended patterns isolate the coverage change.
+// Globally tuned on the diagnostic seed set. This favors given-name-only
+// and initial/surname patterns; an independent holdout is still required.
 const PATTERN_BASE: Record<EmailPattern, number> = {
-  "first.last": 60,
-  "f.last": 50,
-  first: 40,
-  first_last: 30,
-  "last.first": 20,
-  f_last: 10,
-  flast: 9,
-  last: 8,
-  firstlast: 7,
+  first: 60,
+  flast: 50,
+  "first.last": 45,
+  "f.last": 35,
+  firstlast: 32,
+  fmlast: 31,
+  firstl: 30,
+  fl: 25,
+  initials: 37,
+  last: 22,
+  first_last: 18,
+  "last.first": 15,
+  f_last: 12,
+  "first.l": 10,
+  lastf: 8,
 };
+
+function patternScore(candidate: EmailCandidate): number {
+  return PATTERN_BASE[candidate.pattern] - (candidate.nameVariant ? 20 : 0);
+}
 
 const POSITIVE_CUES = [
   "personal",
@@ -117,7 +128,7 @@ export function inferPattern(
     first_name: firstName,
     last_name: lastName,
     domain: email.split("@")[1],
-  }).find((candidate) => candidate.email === email)?.pattern ?? null;
+  }).sort((a, b) => patternScore(b) - patternScore(a)).find((candidate) => candidate.email === email)?.pattern ?? null;
 }
 
 function cueScore(context: string): number {
@@ -222,18 +233,19 @@ export function rankCandidates(input: {
       .map((note) => inferPattern(note.email, input.first_name, input.last_name))
       .filter((pattern): pattern is EmailPattern => pattern !== null),
   );
-  for (const candidate of generateCandidates({
+  const patterns: RankedCandidate[] = generateCandidates({
     first_name: input.first_name,
     last_name: input.last_name,
     domain,
-  })) {
-    ranked.push({
-      email: candidate.email,
-      pattern: candidate.pattern,
-      source: "pattern",
-      context: null,
-      score: PATTERN_BASE[candidate.pattern] + (inferred.has(candidate.pattern) ? 20 : 0),
-    });
-  }
+  }).map((candidate) => ({
+    email: candidate.email,
+    pattern: candidate.pattern,
+    source: "pattern",
+    context: null,
+    score: patternScore(candidate) + (inferred.has(candidate.pattern) ? 20 : 0),
+  }));
+  // A name variant can spell an address in multiple ways. Keep the strongest
+  // name-pattern explanation, while notes and observed handles retain priority.
+  ranked.push(...patterns.sort((a, b) => b.score - a.score));
   return bestFirst(ranked);
 }
