@@ -271,7 +271,7 @@ Given a target's name and company domain, generate up to ten ranked work-email s
 
 ### 7.3 Candidate generation and ranking
 
-- Generate the six name patterns: `first.last`, `f.last`, `first`, `first_last`, `last.first`, and `f_last`.
+- Generate the name patterns: `first.last`, `f.last`, `first`, `first_last`, `last.first`, `f_last`, `flast`, `last`, and `firstlast`. New patterns follow the existing baseline priorities until a separate ranking experiment changes them.
 - Include social-handle candidates and notes addresses only at the resolved company domain.
 - Use `nameParts()` for the same name tokens used in outreach greetings.
 - Rank from notes context, pattern frequency, and other available evidence. Use deterministic ordering and keep every candidate on the company domain.
