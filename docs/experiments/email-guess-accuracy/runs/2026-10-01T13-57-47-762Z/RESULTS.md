@@ -247,7 +247,7 @@ Each answer domain receives equal weight. Domains are used for scoring groups on
 
 ## Reproduction
 
-The adjacent [results.json](results.json) contains the frozen seed snapshot, source/model checksums, runtime metadata, full generated candidates and per-case orders/ranks. Results can be recomputed from these case records without running the model again.
+The adjacent local-only `results.json` contains the frozen seed snapshot, source/model checksums, runtime metadata, full generated candidates and per-case orders/ranks. Results can be recomputed from these case records without running the model again.
 
 ## Limits
 
