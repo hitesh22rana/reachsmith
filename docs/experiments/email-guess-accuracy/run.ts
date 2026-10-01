@@ -56,6 +56,7 @@ function metrics(cases: Case[], order: "baseline" | "pipeline") {
     total: cases.length,
     candidate_coverage: cases.filter((row) => row.candidate_rank !== null).length,
     suggestion_coverage: cases.filter((row) => row[`${order}_order`].length > 0).length,
+    full_list_hits: cases.filter((row) => row[`${order}_rank`] !== null && row[`${order}_error`] === null).length,
     execution_errors: cases.filter((row) => row[`${order}_error`] !== null).length,
     top_k: Object.fromEntries(ks.map((k) => [k, {
       hits: cases.filter((row) => row[`${order}_rank`] !== null && row[`${order}_rank`]! <= k && row[`${order}_error`] === null).length,
@@ -118,6 +119,13 @@ function selfcheck() {
   assert.equal(summary(rows).macro_top_k.baseline[3], 0.75);
   rows[1]!.baseline_error = "execution failed";
   assert.deepEqual(metrics(rows, "baseline").top_k[3], { hits: 1, denominator: 3 });
+  rows.push({
+    ...rows[0]!, id: "fixture_tail", candidate_rank: 11, baseline_rank: 11, pipeline_rank: 11,
+    baseline_order: Array.from({ length: 11 }, (_, index) => `candidate_${index}`),
+    pipeline_order: Array.from({ length: 11 }, (_, index) => `candidate_${index}`),
+  });
+  assert.equal(metrics(rows, "pipeline").full_list_hits, 3, "full-list hits include ranks beyond ten");
+  assert.deepEqual(metrics(rows, "pipeline").top_k[10], { hits: 2, denominator: 4 });
   console.log("eval selfcheck: answer isolation, matching and metric denominators passed");
 }
 
@@ -145,7 +153,7 @@ async function main() {
     tracked_changes_at_start: execFileSync("git", ["status", "--porcelain", "--untracked-files=no"], { cwd: root, encoding: "utf8" }).trim(),
     seeds_sha256: digest(seedText), schema_sha256: digest(await readFile(`${directory}schema.json`)), source_sha256: sourceHashes,
     runtime: { node: process.version, platform: os.platform(), arch: os.arch(), cpu: os.cpus()[0]?.model, cpu_count: os.cpus().length, memory_bytes: os.totalmem() },
-    source_grouping: "case ID prefix before underscore", matching: "trimmed, case-insensitive, exact address", suggestion_limit: 10,
+    source_grouping: "case ID prefix before underscore", matching: "trimmed, case-insensitive, exact address", suggestion_limit: null,
   };
   await mkdir(output, { recursive: true });
   const cases: Case[] = [];
@@ -164,7 +172,7 @@ async function main() {
       const input = guessInput(target);
       row.generated = rankCandidates(input);
       row.candidate_rank = position(row.generated.map((candidate) => candidate.email), expected);
-      row.baseline_order = row.generated.slice(0, 10).map((candidate) => candidate.email);
+      row.baseline_order = row.generated.map((candidate) => candidate.email);
       row.baseline_rank = position(row.baseline_order, expected);
       row.pipeline_order = [...row.baseline_order];
       row.pipeline_rank = row.baseline_rank;
@@ -181,6 +189,7 @@ async function main() {
   const table = (base: ReturnType<typeof metrics>, pipeline: ReturnType<typeof metrics>) => [
     "| Metric | Deterministic | Current pipeline |", "| --- | --- | --- |",
     ...ks.map((k) => `| Top-${k} | ${rate(base.top_k[k]!.hits, base.total)} | ${rate(pipeline.top_k[k]!.hits, pipeline.total)} |`),
+    `| Full-list accuracy | ${rate(base.full_list_hits, base.total)} | ${rate(pipeline.full_list_hits, pipeline.total)} |`,
     `| Candidate coverage | ${rate(base.candidate_coverage, base.total)} | ${rate(pipeline.candidate_coverage, pipeline.total)} |`,
     `| Suggestion coverage | ${rate(base.suggestion_coverage, base.total)} | ${rate(pipeline.suggestion_coverage, pipeline.total)} |`,
   ].join("\n");

@@ -18,15 +18,15 @@ Build on targets and the email-pipeline feature. SPECS.md sections 7 and 8 are t
 
 ## Ranking and storage
 
-- Persist at most ten suggestions per target with email, pattern_used, source, score, and optional context. Higher score means higher selected rank.
-- Only the email-guess BullMQ worker creates suggestion rows. It reloads the target under asUser(userId, ...) and rechecks ownership before writing. Queue payloads carry targetId and userId as scope, not authority.
+- Persist the complete deduplicated candidate set per target with email, pattern_used, source, score, and optional context. Higher score means higher selected rank; the worker stores candidate count minus zero-based rank, so scores remain positive for any list size.
+- Only the email-guess BullMQ worker creates suggestion rows. Each run replaces the complete set in one transaction under a target row lock, including clearing stale rows when generation returns nothing. It reloads the target under asUser(userId, ...) and rechecks ownership before writing. Queue payloads carry targetId and userId as scope, not authority.
 - A target edit that submits name, domain, company website, notes, or social URLs clears old suggestions and enqueues a new search. Unrelated edits leave suggestions alone.
 - GET /api/targets/[id]/guesses is scoped to the session owner and returns only rows matching the currently resolved domain, ordered by score descending.
 - No DNS or SMTP probe, verifier API, email-verify queue, validity status, verification metadata, or automatic primary_email selection is used.
 
 ## User-facing behavior
 
-- Show ranked suggestions with their source or pattern and a Copy action. State clearly that they are unverified.
+- Show the complete ranked list with each source or pattern and a Copy action, without pagination or “Show more”. State clearly that they are unverified.
 - If the website supplied the domain, label it provisional and ask the user to confirm it before outreach.
 - Keep manual email entry available, including personal addresses. A saved primary_email is an owner choice, not a validity claim.
 - Poll briefly while the guess worker generates suggestions; if none appear by the ceiling, show a non-definitive message and the manual entry path. Do not say an email was not found merely because generation or the worker failed.
@@ -45,6 +45,7 @@ Build on targets and the email-pipeline feature. SPECS.md sections 7 and 8 are t
 - With domain acme.com and notes containing example@gmail.com, every suggestion ends in @acme.com.
 - With only a Gmail address in notes and no company domain or website, there are no suggestions.
 - A straightforward company website supplies a provisional domain; a social or mailbox website does not.
+- Suggestions beyond rank ten remain stored and returned. Existing targets expand on their next guess job; saving their search inputs enqueues it.
 - Suggestions never write target.primary_email. A manually saved address remains after later suggestion refreshes.
 - A fresh database from the baseline has no verifier fields, and existing local test data has no old automatic primary emails.
 - A cross-tenant target ID yields no suggestions or writes. The API returns 404 for a foreign target.
