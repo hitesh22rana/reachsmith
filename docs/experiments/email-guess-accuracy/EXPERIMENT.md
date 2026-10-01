@@ -69,7 +69,7 @@ The implementation and [email accuracy feature contract](../../features/email-ac
 2. Use [`resolveDomain()` and `rankCandidates()`](../../../lib/email-rank.ts). The explicit domain wins; otherwise only an eligible company website hostname supplies a provisional domain. The current resolver accepts only a two-label hostname after stripping `www`, with blocked hosts excluded. A company name or a social profile alone does not supply a domain.
 3. Generate the supported name patterns and eligible handle candidates. Notes addresses can also be candidates in production, but the seed bios intentionally contain no answer addresses.
 4. Keep the deterministic order.
-5. Follow the [`email-guess` worker](../../../workers/email-guess.ts) selection order and top-10 limit. Evaluate fresh cases with no previously stored guesses.
+5. Follow the [`email-guess` worker](../../../workers/email-guess.ts) complete ranked output without a suggestion cutoff. Evaluate fresh cases with no previously stored guesses.
 
 The offline runner evaluates these existing functions. Database import, queue processing and application UI behavior are outside this first accuracy experiment. No SMTP probing or outreach is performed.
 
@@ -87,14 +87,15 @@ Derive cohort membership and counts from each run's seed file. Field presence do
 
 ### Selected order
 
-Evaluate the full deterministically ranked candidate set, then apply the worker's top-10 truncation. Compare later changes against a completed report on the same seed snapshot. The existing result format retains deterministic and pipeline columns, which currently use the same order; these columns do not compare against a historical revision. Add any historical comparison explicitly to the final report.
+Evaluate the full deterministically ranked candidate set and retain that whole order as the worker does. Top-k metrics inspect the first k suggestions without truncating the returned list. Historical reports with a recorded suggestion limit describe the former capped worker; new runs record `suggestion_limit: null`. Compare later changes against a completed report on the same seed snapshot. The existing result format retains deterministic and pipeline columns, which currently use the same order; these columns do not compare against a historical revision. Add any historical comparison explicitly to the final report.
 
 ### Metrics
 
 Compare trimmed, case-insensitive email strings. Do not merge dots, plus tags, aliases or different domains. The seed's selected published address is the only accepted label, so an alternative valid alias can still count as a miss.
 
 - **Top-k accuracy**, for `k = 1, 3, 5, 10`: cases with the expected address in the first `k` unique suggestions divided by cases in the reported cohort. Short lists are used as-is; empty lists are misses.
-- **Candidate coverage**: cases whose expected address appears anywhere in the full generated set before truncation, divided by cases in the reported cohort. This is the accuracy ceiling achievable by ranking that set.
+- **Candidate coverage**: cases whose expected address appears anywhere in the full generated set, divided by cases in the reported cohort. This is the accuracy ceiling achievable by ranking that set.
+- **Full-list accuracy**: cases with the expected address anywhere in the returned list, divided by all cases in the reported cohort. This currently equals candidate coverage because the complete generated set is returned. Keep top-k metrics to measure ranking quality.
 - **Suggestion coverage**: cases producing at least one suggestion divided by cases in the reported cohort.
 - **Ranking accuracy conditional on candidate coverage**: top-k hits divided by cases where the expected address was generated. Report this alongside overall accuracy, not in place of it.
 - **Execution errors**: counts and reasons. Never silently remove failed cases or treat a crashed case as successful abstention; report failures explicitly and retain them as non-hits in overall counts.
@@ -115,7 +116,7 @@ The first expansion added first-initial plus surname without a separator (`flast
 
 ## Accuracy improvements to evaluate next
 
-1. **Candidate coverage:** inspect remaining misses and compare full-set coverage with top-10 accuracy so additional patterns do not hide truncation losses.
+1. **Candidate coverage:** inspect remaining misses and compare full-list accuracy with top-k accuracy so additional patterns do not hide ranking regressions.
 2. **Domain inputs:** collect independently supported company email domains where a website is absent or differs from the email domain. Use separately versioned, independently supported input corrections; never fill an evaluation input from its withheld answer.
 3. **Name handling:** review misses involving accents, multiple surnames, initials and published aliases. Use independently observed name overrides; do not guess nicknames from the answer.
 4. **Ranking:** evaluate organization-specific pattern evidence collected independently of the target answer. A larger candidate set alone cannot improve first-choice accuracy. Keep pattern-learning examples separate from scored targets, and test on additional organizations before claiming generalization.

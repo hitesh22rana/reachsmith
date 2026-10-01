@@ -25,6 +25,7 @@ Next.js App Router + TypeScript, Tailwind + shadcn/ui, Drizzle on Postgres, Bett
 
 - `pnpm selfcheck`: shared pure-function checks.
 - `pnpm typecheck` and `pnpm lint`: application checks.
+- `node --experimental-strip-types --no-warnings scripts/check-email-worker.ts`: worker persistence check against a migrated local database; creates and cleans up disposable fixtures.
 - [Email guess accuracy](docs/experiments/email-guess-accuracy/EXPERIMENT.md): offline top-k and candidate-coverage evaluation against curated published addresses. Follow `MEMORY.md` for commands, answer isolation, and report retention. No database or Redis is needed for this experiment.
 
 ## Code structure
