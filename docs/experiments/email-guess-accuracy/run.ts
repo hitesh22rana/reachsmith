@@ -7,12 +7,11 @@ import { fileURLToPath } from "node:url";
 import * as v from "valibot";
 import { TargetCreateSchema } from "../../../features/targets/validation.ts";
 import { nameParts } from "../../../lib/target-name.ts";
-import { extractHandles, extractNoteEmails, rankCandidates, resolveDomain } from "../../../lib/email-rank.ts";
+import { extractNoteEmails, rankCandidates, resolveDomain } from "../../../lib/email-rank.ts";
 
 const directory = fileURLToPath(new URL("./", import.meta.url));
 const root = fileURLToPath(new URL("../../../", import.meta.url));
 const ks = [1, 3, 5, 10];
-const withModel = process.argv.includes("--with-model");
 const SeedSchema = v.strictObject({
   id: v.pipe(v.string(), v.regex(/^[a-zA-Z0-9_-]+$/)),
   target: v.strictObject({
@@ -32,8 +31,7 @@ type Case = {
   cohort: string; short_bio: boolean; resolved_domain: string | null; domain_status: string;
   generated: ReturnType<typeof rankCandidates>; baseline_order: string[]; pipeline_order: string[];
   baseline_rank: number | null; pipeline_rank: number | null; candidate_rank: number | null;
-  model_outcome: "reranked" | "fallback" | "skipped" | "disabled"; fallback_reason: string | null;
-  baseline_error: string | null; pipeline_error: string | null; model_ms: number;
+  baseline_error: string | null; pipeline_error: string | null;
 };
 const normalize = (email: string) => email.trim().toLowerCase();
 const digest = (bytes: string | Uint8Array) => createHash("sha256").update(bytes).digest("hex");
@@ -93,7 +91,6 @@ function summary(cases: Case[]) {
       pipeline: metrics(cases.filter((row) => row.short_bio), "pipeline"),
     },
     expected_domains: domains.length, macro_top_k: { baseline: macro("baseline"), pipeline: macro("pipeline") },
-    model_outcomes: Object.fromEntries(["reranked", "fallback", "skipped", "disabled"].map((outcome) => [outcome, cases.filter((row) => row.model_outcome === outcome).length])),
   };
 }
 
@@ -110,7 +107,6 @@ function selfcheck() {
   const rows: Case[] = [1, 3, null].map((rank, index) => ({
     id: `fixture_${index}`, source: "fixture", company: null, expected: "answer@example.com", expected_domain: index === 0 ? "other.example" : "example.com",
     cohort: "explicit_domain", short_bio: false, resolved_domain: "example.com", domain_status: "matched", generated: [],
-    model_outcome: "skipped", fallback_reason: null, model_ms: 0,
     candidate_rank: rank, baseline_rank: rank, pipeline_rank: rank,
     baseline_order: index === 2 ? [] : ["candidate"], pipeline_order: index === 2 ? [] : ["candidate"],
     baseline_error: null, pipeline_error: null,
@@ -140,30 +136,17 @@ async function main() {
   }
   const paths = [
     "lib/email-patterns.ts", "lib/email-rank.ts", "lib/target-name.ts", "workers/email-guess.ts",
-    "docs/experiments/email-guess-accuracy/model.ts", "features/targets/validation.ts", "package.json", "pnpm-lock.yaml",
+    "features/targets/validation.ts", "package.json", "pnpm-lock.yaml",
     "docs/experiments/email-guess-accuracy/run.ts",
   ];
   const sourceHashes = Object.fromEntries(await Promise.all(paths.map(async (path) => [path, digest(await readFile(`${root}${path}`))])));
-  const modelSource = await readFile(`${root}docs/experiments/email-guess-accuracy/model.ts`, "utf8");
-  const expression = modelSource.match(/const MODEL_FILE\s*=([\s\S]*?);/)?.[1];
-  assert(expression, "Could not read pinned model URI");
-  const uri = [...expression.matchAll(/"([^"]+)"/g)].map((match) => match[1]).join("");
   const metadata = {
     started_at: started.toISOString(), git_revision: execFileSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim(),
     tracked_changes_at_start: execFileSync("git", ["status", "--porcelain", "--untracked-files=no"], { cwd: root, encoding: "utf8" }).trim(),
     seeds_sha256: digest(seedText), schema_sha256: digest(await readFile(`${directory}schema.json`)), source_sha256: sourceHashes,
     runtime: { node: process.version, platform: os.platform(), arch: os.arch(), cpu: os.cpus()[0]?.model, cpu_count: os.cpus().length, memory_bytes: os.totalmem() },
-    model: { enabled: withModel, uri, sha256: null as string | null, backend: null as string | boolean | null, system_info: null as string | null, configuration_source: modelSource, preparation_error: null as string | null },
     source_grouping: "case ID prefix before underscore", matching: "trimmed, case-insensitive, exact address", suggestion_limit: 10,
   };
-  if (withModel) try {
-    const { getLlama, resolveModelFile } = await import("node-llama-cpp");
-    const path = await resolveModelFile(uri, process.env.HF_MODEL_CACHE ?? `${root}.hf-cache`);
-    metadata.model.sha256 = digest(await readFile(path));
-    const llama = await getLlama();
-    metadata.model.backend = llama.gpu;
-    metadata.model.system_info = llama.systemInfo;
-  } catch (error) { metadata.model.preparation_error = errorMessage(error); }
   await mkdir(output, { recursive: true });
   const cases: Case[] = [];
   for (const seed of seeds) {
@@ -175,8 +158,7 @@ async function main() {
       cohort: target.domain ? "explicit_domain" : target.company_website ? "website_only" : "missing_domain_input",
       short_bio: (target.notes ?? "").split(/\s+/).filter(Boolean).length < 40,
       resolved_domain: resolved, domain_status: resolved ? (resolved === expected.split("@")[1] ? "matched" : "mismatch") : target.company_website ? "rejected_website" : "missing_input",
-      generated: [], baseline_order: [], pipeline_order: [], baseline_rank: null, pipeline_rank: null, candidate_rank: null,
-      model_outcome: "skipped", fallback_reason: null, baseline_error: null, pipeline_error: null, model_ms: 0,
+      generated: [], baseline_order: [], pipeline_order: [], baseline_rank: null, pipeline_rank: null, candidate_rank: null, baseline_error: null, pipeline_error: null,
     };
     try {
       const input = guessInput(target);
@@ -186,27 +168,6 @@ async function main() {
       row.baseline_rank = position(row.baseline_order, expected);
       row.pipeline_order = [...row.baseline_order];
       row.pipeline_rank = row.baseline_rank;
-      row.model_outcome = withModel ? "skipped" : "disabled";
-      if (withModel && row.generated.length) {
-        const { rankWithModel } = await import("./model.ts");
-        const warnings: string[] = [];
-        const logger = console.error;
-        const begin = performance.now();
-        let order: string[] | null;
-        try {
-          console.error = (...args: unknown[]) => { warnings.push(args.map(errorMessage).join(" ")); logger(...args); };
-          order = await rankWithModel(
-            { fullName: target.full_name, company: target.company || null }, target.notes ?? null,
-            extractHandles(input.social_urls).map((entry) => entry.handle),
-            row.generated.map((candidate, index) => ({ id: String(index), email: candidate.email, pattern: candidate.pattern, source: candidate.source })),
-          );
-        } finally { console.error = logger; row.model_ms = performance.now() - begin; }
-        row.model_outcome = order === null ? "fallback" : "reranked";
-        row.fallback_reason = order === null ? warnings.join("\n") || metadata.model.preparation_error || "Model returned null order" : null;
-        row.pipeline_order = (order ?? row.generated.map((_, index) => String(index)))
-          .map((id) => row.generated[Number(id)]?.email).filter((email): email is string => email !== undefined).slice(0, 10);
-        row.pipeline_rank = position(row.pipeline_order, expected);
-      }
     } catch (error) {
       if (row.generated.length) row.pipeline_error = errorMessage(error);
       else row.baseline_error = row.pipeline_error = errorMessage(error);
@@ -220,7 +181,7 @@ async function main() {
   await writeFile(`${output}/results.json`, JSON.stringify(result, null, 2) + "\n", { flag: "wx" });
   const rate = (hit: number, denominator: number) => denominator ? `${(100 * hit / denominator).toFixed(2)}% (${hit}/${denominator})` : "n/a (empty cohort)";
   const table = (base: ReturnType<typeof metrics>, pipeline: ReturnType<typeof metrics>) => [
-    `| Metric | Deterministic | ${withModel ? "Historical model comparison" : "Current pipeline"} |`, "| --- | --- | --- |",
+    "| Metric | Deterministic | Current pipeline |", "| --- | --- | --- |",
     ...ks.map((k) => `| Top-${k} | ${rate(base.top_k[k]!.hits, base.total)} | ${rate(pipeline.top_k[k]!.hits, pipeline.total)} |`),
     `| Candidate coverage | ${rate(base.candidate_coverage, base.total)} | ${rate(pipeline.candidate_coverage, pipeline.total)} |`,
     `| Suggestion coverage | ${rate(base.suggestion_coverage, base.total)} | ${rate(pipeline.suggestion_coverage, pipeline.total)} |`,
@@ -230,8 +191,7 @@ async function main() {
     "# Email guess accuracy results", `Completed: ${completed.toISOString()}`, `Evaluated revision: \`${metadata.git_revision}\``,
     "This is a generated run report. Dataset totals and percentages describe this run only.",
     "## Overall", table(totals.baseline, totals.pipeline),
-    `Model outcomes: ${JSON.stringify(totals.model_outcomes)}. Baseline errors: ${totals.baseline.execution_errors}; pipeline errors: ${totals.pipeline.execution_errors}.`,
-    !withModel ? "Model inference is disabled. The current pipeline uses deterministic ranking." : totals.model_outcomes.reranked ? "The historical model comparison includes usable model orders and deterministic fallbacks. It is not the current production pipeline." : "Model comparison unavailable: no successful reranks. The comparison column records fallback/no-suggestion behavior only.",
+    `Baseline errors: ${totals.baseline.execution_errors}; pipeline errors: ${totals.pipeline.execution_errors}.`,
     "## Input cohorts", ...sections,
     "## Conditional ranking accuracy", "Denominator: cases where the expected email was generated.",
     ...ks.map((k) => `- Top-${k}: deterministic ${rate(totals.baseline.conditional_top_k[k]!.hits, totals.baseline.candidate_coverage)}; pipeline ${rate(totals.pipeline.conditional_top_k[k]!.hits, totals.pipeline.candidate_coverage)}.`),
@@ -241,8 +201,8 @@ async function main() {
     "## Source breakdown", ...Object.entries(totals.by_source).map(([source, value]) => `### ${source}\n\n${table(value.baseline, value.pipeline)}`),
     "## Domain diagnostics", ...Object.entries(totals.by_domain_status).map(([status, value]) => `- ${status}: ${value.baseline.total}.`),
     "## Short biographies", table(totals.short_bios.baseline, totals.short_bios.pipeline),
-    "## Reproduction", "The adjacent [results.json](results.json) contains the frozen seed snapshot, source/model checksums, runtime metadata, full generated candidates and per-case orders/ranks. Results can be recomputed from these case records without running the model again.",
-    "## Limits", "This is a diagnostic baseline on published contact directories, not a representative production benchmark or a deliverability check. Website/domain mismatches and missing candidate patterns cannot be repaired by reranking. Use an independent holdout after tuning.",
+    "## Reproduction", "The adjacent [results.json](results.json) contains the frozen seed snapshot, source checksums, runtime metadata, full generated candidates and per-case orders/ranks. Results can be recomputed from these case records without rerunning the pipeline.",
+    "## Limits", "This is a diagnostic baseline on published contact directories, not a representative production benchmark or a deliverability check. Website/domain mismatches and missing candidate patterns require domain or candidate-generation changes. Use an independent holdout after tuning.",
   ].join("\n\n") + "\n";
   await writeFile(`${output}/RESULTS.md`, report, { flag: "wx" });
   console.log(`Saved ${output}`);
