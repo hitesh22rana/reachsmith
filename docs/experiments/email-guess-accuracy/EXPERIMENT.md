@@ -2,7 +2,7 @@
 
 ## Status
 
-Prepared for review. No experiment has been run, no accuracy results exist, and no evaluation runner is included yet. Execution starts only after the user reviews this setup and asks to proceed.
+Execution authorized. The offline runner is available; each completed run saves its results and reproducibility metadata under `runs/`.
 
 ## Objective
 
@@ -17,10 +17,14 @@ Use real people with independently published answers. Synthetic people cannot es
 | [seeds.json](seeds.json) | Curated evaluation cases from published sources |
 | [schema.json](schema.json) | JSON Schema for the form-shaped target and withheld evidence |
 | [EXPERIMENT.md](EXPERIMENT.md) | Objective, evaluation plan, source coverage and collection provenance |
+| [run.ts](run.ts) | Offline runner and metric/answer-isolation self-check |
+| `runs/<timestamp>/` | Generated results, frozen seeds and per-case diagnostics for each execution |
 
 This folder keeps the seed data and schema alongside the experiment plan. Source provenance and collection methods are documented below.
 
 The seed list can grow as more qualifying people are found. Calculate dataset sizes, cohort sizes and SHA-256 checksums from the actual files at execution time, and store them in the run results. Freeze the evaluated files for each run so later additions do not change its reported denominator.
+
+Completed reports are stored in [runs/](runs/). Each report describes its own evaluated snapshot; results are not duplicated here.
 
 ## Sources
 
@@ -67,9 +71,9 @@ The implementation and [email accuracy feature contract](../../features/email-ac
 4. The [`rankWithModel()`](../../../workers/email-rank-model.ts) stage may reorder the generated set. It cannot add missing candidates or repair a wrong domain. A null result uses the deterministic order.
 5. Follow the [`email-guess` worker](../../../workers/email-guess.ts) selection order and top-10 limit. Evaluate fresh cases with no previously stored guesses.
 
-Plan an offline evaluation of these existing functions. Database import, queue processing and application UI behavior are outside this first accuracy experiment. No runner, model loading, candidate generation, SMTP probing or outreach is performed in this preparation step.
+The offline runner evaluates these existing functions. Database import, queue processing and application UI behavior are outside this first accuracy experiment. No SMTP probing or outreach is performed.
 
-## Evaluation plan, pending execution
+## Evaluation plan
 
 ### Input cohorts
 
@@ -87,6 +91,8 @@ Derive cohort membership and counts from each run's seed file. Field presence do
 - Current pipeline: the same set reranked with the pinned Qwen model, using the current deterministic fallback behavior, then truncated to ten.
 
 Use identical inputs in both paths. Record when reranking succeeds, falls back or is skipped because no candidates exist. Do not report an all-fallback run as measured model accuracy. If the model cannot be run, report only the deterministic baseline and mark the model comparison unavailable.
+
+The production model session is shared and retains its conversation history. The runner follows that behavior and evaluates cases sequentially in seed-file order; ordering and context retention can affect reproducibility. A `reranked` outcome means the model returned a usable order, which may be identical to the deterministic order.
 
 ### Metrics
 
@@ -120,7 +126,16 @@ The first run is a diagnostic baseline, not a tuning set with a claimed independ
 
 Before execution, calculate and record the current file checksums and cohort counts, verify that all targets pass the existing form validation, IDs and case-insensitive expected addresses are unique, and input Notes contain no email addresses. These checks validate the seed package; they do not measure pipeline accuracy.
 
-Preparation is complete when this document, the seed list and the schema are reviewable. The next step, after the user asks to proceed, is to implement the offline runner and execute the defined baseline and model comparison. Results remain **not run** until then.
+Run from the repository root using the installed dependencies and model cache:
+
+```sh
+node --experimental-strip-types --no-warnings docs/experiments/email-guess-accuracy/run.ts --selfcheck
+node --experimental-strip-types --no-warnings docs/experiments/email-guess-accuracy/run.ts
+```
+
+The self-check exercises answer isolation, exact matching, denominator handling and macro averaging without loading model weights. The full run compares deterministic and model orders using the production functions and creates a new timestamped output directory. Postgres and Redis are not required for this offline experiment.
+
+Each output directory contains `RESULTS.md` and `results.json`. The JSON includes the frozen input snapshot, generated candidates, selected orders, answer ranks, model outcomes, execution errors and runtime/source checksums. Source breakdowns use the case-ID prefix before the underscore; use the source prefix consistently when adding seeds. Model fallback counts and errors are retained in the report.
 
 ## Collection methods and provenance
 
