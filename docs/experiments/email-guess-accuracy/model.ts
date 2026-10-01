@@ -5,7 +5,7 @@ import {
   type Llama,
 } from "node-llama-cpp";
 
-// Backend rank stage. Output shape is enforced at generation level by a
+// Historical experiment rank stage. Output shape is enforced at generation level by a
 // JSON-schema grammar over candidate indices, so unknown IDs are
 // unrepresentable and every response parses. Deterministic order stands
 // on any failure.
@@ -17,9 +17,8 @@ interface RankInput {
   source: string;
 }
 
-// Pinned to the same revision the Dockerfile bakes (MODEL_SHA). Without the
-// `#rev` fragment this resolves against `main`, so a moved tag would change
-// the weights the worker loads.
+// Preserve the baseline revision for optional experiment reproduction.
+// Without the `#rev` fragment this would resolve against `main`.
 const MODEL_FILE =
   "hf:Qwen/Qwen2.5-0.5B-Instruct-GGUF/qwen2.5-0.5b-instruct-q4_k_m.gguf" +
   "#9217f5db79a29953eb74d5343926648285ec7e67";

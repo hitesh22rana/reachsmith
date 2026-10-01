@@ -16,7 +16,7 @@ Next.js App Router + TypeScript, Tailwind + shadcn/ui, Drizzle on Postgres, Bett
 - `docker compose up -d` (local Postgres + Redis)
 - `pnpm db:migrate` (fresh local database; applies the baseline and tenant RLS migrations)
 - `pnpm dev` and, for the email pipeline, `pnpm worker`
-- Production images: `docker compose --profile prod up --build` (migrates, then runs web + worker with the rank model baked in)
+- Production images: `docker compose --profile prod up --build` (migrates, then runs web + worker with deterministic email ranking)
 
 ## Code structure
 

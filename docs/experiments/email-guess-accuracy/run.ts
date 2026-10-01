@@ -8,12 +8,11 @@ import * as v from "valibot";
 import { TargetCreateSchema } from "../../../features/targets/validation.ts";
 import { nameParts } from "../../../lib/target-name.ts";
 import { extractHandles, extractNoteEmails, rankCandidates, resolveDomain } from "../../../lib/email-rank.ts";
-import { rankWithModel } from "../../../workers/email-rank-model.ts";
-import { getLlama, resolveModelFile } from "node-llama-cpp";
 
 const directory = fileURLToPath(new URL("./", import.meta.url));
 const root = fileURLToPath(new URL("../../../", import.meta.url));
 const ks = [1, 3, 5, 10];
+const withModel = process.argv.includes("--with-model");
 const SeedSchema = v.strictObject({
   id: v.pipe(v.string(), v.regex(/^[a-zA-Z0-9_-]+$/)),
   target: v.strictObject({
@@ -33,7 +32,7 @@ type Case = {
   cohort: string; short_bio: boolean; resolved_domain: string | null; domain_status: string;
   generated: ReturnType<typeof rankCandidates>; baseline_order: string[]; pipeline_order: string[];
   baseline_rank: number | null; pipeline_rank: number | null; candidate_rank: number | null;
-  model_outcome: "reranked" | "fallback" | "skipped"; fallback_reason: string | null;
+  model_outcome: "reranked" | "fallback" | "skipped" | "disabled"; fallback_reason: string | null;
   baseline_error: string | null; pipeline_error: string | null; model_ms: number;
 };
 const normalize = (email: string) => email.trim().toLowerCase();
@@ -94,7 +93,7 @@ function summary(cases: Case[]) {
       pipeline: metrics(cases.filter((row) => row.short_bio), "pipeline"),
     },
     expected_domains: domains.length, macro_top_k: { baseline: macro("baseline"), pipeline: macro("pipeline") },
-    model_outcomes: Object.fromEntries(["reranked", "fallback", "skipped"].map((outcome) => [outcome, cases.filter((row) => row.model_outcome === outcome).length])),
+    model_outcomes: Object.fromEntries(["reranked", "fallback", "skipped", "disabled"].map((outcome) => [outcome, cases.filter((row) => row.model_outcome === outcome).length])),
   };
 }
 
@@ -141,11 +140,11 @@ async function main() {
   }
   const paths = [
     "lib/email-patterns.ts", "lib/email-rank.ts", "lib/target-name.ts", "workers/email-guess.ts",
-    "workers/email-rank-model.ts", "features/targets/validation.ts", "package.json", "pnpm-lock.yaml",
+    "docs/experiments/email-guess-accuracy/model.ts", "features/targets/validation.ts", "package.json", "pnpm-lock.yaml",
     "docs/experiments/email-guess-accuracy/run.ts",
   ];
   const sourceHashes = Object.fromEntries(await Promise.all(paths.map(async (path) => [path, digest(await readFile(`${root}${path}`))])));
-  const modelSource = await readFile(`${root}workers/email-rank-model.ts`, "utf8");
+  const modelSource = await readFile(`${root}docs/experiments/email-guess-accuracy/model.ts`, "utf8");
   const expression = modelSource.match(/const MODEL_FILE\s*=([\s\S]*?);/)?.[1];
   assert(expression, "Could not read pinned model URI");
   const uri = [...expression.matchAll(/"([^"]+)"/g)].map((match) => match[1]).join("");
@@ -154,10 +153,11 @@ async function main() {
     tracked_changes_at_start: execFileSync("git", ["status", "--porcelain", "--untracked-files=no"], { cwd: root, encoding: "utf8" }).trim(),
     seeds_sha256: digest(seedText), schema_sha256: digest(await readFile(`${directory}schema.json`)), source_sha256: sourceHashes,
     runtime: { node: process.version, platform: os.platform(), arch: os.arch(), cpu: os.cpus()[0]?.model, cpu_count: os.cpus().length, memory_bytes: os.totalmem() },
-    model: { uri, sha256: null as string | null, backend: null as string | boolean | null, system_info: null as string | null, configuration_source: modelSource, preparation_error: null as string | null },
+    model: { enabled: withModel, uri, sha256: null as string | null, backend: null as string | boolean | null, system_info: null as string | null, configuration_source: modelSource, preparation_error: null as string | null },
     source_grouping: "case ID prefix before underscore", matching: "trimmed, case-insensitive, exact address", suggestion_limit: 10,
   };
-  try {
+  if (withModel) try {
+    const { getLlama, resolveModelFile } = await import("node-llama-cpp");
     const path = await resolveModelFile(uri, process.env.HF_MODEL_CACHE ?? `${root}.hf-cache`);
     metadata.model.sha256 = digest(await readFile(path));
     const llama = await getLlama();
@@ -184,7 +184,11 @@ async function main() {
       row.candidate_rank = position(row.generated.map((candidate) => candidate.email), expected);
       row.baseline_order = row.generated.slice(0, 10).map((candidate) => candidate.email);
       row.baseline_rank = position(row.baseline_order, expected);
-      if (row.generated.length) {
+      row.pipeline_order = [...row.baseline_order];
+      row.pipeline_rank = row.baseline_rank;
+      row.model_outcome = withModel ? "skipped" : "disabled";
+      if (withModel && row.generated.length) {
+        const { rankWithModel } = await import("./model.ts");
         const warnings: string[] = [];
         const logger = console.error;
         const begin = performance.now();
@@ -216,7 +220,7 @@ async function main() {
   await writeFile(`${output}/results.json`, JSON.stringify(result, null, 2) + "\n", { flag: "wx" });
   const rate = (hit: number, denominator: number) => denominator ? `${(100 * hit / denominator).toFixed(2)}% (${hit}/${denominator})` : "n/a (empty cohort)";
   const table = (base: ReturnType<typeof metrics>, pipeline: ReturnType<typeof metrics>) => [
-    "| Metric | Deterministic | Current pipeline |", "| --- | --- | --- |",
+    `| Metric | Deterministic | ${withModel ? "Historical model comparison" : "Current pipeline"} |`, "| --- | --- | --- |",
     ...ks.map((k) => `| Top-${k} | ${rate(base.top_k[k]!.hits, base.total)} | ${rate(pipeline.top_k[k]!.hits, pipeline.total)} |`),
     `| Candidate coverage | ${rate(base.candidate_coverage, base.total)} | ${rate(pipeline.candidate_coverage, pipeline.total)} |`,
     `| Suggestion coverage | ${rate(base.suggestion_coverage, base.total)} | ${rate(pipeline.suggestion_coverage, pipeline.total)} |`,
@@ -227,7 +231,7 @@ async function main() {
     "This is a generated run report. Dataset totals and percentages describe this run only.",
     "## Overall", table(totals.baseline, totals.pipeline),
     `Model outcomes: ${JSON.stringify(totals.model_outcomes)}. Baseline errors: ${totals.baseline.execution_errors}; pipeline errors: ${totals.pipeline.execution_errors}.`,
-    totals.model_outcomes.reranked ? "The current-pipeline column includes successful reranks and any production fallback cases." : "Model comparison unavailable: no successful reranks. The pipeline column records fallback/no-suggestion behavior only.",
+    !withModel ? "Model inference is disabled. The current pipeline uses deterministic ranking." : totals.model_outcomes.reranked ? "The historical model comparison includes usable model orders and deterministic fallbacks. It is not the current production pipeline." : "Model comparison unavailable: no successful reranks. The comparison column records fallback/no-suggestion behavior only.",
     "## Input cohorts", ...sections,
     "## Conditional ranking accuracy", "Denominator: cases where the expected email was generated.",
     ...ks.map((k) => `- Top-${k}: deterministic ${rate(totals.baseline.conditional_top_k[k]!.hits, totals.baseline.candidate_coverage)}; pipeline ${rate(totals.pipeline.conditional_top_k[k]!.hits, totals.pipeline.candidate_coverage)}.`),
