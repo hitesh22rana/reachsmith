@@ -87,7 +87,7 @@ Derive cohort membership and counts from each run's seed file. Field presence do
 
 ### Selected order
 
-Evaluate the full deterministically ranked candidate set, then apply the worker's top-10 truncation. Keep the saved baseline as the comparison for later candidate-generation and ranking changes. The existing result format retains deterministic and pipeline columns, which currently use the same order.
+Evaluate the full deterministically ranked candidate set, then apply the worker's top-10 truncation. Compare later changes against a completed report on the same seed snapshot. The existing result format retains deterministic and pipeline columns, which currently use the same order; these columns do not compare against a historical revision. Add any historical comparison explicitly to the final report.
 
 ### Metrics
 
@@ -109,14 +109,18 @@ Calculate per-case domains, generated candidates and answer ranks in memory, the
 
 The first run is a diagnostic baseline, not a tuning set with a claimed independent test result. If its outcomes guide changes to patterns or ranking, collect a separate holdout from additional organizations before claiming generalization.
 
+## Completed improvements
+
+The first expansion added first-initial plus surname without a separator (`flast`), surname-only (`last`), and first plus surname without a separator (`firstlast`), keeping existing scores fixed. The later expansion added initials, given-name-plus-initial, and reversed initial patterns, accent folding, observed aliases, and compound-name alternatives, then tuned fixed global priorities on the diagnostic seeds. Completed reports record their measured effects; the current seeds are tuning data.
+
 ## Accuracy improvements to evaluate next
 
-1. **Candidate coverage:** the first expansion adds first-initial plus surname without a separator (`flast`, such as `jdoe`), surname-only (`last`, such as `doe`), and first plus surname without a separator (`firstlast`, such as `janedoe`). These are observed omissions in the baseline. That expansion kept existing scores fixed. A later experiment adds initials, given-name-plus-initial, and reversed initial patterns, folds accents, and handles observed aliases and compound names. It also tunes global pattern priorities using the diagnostic seeds. Compare full-set coverage and top-10 accuracy separately so adding candidates does not hide truncation losses.
-2. **Domain inputs:** collect independently supported company email domains where a website is absent or differs from the email domain. Keep the original baseline inputs frozen; never fill an evaluation input from its withheld answer.
+1. **Candidate coverage:** inspect remaining misses and compare full-set coverage with top-10 accuracy so additional patterns do not hide truncation losses.
+2. **Domain inputs:** collect independently supported company email domains where a website is absent or differs from the email domain. Use separately versioned, independently supported input corrections; never fill an evaluation input from its withheld answer.
 3. **Name handling:** review misses involving accents, multiple surnames, initials and published aliases. Use independently observed name overrides; do not guess nicknames from the answer.
 4. **Ranking:** evaluate organization-specific pattern evidence collected independently of the target answer. A larger candidate set alone cannot improve first-choice accuracy. Keep pattern-learning examples separate from scored targets, and test on additional organizations before claiming generalization.
 
-Record candidate-generation and ranking changes explicitly and compare against the saved baseline. Keep the original baseline and seed inputs frozen when evaluating the pattern expansion.
+Record candidate-generation and ranking changes explicitly and compare against the saved baseline. Compare changes on the same seed snapshot. Preserve historical reports and use their recorded Git revisions and checksums to recover the evaluated inputs; expanding or correcting seeds creates a new snapshot.
 
 ## Limitations
 
@@ -128,7 +132,7 @@ Record candidate-generation and ranking changes explicitly and compare against t
 
 ## Preparation checks and handoff
 
-Before execution, calculate and record the current file checksums and cohort counts, verify that all targets pass the existing form validation, IDs and case-insensitive expected addresses are unique, and input Notes contain no email addresses. These checks validate the seed package; they do not measure pipeline accuracy.
+Before a recorded run, commit code and seed changes and start with a clean tracked working tree. The runner records checksums, cohort counts, revision, and tracked changes, and validates form fields, unique IDs/answers, evidence, and email-free Notes before scoring. It records dirty state but does not reject it. These preparation checks do not measure accuracy.
 
 Run from the repository root using the installed dependencies:
 
