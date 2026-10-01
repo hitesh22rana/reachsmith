@@ -24,6 +24,8 @@ This folder keeps the seed data and schema alongside the experiment plan. Source
 
 The seed list can grow as more qualifying people are found. Calculate dataset sizes, cohort sizes and SHA-256 checksums from the actual files at execution time, and store them in the run results. Freeze the evaluated files for each run so later additions do not change its reported denominator.
 
+Completed reports are stored in [runs/](runs/). Each report describes its own evaluated snapshot; results are not duplicated here.
+
 ## Sources
 
 Each record retains its source URL and inspection date in `evidence`. Coverage below describes the collection approach, not a live inventory or an exhaustive list of people on each website.
@@ -89,6 +91,8 @@ Derive cohort membership and counts from each run's seed file. Field presence do
 - Current pipeline: the same set reranked with the pinned Qwen model, using the current deterministic fallback behavior, then truncated to ten.
 
 Use identical inputs in both paths. Record when reranking succeeds, falls back or is skipped because no candidates exist. Do not report an all-fallback run as measured model accuracy. If the model cannot be run, report only the deterministic baseline and mark the model comparison unavailable.
+
+The production model session is shared and retains its conversation history. The runner follows that behavior and evaluates cases sequentially in seed-file order; ordering and context retention can affect reproducibility. A `reranked` outcome means the model returned a usable order, which may be identical to the deterministic order.
 
 ### Metrics
 
