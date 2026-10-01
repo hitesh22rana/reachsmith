@@ -67,7 +67,7 @@ The implementation and [email accuracy feature contract](../../features/email-ac
 
 1. Map form fields to the worker's inputs. Split `social_urls` on newlines, trim entries and discard blank lines. Use [`nameParts()`](../../../lib/target-name.ts) with the full name and any published overrides.
 2. Use [`resolveDomain()` and `rankCandidates()`](../../../lib/email-rank.ts). The explicit domain wins; otherwise only an eligible company website hostname supplies a provisional domain. The current resolver accepts only a two-label hostname after stripping `www`, with blocked hosts excluded. A company name or a social profile alone does not supply a domain.
-3. Generate the six existing name patterns and eligible handle candidates. Notes addresses can also be candidates in production, but the seed bios intentionally contain no answer addresses.
+3. Generate the supported name patterns and eligible handle candidates. Notes addresses can also be candidates in production, but the seed bios intentionally contain no answer addresses.
 4. Keep the deterministic order.
 5. Follow the [`email-guess` worker](../../../workers/email-guess.ts) selection order and top-10 limit. Evaluate fresh cases with no previously stored guesses.
 
@@ -107,17 +107,16 @@ At execution time, record the evaluated Git revision, seed and schema checksums,
 
 Save per-case resolved domain and its source, generated candidates, selected top ten, expected-answer ranks and any execution error. Expected answers remain scoring data, never pipeline input. Result artifacts make aggregate metrics reproducible from these records.
 
-
 The first run is a diagnostic baseline, not a tuning set with a claimed independent test result. If its outcomes guide changes to patterns or ranking, collect a separate holdout from additional organizations before claiming generalization.
 
 ## Accuracy improvements to evaluate next
 
-1. **Candidate coverage:** add first-initial plus surname without a separator (`jdoe`), surname-only (`doe`), and first plus surname without a separator (`janedoe`). These are observed omissions in the baseline. Compare full-set coverage and top-10 accuracy separately so adding candidates does not hide truncation losses.
+1. **Candidate coverage:** the first expansion adds first-initial plus surname without a separator (`flast`, such as `jdoe`), surname-only (`last`, such as `doe`), and first plus surname without a separator (`firstlast`, such as `janedoe`). These are observed omissions in the baseline. Existing scores and their relative order stay fixed; new patterns follow them. Compare full-set coverage and top-10 accuracy separately so adding candidates does not hide truncation losses.
 2. **Domain inputs:** collect independently supported company email domains where a website is absent or differs from the email domain. Keep the original baseline inputs frozen; never fill an evaluation input from its withheld answer.
 3. **Name handling:** review misses involving accents, multiple surnames, initials and published aliases. Use independently observed name overrides; do not guess nicknames from the answer.
 4. **Ranking:** evaluate organization-specific pattern evidence collected independently of the target answer. A larger candidate set alone cannot improve first-choice accuracy. Keep pattern-learning examples separate from scored targets, and test on additional organizations before claiming generalization.
 
-Change one factor at a time and compare against the saved baseline. Candidate generation remains unchanged in this cleanup.
+Change one factor at a time and compare against the saved baseline. Keep the original baseline and seed inputs frozen when evaluating the pattern expansion.
 
 ## Limitations
 

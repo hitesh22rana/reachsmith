@@ -12,7 +12,7 @@ export interface RankedCandidate {
 
 const EMAIL_RE = /[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/gi;
 
-// Frequency order doubles as base score: first.last wins ties.
+// Fixed baseline priorities; appended patterns isolate the coverage change.
 const PATTERN_BASE: Record<EmailPattern, number> = {
   "first.last": 60,
   "f.last": 50,
@@ -20,6 +20,9 @@ const PATTERN_BASE: Record<EmailPattern, number> = {
   first_last: 30,
   "last.first": 20,
   f_last: 10,
+  flast: 9,
+  last: 8,
+  firstlast: 7,
 };
 
 const POSITIVE_CUES = [
@@ -110,31 +113,11 @@ export function inferPattern(
   firstName: string | undefined,
   lastName: string | undefined,
 ): EmailPattern | null {
-  const first = cleanPart(firstName);
-  const last = cleanPart(lastName);
-  if (!first) {
-    return null;
-  }
-  const local = email.split("@")[0] ?? "";
-  if (last && local === `${first}.${last}`) {
-    return "first.last";
-  }
-  if (last && local === `${first[0]}.${last}`) {
-    return "f.last";
-  }
-  if (local === first) {
-    return "first";
-  }
-  if (last && local === `${first}_${last}`) {
-    return "first_last";
-  }
-  if (last && local === `${last}.${first}`) {
-    return "last.first";
-  }
-  if (last && local === `${first[0]}_${last}`) {
-    return "f_last";
-  }
-  return null;
+  return generateCandidates({
+    first_name: firstName,
+    last_name: lastName,
+    domain: email.split("@")[1],
+  }).find((candidate) => candidate.email === email)?.pattern ?? null;
 }
 
 function cueScore(context: string): number {
