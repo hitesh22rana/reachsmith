@@ -1,4 +1,4 @@
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { NextResponse, type NextRequest } from "next/server";
 import { forUser } from "@/db";
 import { audiences } from "@/db/schema";
@@ -36,7 +36,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ message: "Failed to create audience" }, { status: 500 });
   }
   const [created] = await forUser(userId, (db) =>
-    db.select().from(audiences).where(eq(audiences.id, id)).limit(1),
+    db.select().from(audiences)
+      .where(and(eq(audiences.id, id), eq(audiences.userId, userId))).limit(1),
   );
   if (!created) {
     return NextResponse.json({ message: "Failed to create audience" }, { status: 500 });
