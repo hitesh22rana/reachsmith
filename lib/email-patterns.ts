@@ -1,7 +1,7 @@
 // Fixed pattern priority is defined by the ranker, not generation order.
 const PATTERNS = [
   "first.last", "f.last", "first", "first_last", "last.first", "f_last",
-  "flast", "last", "firstlast", "firstl", "fl", "initials", "fmlast", "first.l", "lastf",
+  "flast", "last", "firstlast", "firstl", "fl", "initials", "fmlast", "first.l", "lastf", "initialslast",
 ] as const;
 
 export type EmailPattern = (typeof PATTERNS)[number];
@@ -78,6 +78,9 @@ export function generateCandidates(input: {
       fmlast: name.nameVariant || lastTokens.length < 2 ? null : `${f[0]}${cleanPart(lastTokens[0])[0] ?? ""}${cleanPart(lastTokens.slice(1).join(" "))}`,
       "first.l": l ? `${f}.${l[0]}` : null,
       lastf: l ? `${l}${f[0]}` : null,
+      initialslast: !name.nameVariant && !!l && firstText.split(/[\s-]+/).length > 1
+        ? firstText.split(/[\s-]+/).filter(Boolean).map((part) => cleanPart(part)[0] ?? "").join("") + cleanPart(stripAnnotations(rawLast))
+        : null,
     };
     for (const pattern of PATTERNS) {
       const part = local[pattern];

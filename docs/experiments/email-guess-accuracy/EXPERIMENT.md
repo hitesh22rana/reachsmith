@@ -66,8 +66,8 @@ Unknown optional fields are omitted. Later batches require at least 40 words of 
 The implementation and [email accuracy feature contract](../../features/email-accuracy/SPEC.md) define the behavior being measured:
 
 1. Map form fields to the worker's inputs. Split `social_urls` on newlines, trim entries and discard blank lines. Use [`nameParts()`](../../../lib/target-name.ts) with the full name and any published overrides.
-2. Use [`resolveDomain()` and `rankCandidates()`](../../../lib/email-rank.ts). The explicit domain wins; otherwise only an eligible company website hostname supplies a provisional domain. The current resolver accepts only a two-label hostname after stripping `www`, with blocked hosts excluded. A company name or a social profile alone does not supply a domain.
-3. Generate the supported name patterns and eligible handle candidates. Notes addresses can also be candidates in production, but the seed bios intentionally contain no answer addresses.
+2. Use [`resolveDomain()` and `rankCandidates()`](../../../lib/email-rank.ts). The explicit domain wins; otherwise only an eligible company website hostname supplies a provisional domain. The resolver uses `tldts` and the Public Suffix List to select the registrable domain, including company subdomains and multi-label suffixes; blocked hosts, hosted/private suffixes, reserved names, and unknown suffixes are excluded. A company name or a social profile alone does not supply a domain.
+3. Generate the supported name patterns, observed biography-name interpretations, and eligible handle candidates. Notes addresses can also be candidates in production, but the seed bios intentionally contain no answer addresses.
 4. Keep the deterministic order.
 5. Follow the [`email-guess` worker](../../../workers/email-guess.ts) complete ranked output without a suggestion cutoff. Evaluate fresh cases with no previously stored guesses.
 
@@ -110,9 +110,19 @@ Calculate per-case domains, generated candidates and answer ranks in memory, the
 
 The first run is a diagnostic baseline, not a tuning set with a claimed independent test result. If its outcomes guide changes to patterns or ranking, collect a separate holdout from additional organizations before claiming generalization.
 
+## Reviewing individual misses
+
+Keep the complete case diagnosis in the evaluated run's `RESULTS.md`; per-case working data stays in memory. Verify its recorded seed, schema, and production source checksums before adding an analysis of an existing run.
+
+- Partition full-list misses into missing domain input, rejected website, resolved-domain mismatch, and missing local part with a matching domain. Assign each miss one primary cause; domain failures can also conceal name or pattern issues.
+- List each missed target with its stable ID, published answer, resolved domain or missing input, source link, and diagnosis. List generated answers below rank one separately, with their actual rank, so ranking misses are not counted as candidate-generation failures.
+- Distinguish an alias or fuller name explicitly present in input biography text from an abbreviation inferred only from the answer. Source URLs and evidence can explain provenance during review but remain withheld from the guesser.
+- Prioritize independently supported domains, observed name context, and ranking evidence. Opaque handles and unobserved aliases may be deferred from implementation work; retain them in the overall accuracy denominator. Any scoped metric must declare its selection rule and denominator.
+- A likely cause is a diagnostic hypothesis, not proof of a person's preferred name or of which alternative mailboxes are valid. Do not add answer-derived domains, name overrides, or nicknames to seeds to manufacture hits.
+
 ## Completed improvements
 
-The first expansion added first-initial plus surname without a separator (`flast`), surname-only (`last`), and first plus surname without a separator (`firstlast`), keeping existing scores fixed. The later expansion added initials, given-name-plus-initial, and reversed initial patterns, accent folding, observed aliases, and compound-name alternatives, then tuned fixed global priorities on the diagnostic seeds. Completed reports record their measured effects; the current seeds are tuning data.
+The first expansion added first-initial plus surname without a separator (`flast`), surname-only (`last`), and first plus surname without a separator (`firstlast`), keeping existing scores fixed. The later expansion added initials, given-name-plus-initial, and reversed initial patterns, accent folding, observed aliases, and compound-name alternatives, then tuned fixed global priorities on the diagnostic seeds. The biography-context expansion extracts constrained quoted/parenthetical aliases, short-name subjects, and fuller names already in Notes, adds compound given-name initials plus surname, and supports registrable website domains through the Public Suffix List. Observed short given names can rank above the original given-name guess; other biography interpretations remain lower-priority alternatives. Completed reports record their measured effects, recoveries, and ranking regressions; the current seeds are tuning data.
 
 ## Accuracy improvements to evaluate next
 

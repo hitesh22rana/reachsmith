@@ -183,7 +183,7 @@
           "evidence_notes": {
             "type": "string",
             "maxLength": 2000,
-            "description": "Evidence of person-address association, especially for confirmation or replies. Never passed to the model."
+            "description": "Evidence of person-address association, especially for confirmation or replies. Never passed to the guesser."
           }
         }
       }

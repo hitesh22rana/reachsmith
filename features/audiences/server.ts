@@ -1,7 +1,7 @@
 import { and, eq, sql } from "drizzle-orm";
 import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
-import { audiences, type Audience } from "@/db/schema";
-import * as schema from "@/db/schema";
+import { audiences, type Audience } from "../../db/schema.ts";
+import type * as schema from "../../db/schema.ts";
 import type { ApiAudience } from "./validation";
 
 // Suggestions every account starts with. A constant, not rows: nothing to

@@ -251,15 +251,16 @@ Given a target's name and company domain, generate and retain every ranked, dedu
 ### 7.2 Domain determination
 
 - Use the owner's explicit `domain` first.
-- Otherwise use a straightforward company website hostname as a provisional domain. Reject public email, social, hosting, link-shortener, IP, localhost, and ambiguous hostnames; require an explicit domain in those cases.
+- Otherwise use the registrable domain of an HTTP(S) company website as a provisional domain, using the Public Suffix List through `tldts`. Support company subdomains and multi-label suffixes such as `co.uk`. Reject public email, social, hosted/private suffixes, link-shortener, IP, reserved, localhost, and unrecognized suffixes; require an explicit domain in those cases. The website domain can still differ from the email domain.
 - Notes addresses and social profiles never supply the company domain. No domain means no suggestions and an actionable prompt to enter one. There is no Gmail fallback.
 
 ### 7.3 Candidate generation and ranking
 
-- Generate the name patterns: `first.last`, `f.last`, `first`, `first_last`, `last.first`, `f_last`, `flast`, `last`, `firstlast`, `firstl`, `fl`, `initials`, `fmlast`, `first.l`, and `lastf`. Fold accents and offer observed aliases, hyphenated given names, and alternatives for compound names and middle initials. Keep name overrides and outreach greetings unchanged.
+- Generate the name patterns: `first.last`, `f.last`, `first`, `first_last`, `last.first`, `f_last`, `flast`, `last`, `firstlast`, `firstl`, `fl`, `initials`, `fmlast`, `first.l`, `lastf`, and `initialslast` (compound given-name initials plus the full surname). Fold accents and offer observed aliases, hyphenated given names, and alternatives for compound names and middle initials. Keep name overrides and outreach greetings unchanged.
+- Read quoted or parenthetical aliases tied to the supplied given name, fuller opening biography names with the same surname, and short-name subjects sharing at least three opening letters. These are email-only interpretations: do not change name overrides or outreach greetings. English subject cues are heuristic; arbitrary nicknames and unprovided surnames are not invented.
 - Include social-handle candidates and notes addresses only at the resolved company domain.
 - Use `nameParts()` for the same name tokens used in outreach greetings.
-- Rank using notes context, observed handles, fixed global pattern priorities, and penalties for alternative name interpretations. Same-domain notes can supply pattern evidence. Priorities were tuned on diagnostic seeds; no model or learned organization-specific ranking runs in production. Keep every candidate on the company domain.
+- Rank using notes context, observed handles, fixed global pattern priorities, and penalties for alternative name interpretations. Same-domain notes can supply pattern evidence. Short given names observed in the biography rank above the unshortened given-name guess, while other biography interpretations receive a penalty; direct address evidence still ranks highest. Priorities were tuned on diagnostic seeds; no model or learned organization-specific ranking runs in production. Keep every candidate on the company domain.
 - Persist every candidate in `email_guesses` with source, pattern, context, and rank in `score`. Do not assign validity or deliverability status.
 
 ### 7.4 User decision
