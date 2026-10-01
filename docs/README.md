@@ -2,6 +2,10 @@
 
 `SPECS.md` is source of truth. `AGENTS.md` holds repo constraints. Each `docs/features/<name>/SPEC.md` is a self-contained build prompt: give one to one agent/session.
 
+## Experiments
+
+- [Email guess accuracy](experiments/email-guess-accuracy/EXPERIMENT.md): prepared evaluation plan and curated seed data. Not run.
+
 ## Status
 
 - [x] `foundation`: scaffolded and verified (`typecheck`, `lint`, `build`, dev render, `db:generate`); local `compose.yaml` (Postgres + Redis) included.
