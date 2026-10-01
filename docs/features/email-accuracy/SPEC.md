@@ -6,7 +6,7 @@ Offer likely work-email addresses without presenting a guess as a verified mailb
 
 ## Dependencies
 
-Build on targets and the email-pipeline feature. SPECS.md sections 7 and 8 are the source of truth. This feature replaces the former external verification stage in the baseline schema before deployment.
+Build on targets and the email-pipeline feature. SPECS.md sections 7 and 8 are the source of truth. This feature replaced the former external verification stage in the predeployment baseline schema.
 
 ## Domain boundary
 
@@ -32,12 +32,12 @@ Build on targets and the email-pipeline feature. SPECS.md sections 7 and 8 are t
 - Poll briefly while the guess worker generates suggestions; if none appear by the ceiling, show a non-definitive message and the manual entry path. Do not say an email was not found merely because generation or the worker failed.
 - Outreach remains manual: compose, copy, and mark sent or replied. A reply is user-recorded evidence of contact, not a mailbox check performed by the app.
 
-## Schema and cleanup
+## Schema and completed cleanup
 
-- Remove email_guesses.status, email_guesses.verification_meta, the email_guess_status enum, and targets.primary_email_source from the existing baseline schema and migration. No new migration file is needed before deployment.
-- Existing local test databases can be reset and migrated from the updated baseline. If adjusted in place, clear any previously automatic primary_email values before dropping provenance; preserve manually entered values.
+- The predeployment baseline removed email_guesses.status, email_guesses.verification_meta, the email_guess_status enum, and targets.primary_email_source. These fields must remain absent.
+- A disposable local test database can be reset and migrated from the updated baseline. For any deployed database, use an additive migration rather than editing applied migrations or resetting data. If converting legacy data in place, clear previously automatic primary_email values before dropping provenance; preserve manually entered values.
 - Exclude any legacy off-domain rows from API results. An input edit regenerates rows with current rules.
-- Remove EMAIL_VERIFIER_API_KEY, the verifier queue and worker, provider mapping, verifier-only tests, and claims of automatic verification from product copy and documentation.
+- EMAIL_VERIFIER_API_KEY, the verifier queue and worker, provider mapping, and verifier-only tests were removed. Product copy and documentation must not claim automatic verification.
 - Better Auth's verifications table and users.email_verified field are authentication data and must remain.
 
 ## Acceptance
