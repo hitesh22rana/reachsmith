@@ -25,7 +25,7 @@ Compared with the [retained baseline](../2026-10-01T13-57-47-762Z/RESULTS.md) on
 - Domain-macro top-10 accuracy rose from 35.43% to 46.53%. Website-only top-10 rose from 47.57% to 72.82%; explicit-domain top-10 rose from 67.42% to 75.00%.
 - These patterns were selected after inspecting the original baseline. The improvement is measured on that diagnostic dataset; an independent organizational holdout is needed before claiming accuracy on new contacts.
 
-The adjacent JSON records the baseline artifact checksum, before/after aggregates, newly covered case IDs and patterns, and regression/truncation diagnostics. Its generated Deterministic and Current pipeline columns both evaluate this run's current code; the table above compares against the original saved baseline.
+The adjacent local-only JSON records the baseline artifact checksum, before/after aggregates, newly covered case IDs and patterns, and regression/truncation diagnostics. Its generated Deterministic and Current pipeline columns both evaluate this run's current code; the table above compares against the original saved baseline.
 
 ## Overall
 
@@ -256,7 +256,7 @@ Each answer domain receives equal weight. Domains are used for scoring groups on
 
 ## Reproduction
 
-The adjacent [results.json](results.json) contains the frozen seed snapshot, source checksums, runtime metadata, full generated candidates and per-case orders/ranks. Results can be recomputed from these case records without rerunning the pipeline.
+The adjacent local-only `results.json` contains the frozen seed snapshot, source checksums, runtime metadata, full generated candidates and per-case orders/ranks. Results can be recomputed from these case records without rerunning the pipeline.
 
 ## Limits
 

@@ -12,9 +12,9 @@ Foundation, auth, targets. Target creation and search-input edits enqueue email-
 
 - Resolve the company domain from target.domain, or an eligible company_website hostname. Notes and social profiles never supply the domain. If none is available, write no rows.
 - Use nameParts() to obtain the same given and family names that outreach templates use.
-- Generate the name patterns: first.last, f.last, first, first_last, last.first, f_last, flast, last, firstlast. New patterns follow the existing baseline priorities. Include observed social handles at the company domain.
+- Generate the name patterns: `first.last`, `f.last`, `first`, `first_last`, `last.first`, `f_last`, `flast`, `last`, `firstlast`, `firstl`, `fl`, `initials`, `fmlast`, `first.l`, and `lastf`. Fold accents and offer observed aliases, hyphenated given names, and alternatives for compound names and middle initials. Keep name overrides and outreach greetings unchanged.
 - Extract note addresses only at the resolved domain. Rank them using nearby positive and negative context cues and name matches; a known name pattern in notes can boost matching generated candidates.
-- Deduplicate, syntax-check, and rank eligible candidates deterministically.
+- Deduplicate, syntax-check, and rank eligible candidates deterministically. Global priorities favor given-name-only and initial/surname patterns, tuned on the diagnostic seeds. Alternative name interpretations receive a score penalty; direct notes evidence and observed handles keep their precedence. Keep the strongest pattern score for duplicate name candidates.
 - Store the top ten in email_guesses with source, pattern_used, score, and optional context. No candidate receives a validity or deliverability label.
 
 ## Worker and security

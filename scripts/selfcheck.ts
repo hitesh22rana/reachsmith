@@ -56,6 +56,33 @@ const initialCandidates = rankCandidates({ first_name: "J", last_name: "Smith", 
 assert.equal(initialCandidates.filter((candidate) => candidate.email === "jsmith@acme.com").length, 1, "overlapping initial/full-name patterns yield one suggestion");
 assert.deepEqual(rankCandidates({ first_name: "Cher", domain: "acme.com" }).map((candidate) => candidate.email), ["cher@acme.com"], "missing surname does not invent surname patterns");
 
+// These cases protect the worker-facing name-to-top-ten contract, including
+// collisions where a weaker surname interpretation previously won deduplication.
+for (const [fullName, email] of [
+  ["René Martin", "rene@acme.com"],
+  ["Will Greenberg", "willg@acme.com"],
+  ["Emma Fraser", "ef@acme.com"],
+  ["Marie-Claire Forgue", "mcf@acme.com"],
+  ["Pierre-Antoine Champin", "pierre-antoine@acme.com"],
+  ["Gregory P. Adams", "gadams@acme.com"],
+  ["Elizabeth (Lisa) Femia", "lfemia@acme.com"],
+  ["F. Mario Trujillo", "mario@acme.com"],
+  ["Mary Kay Delvo", "marykay@acme.com"],
+  ["Rena Henderson Mason", "rhmason@acme.com"],
+  ["Mateus Kaba Aboud", "maboud@acme.com"],
+]) {
+  const parts = nameParts({ fullName: fullName! });
+  const candidates = rankCandidates({ first_name: parts.firstName, last_name: parts.lastName, domain: "acme.com", notes: "Personal: elsewhere@gmail.com" });
+  assert.ok(candidates.slice(0, 10).some((candidate) => candidate.email === email), `top ten includes ${email}`);
+  assert.ok(candidates.every((candidate) => candidate.email.endsWith("@acme.com")), "name variants respect the domain boundary");
+  assert.equal(new Set(candidates.map((candidate) => candidate.email)).size, candidates.length, "variants yield unique suggestions");
+}
+const accentCandidates = rankCandidates({ first_name: "René", last_name: "Martin", domain: "acme.com" });
+assert.ok(accentCandidates.some((candidate) => candidate.email === "ren@acme.com"), "legacy accent omission stays available");
+const givenFirst = rankCandidates({ first_name: "Ada", last_name: "Lovelace", domain: "acme.com" });
+assert.equal(givenFirst[0]?.email, "ada@acme.com", "tuned priorities favor the given-name pattern");
+assert.equal(rankCandidates({ first_name: "Ada", last_name: "Lovelace", domain: "acme.com", notes: "My email is ada.lovelace@acme.com" })[0]?.email, "ada.lovelace@acme.com", "direct notes evidence still overrides global priorities");
+
 // CSRF: only a present-and-foreign Origin is rejected.
 assert.equal(isCrossOrigin(null, HOST), false, "missing Origin allowed (non-browser client)");
 assert.equal(isCrossOrigin(SAME, HOST), false, "same origin allowed");

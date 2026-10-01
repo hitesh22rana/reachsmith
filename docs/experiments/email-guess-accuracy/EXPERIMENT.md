@@ -111,12 +111,12 @@ The first run is a diagnostic baseline, not a tuning set with a claimed independ
 
 ## Accuracy improvements to evaluate next
 
-1. **Candidate coverage:** the first expansion adds first-initial plus surname without a separator (`flast`, such as `jdoe`), surname-only (`last`, such as `doe`), and first plus surname without a separator (`firstlast`, such as `janedoe`). These are observed omissions in the baseline. Existing scores and their relative order stay fixed; new patterns follow them. Compare full-set coverage and top-10 accuracy separately so adding candidates does not hide truncation losses.
+1. **Candidate coverage:** the first expansion adds first-initial plus surname without a separator (`flast`, such as `jdoe`), surname-only (`last`, such as `doe`), and first plus surname without a separator (`firstlast`, such as `janedoe`). These are observed omissions in the baseline. That expansion kept existing scores fixed. A later experiment adds initials, given-name-plus-initial, and reversed initial patterns, folds accents, and handles observed aliases and compound names. It also tunes global pattern priorities using the diagnostic seeds. Compare full-set coverage and top-10 accuracy separately so adding candidates does not hide truncation losses.
 2. **Domain inputs:** collect independently supported company email domains where a website is absent or differs from the email domain. Keep the original baseline inputs frozen; never fill an evaluation input from its withheld answer.
 3. **Name handling:** review misses involving accents, multiple surnames, initials and published aliases. Use independently observed name overrides; do not guess nicknames from the answer.
 4. **Ranking:** evaluate organization-specific pattern evidence collected independently of the target answer. A larger candidate set alone cannot improve first-choice accuracy. Keep pattern-learning examples separate from scored targets, and test on additional organizations before claiming generalization.
 
-Change one factor at a time and compare against the saved baseline. Keep the original baseline and seed inputs frozen when evaluating the pattern expansion.
+Record candidate-generation and ranking changes explicitly and compare against the saved baseline. Keep the original baseline and seed inputs frozen when evaluating the pattern expansion.
 
 ## Limitations
 
@@ -139,7 +139,7 @@ node --experimental-strip-types --no-warnings docs/experiments/email-guess-accur
 
 The self-check exercises answer isolation, exact matching, denominator handling and macro averaging. The full run evaluates the deterministic production order and creates a new timestamped output directory. Postgres and Redis are not required for this offline experiment.
 
-Each output directory contains `RESULTS.md` and `results.json`. The JSON includes the frozen input snapshot, generated candidates, selected orders, answer ranks, execution errors and runtime/source checksums. Source breakdowns use the case-ID prefix before the underscore; use the source prefix consistently when adding seeds. Execution errors are retained in the report.
+Each output directory contains a tracked `RESULTS.md` and a local-only `results.json`. Detailed JSON snapshots are ignored by Git to keep pull requests small. The JSON includes the frozen input snapshot, generated candidates, selected orders, answer ranks, execution errors and runtime/source checksums. Source breakdowns use the case-ID prefix before the underscore; use the source prefix consistently when adding seeds. Execution errors are retained in the report.
 
 
 ## Collection methods and provenance
