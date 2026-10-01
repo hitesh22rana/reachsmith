@@ -77,7 +77,7 @@ User can:
   - Company / domain (derived from company website, or manually provided).
 - ReachSmith:
   - Generates a small set of candidate emails using common patterns.
-  - Ranks up to ten company-domain suggestions using notes, patterns, social handles, and the optional local model.
+  - Ranks up to ten company-domain suggestions using notes, patterns, and social handles.
   - Labels suggestions as unverified and lets the user copy or manually save an address for outreach.
 
 ### 3.4 Outreach template management
@@ -139,7 +139,7 @@ For a selected contact:
 - **ORM**: Drizzle (for schema, migrations, and type-safe access).
 - **Styling/UI**: Tailwind CSS + shadcn/ui components.
 - **Background jobs**: BullMQ + Redis (e.g., Upstash or any hosted Redis).
-- **Email suggestions**: BullMQ worker with deterministic ranking and an optional locally hosted Qwen reranker; no external verifier.
+- **Email suggestions**: BullMQ worker with deterministic ranking; no external verifier.
 - **Auth**: Better Auth with email/password.
 - **Validation**: Valibot with feature-owned schemas shared between forms and API routes; forms via react-hook-form + Valibot resolver.
 - **Client data**: TanStack Query; server components fetch directly.
@@ -274,7 +274,7 @@ Given a target's name and company domain, generate up to ten ranked work-email s
 - Generate the six name patterns: `first.last`, `f.last`, `first`, `first_last`, `last.first`, and `f_last`.
 - Include social-handle candidates and notes addresses only at the resolved company domain.
 - Use `nameParts()` for the same name tokens used in outreach greetings.
-- Rank from notes context, pattern frequency, and other available evidence. The baked Qwen model may reorder eligible candidates; deterministic ordering is the fallback. The model cannot introduce an address outside the company domain.
+- Rank from notes context, pattern frequency, and other available evidence. Use deterministic ordering and keep every candidate on the company domain. Model reranking is disabled after the accuracy experiment found no improvement.
 - Persist the top ten in `email_guesses` with source, pattern, context, and rank in `score`. Do not assign validity or deliverability status.
 
 ### 7.4 User decision
@@ -405,7 +405,7 @@ Sections:
 
 - Implement EmailGuess model.
 - Implement BullMQ + Redis.
-- Implement the `email-guess` queue and local ranking model with deterministic fallback.
+- Implement the `email-guess` queue and deterministic ranking.
 - Surface ranked, unverified suggestions and the manually selected `primary_email` in the UI.
 
 ### 11.3 Phase 3 – Enrichment & integrations
@@ -436,7 +436,7 @@ Sections:
   - `db/` – Drizzle schema (`db/schema.ts`) and client (`db/index.ts`); `drizzle/` – generated migrations.
   - `lib/queues/` – BullMQ queue definitions for the email pipeline.
   - `workers/` – email pipeline workers (one `pnpm worker` process); `scripts/` – one-off tooling.
-  - `Dockerfile` (multi-stage `web`/`worker` images, rank model baked in) + `compose.yaml` (local Postgres 18 + Redis 8, prod profile).
+  - `Dockerfile` (multi-stage `web`/`worker` images, deterministic suggestion worker) + `compose.yaml` (local Postgres 18 + Redis 8, prod profile).
   - `workers/` – standalone worker entry points when the email pipeline is implemented.
 
 - Keep feature internals local. Other features import public entry points; shared UI and helpers never import feature code. Colocate feature-specific validation and TanStack Query hooks. Use server components for direct data reads, TanStack Query for client server state, and local React state for local UI state. Add global client state only when a real cross-feature need appears.
