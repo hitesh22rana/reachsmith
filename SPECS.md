@@ -1,16 +1,16 @@
-# ReachSmith – SPEC.md
+# ReachSmith: SPECS.md
 
 ## 1. Overview
 
 ReachSmith is a personal outreach and contact engine focused on job hunting, referrals, and recruiting conversations. It helps a user:
 
 - Collect and organize target contacts (recruiters, HRs, employees, hiring managers).
-- Enrich those contacts from public profiles (e.g., LinkedIn, GitHub) and manual data.
+- Store manually entered contact details and public profile references.
 - Generate personalized outreach messages from reusable templates.
 - Suggest likely work email addresses from names, domains, and context without claiming verification.
 - Track outreach status, follow-ups, and outcomes over time.
 
-The initial goal is to build a functional MVP in a private GitHub repository, with a clear path to evolve into a hosted service later.
+The core MVP is implemented in a private GitHub repository. Hosted service operations and integrations remain future work.
 
 ---
 
@@ -26,7 +26,7 @@ The initial goal is to build a functional MVP in a private GitHub repository, wi
   - Generate likely email candidates from known patterns.
   - Rank likely work email addresses without an external verifier.
 - Provide a clean, responsive UI with good defaults, using shadcn/ui and open-source components.
-- Use Next.js as both frontend and backend, and a managed SQL database.
+- Use Next.js as both frontend and backend, and Postgres with tenant row-level security.
 
 ### 2.2 Non‑goals (for MVP)
 
@@ -43,32 +43,21 @@ The initial goal is to build a functional MVP in a private GitHub repository, wi
 
 User can:
 
-- Add a new contact via:
-  - A profile URL (LinkedIn, GitHub, personal website, company profile).
-  - A manual form (name, role, company, email if known).
-- See all contacts in a table with:
+- Add a contact through the manual form, with optional profile URLs as references. A URL alone does not populate a contact.
+- See contacts in a card grid with:
   - Name, role, company, email (if available).
   - Source (LinkedIn, GitHub, manual).
   - Status tags (no outreach, draft, sent, replied, etc.).
 - View a contact detail page:
   - Basic profile info.
-  - Enrichment data (where available).
+  - Manually entered contact links, location, and notes.
   - Outreach history and statuses.
 
-### 3.2 Enrich contact data
+### 3.2 Contact context and future enrichment
 
-- Given a profile URL, ReachSmith may:
-  - Store the URL as a reference.
-  - Optionally trigger an asynchronous enrichment job (via compliant APIs).
-- The enrichment may populate:
-  - Full name.
-  - Role/title.
-  - Company.
-  - Location.
-  - Public links (GitHub, personal website).
-- Due to ToS constraints, enrichment via direct scraping is not the default. Instead:
-  - MVP favors manual input plus optional third-party enrichment APIs.
-  - Future phases might add browser-extension–based scraping (user-initiated).
+- MVP stores manually entered names, roles, companies, locations, notes, company websites, and social URLs.
+- Profile links are references; the app does not fetch them or run an enrichment worker.
+- Compliant enrichment APIs and user-initiated browser capture are future work. No server-side LinkedIn scraping.
 
 ### 3.3 Email pattern suggestions
 
@@ -96,21 +85,19 @@ User can:
 For a selected contact:
 
 - User chooses:
-  - Purpose (e.g., “Ask for referral to Job X”).
-  - Channel (email, LinkedIn DM).
+  - Channel (email, LinkedIn DM, other).
   - Template (or writes from scratch).
 - ReachSmith:
   - Fills template variables using:
     - Target contact data (first name, role, company).
-    - User’s own profile (sender name, current role).
-    - Optional job link or custom context.
+    - Editable values entered for each declared placeholder, including any sender details, job links, or custom context.
 - User can:
   - Edit final message.
   - Copy it to clipboard for LinkedIn messaging.
   - Mark it as “sent” (for now, sending is manual).
 - Outreach records:
   - Statuses: draft, sent, replied, rejected, no response, success (e.g., got referral).
-  - Timestamps: created, sent_at, last_status_change.
+  - Timestamps: created_at, sent_at, last_status_change_at.
 
 ---
 
@@ -135,7 +122,7 @@ For a selected contact:
 ### 5.1 Tech stack
 
 - **Frontend & backend**: Next.js (App Router, TypeScript).
-- **Database**: Managed SQL (e.g., Postgres via Supabase, Neon, PlanetScale, or Railway).
+- **Database**: Postgres with tenant RLS; `DATABASE_URL` is the migration owner and `APP_DATABASE_URL` is the non-superuser runtime role without `BYPASSRLS`.
 - **ORM**: Drizzle (for schema, migrations, and type-safe access).
 - **Styling/UI**: Tailwind CSS + shadcn/ui components.
 - **Background jobs**: BullMQ + Redis (e.g., Upstash or any hosted Redis).
@@ -155,7 +142,7 @@ For a selected contact:
     - `/templates` – template list and CRUD.
     - `/outreach` – pipeline view (outreach records, loaded a page at a time).
   - API routes / server actions:
-    - `POST /api/targets` – create target; enqueue enrichment/email guess jobs.
+    - `POST /api/targets` – create target; attempt to enqueue an email-guess job.
     - `GET /api/targets` – list targets.
     - `POST /api/outreach` – create outreach.
     - `PATCH /api/outreach/[id]` – update status.
@@ -167,9 +154,9 @@ For a selected contact:
 
 ---
 
-## 6. Data Model (Initial Draft)
+## 6. Data Model
 
-Using generic field names; actual implementation will use Drizzle tables.
+Persisted column names below correspond to the Drizzle tables in `db/schema.ts`. Better Auth also owns `sessions`, `accounts`, and `verifications`; its user rows include `email_verified` and optional `image`.
 
 ### 6.1 User
 
@@ -194,20 +181,14 @@ Represents a target contact (recruiter, HR, employee, etc.).
 - `primary_email` (nullable, set by the owner for outreach; never filled by the suggestion worker)
 - `domain` (nullable company email domain, used for suggestions)
 - `company_website` (nullable, can supply a provisional domain)
-- `profile_url` (e.g., LinkedIn/GitHub URL)
+- `social_urls` (nullable text array of profile/reference URLs; forms accept up to five, one per line)
+- `location` (nullable)
+- `extra_enrichment` (nullable JSON, reserved; not populated by an MVP enrichment worker)
 - `source_type` (enum: `linkedin`, `github`, `website`, `manual`, `other`)
 - `enrichment_status` (enum: `not_started`, `pending`, `success`, `failed`)
 - `notes` (text)
 - `created_at`
 - `updated_at`
-
-Optional enrichment fields (for later):
-
-- `location`
-- `company_website`
-- `github_url`
-- `linkedin_url` (if different from profile_url)
-- `extra_enrichment` (JSON)
 
 ### 6.3 Template
 
@@ -218,7 +199,7 @@ Represents a reusable message template.
 - `name` (e.g., “Referral request – backend role”)
 - `channel` (enum: `email`, `linkedin_dm`, `other`)
 - `audience_id` (nullable FK to `audiences.id`; audience is free text, not an enum)
-- `purpose` (string/enum; e.g., `referral_request`, `cold_intro`, `follow_up`)
+- `purpose` (free text; e.g., `referral_request`, `cold_intro`, `follow_up`)
 - `body` (text with placeholders like `{{first_name}}`, `{{resume_link}}`)
 - `placeholders` (JSON: one `{name, label, source}` per placeholder in the body, derived on save)
 - `created_at`
@@ -238,7 +219,7 @@ Represents a specific message (or planned message) from user to a target.
 - `status` (enum: `draft`, `sent`, `replied`, `rejected`, `no_response`, `success`)
 - `sent_at` (nullable)
 - `last_status_change_at`
-- `metadata` (JSON – can store things like job_link, job_title, email_message_id later)
+- `metadata` (nullable JSON of filled placeholder values; template-backed messages allow only declared keys, custom messages permit user-supplied keys, at most 50)
 - `created_at`
 - `updated_at`
 
@@ -257,6 +238,10 @@ Represents a candidate email address generated for a target.
 - `created_at`
 - `updated_at`
 
+### 6.6 Audience
+
+Per-user free-text presets in `audiences`: `id`, `user_id`, `name`, `created_at`. Names are unique case-insensitively within each user. Deleting a preset sets related `templates.audience_id` to null. Built-in suggestions are constants, not shared database rows.
+
 ## 7. Company Email Suggestions
 
 ### 7.1 Overview
@@ -274,7 +259,7 @@ Given a target's name and company domain, generate up to ten ranked work-email s
 - Generate the name patterns: `first.last`, `f.last`, `first`, `first_last`, `last.first`, `f_last`, `flast`, `last`, `firstlast`, `firstl`, `fl`, `initials`, `fmlast`, `first.l`, and `lastf`. Fold accents and offer observed aliases, hyphenated given names, and alternatives for compound names and middle initials. Keep name overrides and outreach greetings unchanged.
 - Include social-handle candidates and notes addresses only at the resolved company domain.
 - Use `nameParts()` for the same name tokens used in outreach greetings.
-- Rank from notes context, pattern frequency, and other available evidence. Use deterministic ordering and keep every candidate on the company domain.
+- Rank using notes context, observed handles, fixed global pattern priorities, and penalties for alternative name interpretations. Same-domain notes can supply pattern evidence. Priorities were tuned on diagnostic seeds; no model or learned organization-specific ranking runs in production. Keep every candidate on the company domain.
 - Persist the top ten in `email_guesses` with source, pattern, context, and rank in `score`. Do not assign validity or deliverability status.
 
 ### 7.4 User decision
@@ -282,6 +267,10 @@ Given a target's name and company domain, generate up to ten ranked work-email s
 - Show the ranked suggestions with a copy action and an explicit "not verified" label.
 - Allow manual entry of any email, including a personal address, into `target.primary_email`. This is an owner selection, not a verification result.
 - The user sends outreach manually and tracks the outcome. A reply can be recorded through outreach status; copying or saving an address never proves deliverability.
+
+### 7.5 Accuracy experiments
+
+The [email guess accuracy experiment](docs/experiments/email-guess-accuracy/EXPERIMENT.md) evaluates the production candidate and ranking functions offline against published addresses. `MEMORY.md` describes how to run and report it. Keep expected answers and evidence out of pipeline inputs. Report top-k accuracy and candidate coverage separately; diagnostic seed results do not establish deliverability or independent generalization.
 
 ---
 
@@ -298,7 +287,7 @@ Given a target's name and company domain, generate up to ten ranked work-email s
 
 ### 9.1 Onboarding
 
-- Simple login/signup.
+- Better Auth email/password login/signup. Signup continues at `/login?new=1`, without automatically creating a session.
 - Post-login redirect to `/dashboard`:
   - A minimal dashboard showing:
     - “Add your first target” CTA.
@@ -322,6 +311,7 @@ Three-step wizard (Basics, Contact, Notes plus review) with a stepper. Fields:
 - Full name (required).
 - Company (optional but recommended).
 - Role/title (optional).
+- Source type and location (optional).
 - Email (optional, if known).
 - Email domain (optional, drives guessing).
 - Social URLs (up to 5, one per line).
@@ -332,10 +322,8 @@ Behavior:
 
 - On submit:
   - Creates the Target.
-  - Optionally triggers:
-    - Email guessing pipeline (if company/domain is available).
-    - Enrichment job in future.
-  - UI shows pending state for email if pipeline is running.
+  - Attempts to enqueue email guessing. Queue failures are logged and do not roll back target creation. A company name alone cannot supply a domain.
+  - With no resolvable domain, generation yields no suggestions; the UI prompts for a domain. Otherwise the suggestions section polls briefly.
 
 ### 9.4 Target detail page
 
@@ -345,14 +333,14 @@ Sections:
   - Name, role, company, and any manually saved primary_email.
   - “Edit target” dialog covering every field.
 - Contact info:
-  - Profile links, notes, enrichment info.
+  - Profile links, location, company website, and notes.
 - Email suggestions section:
   - Show ranked company-domain suggestions with a copy action.
   - Allow the user to save an email manually for outreach.
 - Outreach history (live):
   - List of Outreach records with status, sent date, copy button, and inline status change.
 - “New Outreach” button:
-  - Opens a flow to select template and channel, fill job title/link, edit, copy-to-clipboard, then save draft or save and mark `sent`.
+  - Opens a flow to select template and channel, fill editable fields for the template’s declared placeholders, edit the message, copy to clipboard, then save draft or save and mark `sent`.
 
 ### 9.5 Template management
 
@@ -360,17 +348,17 @@ Sections:
   - Name, channel, audience, updated_at.
 - Template editor:
   - Name.
-  - Channel (email, LinkedIn DM).
-  - Audience type.
+  - Channel (email, LinkedIn DM, other).
+  - Free-text audience with per-user preset suggestions.
   - Purpose.
-  - Body text with placeholder hints (list of supported variables).
+  - Body text with detected placeholder chips; any lowercase `snake_case` name in double braces, up to 50.
 
 ### 9.6 Outreach view
 
 - Global outreach table or simple pipeline:
   - Filters by status (draft, sent, replied, etc.).
   - Ability to quickly change status (e.g., mark as replied).
-  - Sorting by sent_at or last_status_change.
+  - Cursor pagination by immutable `(created_at, id)` descending. The Updated column displays `last_status_change_at` without changing list order.
 
 ---
 
@@ -382,14 +370,17 @@ Sections:
 - Make it clear in future ToS/Privacy:
   - User is responsible for having legitimate interest/consent for emails they send.
 - Respect platform ToS:
-  - Avoid large-scale LinkedIn scraping from server-side.
+  - No server-side LinkedIn scraping.
   - Prefer enrichment APIs or user-run browser extensions.
-- Rate-limit:
-- Any future enrichment or email sending to avoid abuse and IP blocking.
+- Every domain query uses `forUser()` or worker `asUser()` with tenant RLS, plus ownership checks. APIs return 401 when logged out and 404 for foreign record IDs.
+- `forUser()` verifies the runtime role cannot bypass RLS before its first domain transaction; worker `asUser()` performs its own role check.
+- Better Auth rate limits authentication; future enrichment or sending requires its own abuse limits.
 
 ---
 
 ## 11. Implementation Phases
+
+Phases 1 and 2 are implemented; phases 3 and 4 describe future work. See `docs/README.md` for feature status.
 
 ### 11.1 Phase 1 – Core MVP
 
@@ -416,7 +407,7 @@ Sections:
 
 ### 11.4 Phase 4 – Towards SaaS
 
-- Multi-tenant best practices (if needed).
+- Hosted SaaS operations and scaling; session ownership and tenant RLS are already required in the MVP.
 - Billing, rate limits, usage analytics.
 - Hardened security and privacy controls.
 
@@ -429,7 +420,7 @@ Sections:
 - Directory layout (high-level):
 
   - `app/` – Next.js App Router entry points, layouts, route handlers, and global CSS. Route files connect URLs to features.
-  - `features/<name>/` – domain UI, schemas, and logic that change together. Existing features are `auth`, `landing`, `dashboard`, `targets`, `templates`, `outreach`, and `email`; add others when implemented.
+  - `features/<name>/` – domain UI, schemas, and logic that change together. Existing features are `auth`, `landing`, `dashboard`, `targets`, `templates`, `outreach`, `email`, and `audiences`; add others when implemented.
   - `features/<name>/index.ts` – public UI entry point for routes and other features. Server-only code uses an explicit server entry point so client bundles cannot import database logic.
   - `components/ui/` – domain-agnostic UI primitives; other shared components stay in `components/` only when used across features.
   - `lib/` – shared framework setup and cross-feature helpers, including the common request body parser and Better Auth server setup.
@@ -437,12 +428,12 @@ Sections:
   - `lib/queues/` – BullMQ queue definitions for the email pipeline.
   - `workers/` – email pipeline workers (one `pnpm worker` process); `scripts/` – one-off tooling.
   - `Dockerfile` (multi-stage `web`/`worker` images, deterministic suggestion worker) + `compose.yaml` (local Postgres 18 + Redis 8, prod profile).
-  - `workers/` – standalone worker entry points when the email pipeline is implemented.
+  - `docs/experiments/` – experiment plans, seeds, runners, and final reports.
 
 - Keep feature internals local. Other features import public entry points; shared UI and helpers never import feature code. Colocate feature-specific validation and TanStack Query hooks. Use server components for direct data reads, TanStack Query for client server state, and local React state for local UI state. Add global client state only when a real cross-feature need appears.
 - Prefer one clear owner for each behavior (DRY), small focused modules where behavior warrants it (SOLID), and no empty directories or speculative layers (YAGNI).
 
 - Config:
-  - `.env` for database URL, Redis URL, and Better Auth secrets.
+  - `.env` for owner/runtime database URLs, Redis URL, and Better Auth secrets.
   - `README.md` for quickstart and local dev setup.
-  - `SPEC.md` (this file) to describe the platform.
+  - `SPECS.md` (this file) to describe the platform.

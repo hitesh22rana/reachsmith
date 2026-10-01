@@ -1,21 +1,21 @@
 # ReachSmith: Feature Build Map
 
-`SPECS.md` is source of truth. `AGENTS.md` holds repo constraints. Each `docs/features/<name>/SPEC.md` is a self-contained build prompt: give one to one agent/session.
+`SPECS.md` is source of truth. `AGENTS.md` holds repo constraints. Each `docs/features/<name>/SPEC.md` records its feature contract and original build tasks. Foundation describes the initial scaffolding stage; use the root README for current setup. Checked status entries record completed implementation and prior verification, not a fresh test run.
 
 ## Experiments
 
-- [Email guess accuracy](experiments/email-guess-accuracy/EXPERIMENT.md): evaluation plan, curated seeds, offline runner and generated results.
+- [Email guess accuracy](experiments/email-guess-accuracy/EXPERIMENT.md): evaluation plan, curated seeds, offline runner and final Markdown reports. Run instructions and retention rules are in `MEMORY.md`. Seed totals belong in each report; tuning results require an independent holdout before claiming generalization.
 
 ## Status
 
 - [x] `foundation`: scaffolded and verified (`typecheck`, `lint`, `build`, dev render, `db:generate`); local `compose.yaml` (Postgres + Redis) included.
-- [x] `auth`: Better Auth email/password, Drizzle tables + migration, login/signup UI, guards on `/targets` `/templates` `/outreach`; verified signup → session → guarded 200 / logged-out 307.
+- [x] `auth`: Better Auth email/password, Drizzle tables + migration, login/signup UI, guards on `/targets` `/templates` `/outreach`; signup continues at login without auto sign-in; logged-out pages redirect and domain APIs return 401.
 - [x] `landing`: public `/`, guarded `/dashboard`, and post-auth redirects.
 - [x] `targets`: table + enums + migration, scoped CRUD APIs with Valibot validation, card grid/multi-step wizard/detail UI with full edit dialog, cascade-warning delete dialogs; fields include an explicit email domain, company website, and social URLs; verified isolation (404s) plus doctor clean.
 - [x] `templates`: table + channel enum + migration, `renderTemplate` + `parsePlaceholders` with selfcheck coverage, open `{{snake_case}}` placeholders derived server-side into `placeholders`, free-text audience field (Autocomplete over the caller's presets, new names resolve-or-create on save), list/editor UI; verified CRUD, placeholder derivation and 50/51 boundary, isolation (404s), and 400/401 cases.
 - [x] `outreach`: table + status enum + migration, `buildOutreachBody` on `renderTemplate`, scoped CRUD APIs with owned-target/template checks, 4-step compose dialog (channel/template, one field per declared placeholder prefilled from the target, editable draft with live re-render until edited, review) + per-target history + pipeline with filter/inline status; `metadata` key set intersected with the template's declared placeholders server-side. Verified transitions, the key allowlist, isolation (404s), and 400/401 cases.
 - [x] `email-pipeline`: ranked work-email suggestions with notes context, handle derivation, pattern inference, deterministic ranking, and a top-10 limit. No external verifier or validity claim.
-- [x] `docker`: single multi-stage `Dockerfile` (`web`, `worker`, `builder`-as-migrator), prod profile in `compose.yaml` (Postgres 18.0, Redis 8.2.1, healthchecks, non-root, pruned prod deps). Verified `runner-web` + `runner-worker` images build.
+- [x] `docker`: single multi-stage `Dockerfile` (`runner-web`, `runner-worker`, `builder`-as-migrator), prod profile in `compose.yaml` (Postgres 18.0, Redis 8.2.1, healthchecks, non-root, pruned prod deps). Verified `runner-web` + `runner-worker` images build.
 - [x] `seo`: indexable `/` (metadata, canonical, FAQPage schema from exported `FAQS`), Organization + WebSite JSON-LD, `robots`/`sitemap`/`manifest`/`opengraph-image`, `noindex` on private/auth routes, viewport + themeColor, logo alt text, 48px menu target, brand favicons from the mascot, pipe title separators, font swap + `optimizePackageImports`. Verified `typecheck`, `lint`, `build` plus crawler routes resolve.
 - [x] `audiences`: `audiences` table (free text, per-user presets, unique per user on `lower(name)`, `ON DELETE SET NULL` from templates, RLS in `drizzle/0001_tenant_rls.sql`) replacing the `audience_type` enum; four built-in defaults are a constant, not rows; resolve-or-create via `ON CONFLICT DO NOTHING` so concurrent saves cannot abort the transaction. Verified: two tenants in isolation (404s, one-way 400s), preset removal unlinking templates, seed, `typecheck`, `lint`, `build`, `selfcheck`, react-doctor 100.
 - [x] `pagination`: keyset (cursor) pagination on `GET /api/targets` and `GET /api/outreach`; cursor is an opaque base64url `(created_at, id)` position validated before it reaches SQL, `limit+1` fetch derives `nextCursor` (no `hasMore`, no `total`), and `useInfiniteQuery` + Load more in both views. `outreaches` now orders by the immutable `created_at` instead of the mutable `last_status_change_at`, so a status PATCH cannot re-sort the list under a reader mid-scroll. Templates and audiences stay unpaginated because they are pickers, not feeds. Composite `(user_id, created_at, id)` indexes replace the `user_id`-only ones; the dashboard's full-table status scan became a `groupBy`. Verified: 5 page sizes match the DB order exactly with no duplicate or skip across the seam, cursor composes with the `status` filter, a concurrent insert does not disturb an open page 2, hostile cursors and out-of-range limits 400, unauthenticated 401.
@@ -25,21 +25,22 @@
 ## Features (build order)
 
 1. `foundation`: scaffolding only. No dependencies.
-2. `auth` (Better Auth): needs foundation. Stub-able: skip session check, hardcode `user_id`.
+2. `auth` (Better Auth): needs foundation and configured Postgres. All domain features require real session ownership.
 3. `landing`: public `/`, dashboard moves to guarded `/dashboard`. Needs foundation + auth.
-4. `targets`: needs foundation (+ auth for ownership; stub `user_id` if missing).
-5. `templates`: needs foundation (+ auth for ownership, + `docs/features/audiences` for `audience_id`). Independent of targets.
-6. `outreach`: needs foundation, targets, templates. If missing: hardcoded `target_id` / nullable `template_id` (custom message path).
-7. `email-pipeline`: needs foundation, targets. Enqueues from `POST /api/targets`; jobs carry target and user IDs for tenant-scoped workers.
-8. `seo`: needs foundation + landing. Parallel-safe with any feature after landing.
-9. `pagination`: needs foundation (+ auth). Optional on everything else: only `GET /api/targets` and `GET /api/outreach` import `lib/pagination.ts`, so it can land before outreach by paginating targets alone.
-10. `email-accuracy`: needs targets and email-pipeline. Current domain and suggestion semantics live in `docs/features/email-accuracy/SPEC.md`.
+4. `targets`: needs foundation + auth.
+5. `audiences`: needs foundation + auth; independent of targets.
+6. `templates`: needs foundation + auth + audiences for `audience_id`; independent of targets.
+7. `outreach`: needs foundation + auth + targets + templates. A custom message can omit a template, but always requires an owned target.
+8. `email-pipeline`: needs foundation + auth + targets. Creation and search-input edits enqueue tenant-scoped jobs; standalone workers need Redis.
+9. `seo`: needs foundation + landing.
+10. `pagination`: needs foundation + auth + targets + outreach for both paginated lists.
+11. `email-accuracy`: needs targets and email-pipeline. Current domain and suggestion semantics live in `docs/features/email-accuracy/SPEC.md`.
 
 Parallel-safe pairs: targets + templates, then outreach + email-pipeline.
 
 ## Shared contracts (do not reinvent per feature)
 
-- Layout: `app/` routes, `features/<name>/` domain code, `components/ui/` shared primitives, `lib/` shared setup, `db/` and `drizzle/` persistence; add `lib/queues/` and `workers/` with the pipeline (`SPECS.md` §12).
+- Layout: `app/` routes, `features/<name>/` domain code, `components/ui/` shared primitives, `lib/` shared setup, `db/` and `drizzle/` persistence; `lib/queues/` and `workers/` hold the pipeline (`SPECS.md` §12).
 - Enums verbatim (`SPECS.md` §6): `source_type: linkedin|github|website|manual|other`, `enrichment_status: not_started|pending|success|failed`, `channel: email|linkedin_dm|other`, `Outreach.status: draft|sent|replied|rejected|no_response|success`. Email guesses have no validity enum; audiences are free text (`docs/features/audiences/SPEC.md`).
 - Template vars are open: any lowercase `snake_case` name in `{{double_braces}}`, up to 50 per template, declared in `templates.placeholders` and filled in `outreaches.metadata` (`docs/features/templates/SPEC.md`, `docs/features/outreach/SPEC.md`).
 - Validation: feature-owned Valibot schemas in `features/<name>/validation.ts`; forms use react-hook-form with the Valibot resolver, API routes check bodies with shared `parseBody` from `lib/validators.ts` (400 + message). Client fetching via TanStack Query (`components/providers.tsx`); server components fetch directly. Routes import feature public UI from `index.ts`; server-only helpers use explicit server entry points.
@@ -51,8 +52,8 @@ Parallel-safe pairs: targets + templates, then outreach + email-pipeline.
 
 - Every row is owned by a `user_id` from the Better Auth session. Every query filters by it; every `:id` route re-checks ownership and returns 404 (not 403) on mismatch so IDs can't be probed.
 - Never trust client-supplied `user_id` or nested IDs: verify `target_id`/`template_id` belong to the caller before use.
-- Defense in depth, both live: app queries filter by session `user_id`, and Postgres RLS (`drizzle/0001_tenant_rls.sql`) filters again on `targets`, `templates`, `outreaches`, `email_guesses` and `audiences` via a transaction-local `app.user_id` GUC. `FORCE ROW LEVEL SECURITY` plus a non-superuser runtime role (`APP_DATABASE_URL`) is what makes the policies bind; `getDb()` throws at startup if the role could bypass them.
+- Defense in depth, both live: app queries filter by session `user_id`, and Postgres RLS (`drizzle/0001_tenant_rls.sql`) filters again on `targets`, `templates`, `outreaches`, `email_guesses` and `audiences` via a transaction-local `app.user_id` GUC. `FORCE ROW LEVEL SECURITY` plus a non-superuser runtime role (`APP_DATABASE_URL`) is what makes the policies bind; `forUser()` checks and rejects a role that can bypass RLS before its first domain transaction; worker `asUser()` also checks its role.
 
 ## Out of scope (all features)
 
-Phase 3–4: enrichment APIs, browser extension, real email sending, billing/multi-tenancy (`SPECS.md` §11.3–11.4).
+Phase 3–4: enrichment APIs, browser extension, real email sending, billing and SaaS scaling (`SPECS.md` §11.3–11.4).

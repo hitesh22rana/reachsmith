@@ -4,9 +4,10 @@
 Compose against whatever variables the chosen template declares, then copy manually and track status (`SPECS.md` §3.5, §6.4, §9.4, §9.6). Sending is manual: no email integration.
 
 ## Dependencies
-Foundation, targets, templates. If either missing: hardcode `target_id` / allow null `template_id` (custom message path) with `// TODO` markers; do not rebuild those features.
+Foundation, Better Auth, targets, and templates. A real owned target is required. A null `template_id` is supported for a custom message; never hardcode ownership or related IDs.
 
 ## Scope
+
 - `Outreach` model exactly per `SPECS.md` §6.4: `user_id, target_id, template_id?, channel, subject?, body_final, status, sent_at?, last_status_change_at, metadata, created_at, updated_at`. Status enum verbatim. `metadata` is now `{[placeholder]: value}` for whatever variables the template declared; the old fixed `job_title`/`job_link` pair is gone.
 - `features/outreach/server.ts`: `buildOutreachBody(template.body?, target, variables)` over `renderTemplate` (no `sender` param: no variable consumes one). Target-sourced values fill first, then user-entered `variables` override them, so any prefilled field can be corrected per message. The existing `job_title → target.roleTitle` fallback is preserved.
 - `targetVariables()` resolves `{{first_name}}`/`{{last_name}}` through `lib/target-name.ts`, the same helper the email pipeline uses, so a target with no name override prefills a greeting instead of an empty string. `OutreachTarget` therefore carries `fullName`; before this, the pipeline derived the tokens from it and the compose form read the nullable columns directly, so the same person produced `bae.suzy@` guesses and a blank `{{first_name}}`.
@@ -21,11 +22,13 @@ Foundation, targets, templates. If either missing: hardcode `target_id` / allow 
 - Step changes scroll the content to the top and focus the step heading, as `add-target-dialog` already does.
 
 ## Security
+
 - Scope all queries by session `user_id`. On create/update, verify `target_id` (and `template_id` if set) belong to the caller: reject with 404 otherwise. Never trust client `user_id` or cross-user IDs.
 - `GET` filters (`status`, `targetId`) apply inside the caller's rows only.
 - `variables` keys are never trusted: the template's stored placeholder list is the allowlist, so a client cannot smuggle unbounded or foreign keys into `metadata`.
 
 ## Tasks
+
 1. `metadata` shape, `OutreachCreateSchema` `variables`, server-side key intersection and 50 cap in the create route.
 2. Move `stepper.tsx` to `components/ui/` and repoint the targets wizard.
 3. The 4-step dialog, per-step `trigger(variableNames)` gate on step 2.
@@ -33,13 +36,14 @@ Foundation, targets, templates. If either missing: hardcode `target_id` / allow 
 5. Docs sync: `SPECS.md` §3.5 and §6.4, `AGENTS.md`, `docs/README.md` drop the four-var list and the job title/link form fields.
 
 ## Acceptance
+
 - A template with `{{first_name}}`, `{{company}}`, `{{resume_link}}` shows three fields on step 2, two prefilled and editable, `resume_link` empty.
 - A target stored with only a full name (no split override) still prefills `{{first_name}}` from that name, matching what the email pipeline guesses.
 - Filling `resume_link` updates the body live; hand-editing the body stops live re-render, and Re-apply template restores it.
 - A 50-placeholder template renders 50 fields and saves; 51 is rejected at save naming the 51st.
 - A long custom placeholder name ellipsizes on step 2 and does not break the grid at 360px.
 - Save draft → copy → mark `sent` (sets `sent_at`) → transition to `replied`/`success` updates pipeline + target history.
-- Custom message with null `template_id` works and stores no `metadata`.
+- Custom message with null `template_id` works. The UI submits no variables, so metadata is null; API-supplied custom variables are permitted within the 50-key cap.
 - A submitted variable key that the template does not declare is dropped server-side.
 - User B cannot create outreach on user A's target, nor read/update user A's outreach (404).
 
