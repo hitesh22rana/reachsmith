@@ -18,11 +18,11 @@ Use real people with independently published answers. Synthetic people cannot es
 | [schema.json](schema.json) | JSON Schema for the form-shaped target and withheld evidence |
 | [EXPERIMENT.md](EXPERIMENT.md) | Objective, evaluation plan, source coverage and collection provenance |
 | [run.ts](run.ts) | Offline runner and metric/answer-isolation self-check |
-| `runs/<timestamp>/` | Generated results, frozen seeds and per-case diagnostics for each execution |
+| `runs/<timestamp>/` | Final Markdown report for each execution |
 
 This folder keeps the seed data and schema alongside the experiment plan. Source provenance and collection methods are documented below.
 
-The seed list can grow as more qualifying people are found. Calculate dataset sizes, cohort sizes and SHA-256 checksums from the actual files at execution time, and store them in the run results. Freeze the evaluated files for each run so later additions do not change its reported denominator.
+The seed list can grow as more qualifying people are found. Calculate dataset sizes, cohort sizes and SHA-256 checksums from the actual files at execution time, and store them in the run results. Record the evaluated Git revision and input checksums so later additions do not change a completed report's denominator.
 
 Completed reports are stored in [runs/](runs/). Each report describes its own evaluated snapshot; results are not duplicated here.
 
@@ -105,7 +105,7 @@ Report each metric as a numerator, denominator and percentage. Include overall r
 
 At execution time, record the evaluated Git revision, seed and schema checksums, dataset and cohort sizes, source checksums, Node version and runtime/hardware details.
 
-Save per-case resolved domain and its source, generated candidates, selected top ten, expected-answer ranks and any execution error. Expected answers remain scoring data, never pipeline input. Result artifacts make aggregate metrics reproducible from these records.
+Calculate per-case domains, generated candidates and answer ranks in memory, then summarize the metrics, diagnostics and execution errors in `RESULTS.md`. Retain the evaluated revision and checksums in that report. Expected answers remain scoring data, never pipeline input. No intermediate result files are retained.
 
 The first run is a diagnostic baseline, not a tuning set with a claimed independent test result. If its outcomes guide changes to patterns or ranking, collect a separate holdout from additional organizations before claiming generalization.
 
@@ -139,8 +139,7 @@ node --experimental-strip-types --no-warnings docs/experiments/email-guess-accur
 
 The self-check exercises answer isolation, exact matching, denominator handling and macro averaging. The full run evaluates the deterministic production order and creates a new timestamped output directory. Postgres and Redis are not required for this offline experiment.
 
-Each output directory contains a tracked `RESULTS.md` and a local-only `results.json`. Detailed JSON snapshots are ignored by Git to keep pull requests small. The JSON includes the frozen input snapshot, generated candidates, selected orders, answer ranks, execution errors and runtime/source checksums. Source breakdowns use the case-ID prefix before the underscore; use the source prefix consistently when adding seeds. Execution errors are retained in the report.
-
+Each output directory contains only `RESULTS.md`, with aggregate metrics, diagnostics, execution errors and reproducibility metadata. Source breakdowns use the case-ID prefix before the underscore; use the source prefix consistently when adding seeds.
 
 ## Collection methods and provenance
 
