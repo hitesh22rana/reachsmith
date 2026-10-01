@@ -1,3 +1,4 @@
+import { parse as parseDomain } from "tldts";
 import { cleanPart, generateCandidates, type EmailPattern, type EmailCandidate } from "./email-patterns.ts";
 
 export type CandidateSource = "notes" | "pattern";
@@ -30,6 +31,7 @@ const PATTERN_BASE: Record<EmailPattern, number> = {
   f_last: 12,
   "first.l": 10,
   lastf: 8,
+  initialslast: 29,
 };
 
 function patternScore(candidate: EmailCandidate): number {
@@ -151,8 +153,8 @@ function bestFirst(candidates: RankedCandidate[]): RankedCandidate[] {
     .sort((a, b) => b.score - a.score);
 }
 
-// Only an explicit domain or a straightforward company website can supply
-// the company domain. Notes addresses never determine where we guess.
+// Only an explicit domain or an eligible HTTP(S) company website can supply
+// the provisional registrable company domain. Notes addresses never determine where we guess.
 export function resolveDomain(
   explicit: string | null | undefined,
   website: string | null | undefined,
@@ -164,18 +166,57 @@ export function resolveDomain(
   try {
     const url = new URL(website);
     if (url.protocol !== "https:" && url.protocol !== "http:") return null;
-    const host = url.hostname.toLowerCase().replace(/^www\./, "");
+    const parsed = parseDomain(url.hostname, { allowPrivateDomains: true, detectSpecialUse: true });
+    const host = parsed.domain;
+    if (!host || !parsed.isIcann || parsed.isPrivate || parsed.isIp || parsed.isSpecialUse) return null;
     const blocked = new Set([
       "gmail.com", "outlook.com", "yahoo.com", "hotmail.com",
       "linkedin.com", "github.com", "facebook.com", "instagram.com",
       "x.com", "twitter.com", "linktr.ee", "bit.ly", "vercel.app",
       "netlify.app", "wordpress.com", "wixsite.com",
     ]);
-    if (host.split(".").length !== 2 || blocked.has(host) || !/^[a-z0-9-]+\.[a-z]{2,}$/.test(host)) return null;
+    if (blocked.has(host)) return null;
     return host;
   } catch {
     return null;
   }
+}
+
+// Read only names tied to this target: an explicit quoted/parenthetical alias,
+// the opening subject with the same surname, or a subject whose short given
+// name shares at least three opening letters with the supplied one.
+// No nickname dictionary or URL fetching.
+function biographyNames(first: string | undefined, last: string | undefined, notes: string | null | undefined) {
+  const names: { first: string; last: string; context: string }[] = [];
+  if (!first || !notes) return names;
+  const given = cleanPart(first);
+  const familyTokens = (last ?? "").split(/\s+/).filter(Boolean);
+  const family = cleanPart(last);
+  const add = (observed: string, context: string) => {
+    if (cleanPart(observed) !== given && !names.some((name) => cleanPart(name.first) === cleanPart(observed))) {
+      names.push({ first: observed, last: last ?? "", context });
+    }
+  };
+  for (const match of notes.matchAll(/([\p{L}][\p{L}'’-]*)\s+["“(]([\p{L}][\p{L}'’-]*)["”)](?:\s+([\p{Lu}][\p{L}'’-]*(?:\s+[\p{Lu}][\p{L}'’-]*){0,3}))?/gu)) {
+    if (family && match[3] && cleanPart(match[3]) !== family) continue;
+    if (cleanPart(match[1]) === given) add(match[2]!, match[0]);
+    else if (cleanPart(match[2]) === given) add(match[1]!, match[0]);
+  }
+  const text = notes.replace(/^Abbreviated:\s*/i, "");
+  for (const match of text.matchAll(/(?:^|[.!?]\s+|\n+)([\p{Lu}][\p{L}'’-]*(?:\s+[\p{Lu}][\p{L}'’-]*){0,4})\s+(?:is|works|hosts|joined|advises|has)\b/gu)) {
+    const tokens = match[1]!.split(/\s+/);
+    const observed = tokens[0]!;
+    const observedGiven = cleanPart(observed);
+    if (tokens.length === 1 && observedGiven.length >= 3 && given.length >= observedGiven.length && given.slice(0, 3) === observedGiven.slice(0, 3)) {
+      add(observed, match[0].trim());
+    } else if (family && tokens.length > familyTokens.length && cleanPart(tokens.slice(-familyTokens.length).join(" ")) === family) {
+      const fullGiven = tokens.slice(0, -familyTokens.length).join(" ");
+      // A different given name with the same surname must be the opening
+      // subject; later mentions could describe a relative or colleague.
+      if (match.index === 0 || cleanPart(observed) === given) add(fullGiven, match[0].trim());
+    }
+  }
+  return names;
 }
 
 // Full ranked set: notes addresses first by evidence, then name patterns.
@@ -244,6 +285,20 @@ export function rankCandidates(input: {
     context: null,
     score: patternScore(candidate) + (inferred.has(candidate.pattern) ? 20 : 0),
   }));
+  // A short name used in the biography is stronger than the form's given
+  // name. Fuller-name interpretations remain alternatives, below direct names.
+  // ponytail: deterministic English subject cues; explicit name overrides cover other biography styles.
+  for (const name of biographyNames(input.first_name, input.last_name, input.notes)) {
+    patterns.push(...generateCandidates({ first_name: name.first, last_name: name.last, domain }).map((candidate) => ({
+      email: candidate.email,
+      pattern: candidate.pattern,
+      source: "pattern" as const,
+      context: name.context,
+      score: candidate.pattern === "first" && !candidate.nameVariant && cleanPart(name.first).length < cleanPart(input.first_name).length
+        ? PATTERN_BASE.first + 5
+        : patternScore(candidate) - 10,
+    })));
+  }
   // A name variant can spell an address in multiple ways. Keep the strongest
   // name-pattern explanation, while notes and observed handles retain priority.
   ranked.push(...patterns.sort((a, b) => b.score - a.score));
