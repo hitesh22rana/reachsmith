@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createRequire } from "node:module";
 import { isCrossOrigin, isCsrfAttempt } from "../lib/csrf.ts";
 import { DomainSchema, OptionalUrlSchema, TargetPatchSchema } from "../features/targets/validation.ts";
 import { toTargetPatch } from "../features/targets/server.ts";
@@ -21,6 +22,9 @@ import * as v from "valibot";
 
 // Self-check for the security-relevant pure logic. No framework: run with
 //   node --experimental-strip-types --no-warnings scripts/selfcheck.ts
+
+// The private lint compatibility API must not downgrade the project compiler.
+assert.match(createRequire(import.meta.url)("typescript").version, /^7\./, "project compiler remains TypeScript 7");
 
 const HOST = "app.example.com";
 const CROSS = "https://evil.example";

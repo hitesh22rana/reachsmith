@@ -5,7 +5,7 @@
 FROM node:22-bookworm-slim AS deps
 WORKDIR /app
 RUN corepack enable && corepack prepare pnpm@12.6.0 --activate
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .pnpmfile.cjs ./
 RUN pnpm install --frozen-lockfile
 
 FROM node:22-bookworm-slim AS builder
@@ -46,7 +46,7 @@ ENV NODE_ENV=production
 RUN corepack enable && corepack prepare pnpm@12.6.0 --activate && \
     groupadd --system --gid 1001 nodejs && \
     useradd --system --uid 1001 --gid nodejs --create-home nextjs
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .pnpmfile.cjs ./
 COPY --from=deps /app/node_modules ./node_modules
 RUN pnpm prune --prod
 COPY --chown=nextjs:nodejs workers ./workers
