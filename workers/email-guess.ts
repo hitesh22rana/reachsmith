@@ -1,6 +1,6 @@
 import "dotenv/config";
 import { Worker } from "bullmq";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { asUser } from "./db.ts";
 import { emailGuesses, targets } from "../db/schema.ts";
 import { rankCandidates } from "../lib/email-rank.ts";
@@ -14,18 +14,18 @@ function redisConnection() {
   return { url };
 }
 
-const SUGGESTION_LIMIT = 10;
-
 export async function processGuessJob(job: { data: { targetId: string; userId: string } }): Promise<void> {
   // Tenant RLS is scoped by the payload's userId for the whole job. The
-  // target lookup below is by id alone, so this is what keeps it inside one
-  // tenant: a payload naming someone else's target simply matches nothing.
+  // target lookup also checks its owner: a payload naming another tenant's
+  // target simply matches nothing.
   await asUser(job.data.userId, async (db) => {
     const [target] = await db
       .select()
       .from(targets)
-      .where(eq(targets.id, job.data.targetId))
-      .limit(1);
+      .where(and(eq(targets.id, job.data.targetId), eq(targets.userId, job.data.userId)))
+      .limit(1)
+      // Serialize reruns with other jobs and target edits before replacing rows.
+      .for("update");
     if (!target) {
       return;
     }
@@ -39,32 +39,20 @@ export async function processGuessJob(job: { data: { targetId: string; userId: s
       notes: target.notes,
       social_urls: target.socialUrls,
     });
-    if (ranked.length === 0) {
-      return;
-    }
-
-    const existing = await db
-      .select({ email: emailGuesses.email })
-      .from(emailGuesses)
-      .where(eq(emailGuesses.targetId, target.id));
-    const seen = new Set(existing.map((row) => row.email));
-    const fresh = ranked.filter((candidate) => !seen.has(candidate.email));
-    if (fresh.length === 0) {
-      return;
-    }
-
-    const ordered = fresh.slice(0, SUGGESTION_LIMIT);
+    await db.delete(emailGuesses)
+      .where(and(eq(emailGuesses.targetId, target.id), eq(emailGuesses.userId, target.userId)));
+    if (ranked.length === 0) return;
 
     await db
       .insert(emailGuesses)
       .values(
-        ordered.map((candidate, index) => ({
+        ranked.map((candidate, index) => ({
           userId: target.userId,
           targetId: target.id,
           email: candidate.email,
           patternUsed: candidate.pattern,
           source: candidate.source,
-          score: SUGGESTION_LIMIT - index,
+          score: ranked.length - index,
           context: candidate.context,
         })),
       );

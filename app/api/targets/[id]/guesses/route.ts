@@ -32,8 +32,8 @@ export async function GET(_request: NextRequest, context: RouteContext): Promise
       .select()
       .from(emailGuesses)
       .where(and(eq(emailGuesses.targetId, target.id), eq(emailGuesses.userId, userId)))
-      // ~5-20 rows for one target, so no pagination, but they do need a
-      // defined order and created_at cannot give one: the guess worker
+      // Return the complete candidate set for this target in rank order.
+      // created_at cannot give that order: the guess worker
       // inserts a whole ranked batch in one statement, so every candidate
       // shares a transaction timestamp. score is the ranking it computed.
       .orderBy(desc(emailGuesses.score), desc(emailGuesses.createdAt)),
