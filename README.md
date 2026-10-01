@@ -30,7 +30,7 @@ Next.js App Router + TypeScript, Tailwind + shadcn/ui, Drizzle on Postgres, Bett
 
 ## Development toolchain
 
-DevDependencies use explicit `^major.minor.patch` ranges. TypeScript stays on the newest API-compatible release while `typescript-eslint` requires the JavaScript compiler API. TypeScript 7 currently needs [side-by-side aliases](https://devblogs.microsoft.com/typescript/announcing-typescript-7-0/#running-side-by-side-with-typescript-6.0), so it is deferred to preserve the version-range format and working lint checks.
+DevDependencies use explicit `^major.minor.patch` ranges. The project uses TypeScript 7 for `tsc`, type checking, and builds. The latest `typescript-eslint` package family still needs the JavaScript compiler API that TypeScript 7.0 does not expose. `.pnpmfile.cjs` gives only its API-dependent 8.x packages the official [TypeScript 6 compatibility API](https://devblogs.microsoft.com/typescript/announcing-typescript-7-0/#running-side-by-side-with-typescript-6.0) as a private dependency; the project compiler remains TypeScript 7. Remove that hook when native API support lands upstream. This makes the current commands work, without claiming native TypeScript 7 API support in ESLint. The Docker dependency stages copy the hook before installing or pruning.
 
 ESLint 10 uses the official `@eslint/compat` wrapper for Next's existing React/import/accessibility plugins. Remove the wrapper when those plugins support the new rule API. Their current peer ranges still report ESLint compatibility warnings; the repository lint command runs with the wrapper.
 
