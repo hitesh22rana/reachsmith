@@ -2,7 +2,7 @@
 
 ## Status
 
-Execution authorized. The offline runner is available; each completed run saves its results and reproducibility metadata under `runs/`.
+The measured baseline found no improvement from model reranking. Production now uses deterministic ranking. The offline runner evaluates that pipeline by default; `--with-model` enables the historical model comparison. Each completed run saves its results and reproducibility metadata under `runs/`.
 
 ## Objective
 
@@ -68,7 +68,7 @@ The implementation and [email accuracy feature contract](../../features/email-ac
 1. Map form fields to the worker's inputs. Split `social_urls` on newlines, trim entries and discard blank lines. Use [`nameParts()`](../../../lib/target-name.ts) with the full name and any published overrides.
 2. Use [`resolveDomain()` and `rankCandidates()`](../../../lib/email-rank.ts). The explicit domain wins; otherwise only an eligible company website hostname supplies a provisional domain. The current resolver accepts only a two-label hostname after stripping `www`, with blocked hosts excluded. A company name or a social profile alone does not supply a domain.
 3. Generate the six existing name patterns and eligible handle candidates. Notes addresses can also be candidates in production, but the seed bios intentionally contain no answer addresses.
-4. The [`rankWithModel()`](../../../workers/email-rank-model.ts) stage may reorder the generated set. It cannot add missing candidates or repair a wrong domain. A null result uses the deterministic order.
+4. Keep the deterministic order. Production performs no model inference. The historical [`rankWithModel()`](model.ts) experiment can reorder the generated set with `--with-model`; it cannot add missing candidates or repair a wrong domain.
 5. Follow the [`email-guess` worker](../../../workers/email-guess.ts) selection order and top-10 limit. Evaluate fresh cases with no previously stored guesses.
 
 The offline runner evaluates these existing functions. Database import, queue processing and application UI behavior are outside this first accuracy experiment. No SMTP probing or outreach is performed.
@@ -88,11 +88,12 @@ Derive cohort membership and counts from each run's seed file. Field presence do
 ### Compared orders
 
 - Deterministic baseline: the full existing ranked set, then the worker's top-10 truncation.
-- Current pipeline: the same set reranked with the pinned Qwen model, using the current deterministic fallback behavior, then truncated to ten.
+- Current pipeline: the same deterministic order, truncated to ten.
+- Optional historical model comparison (`--with-model`): the same set reranked with the pinned Qwen model, with deterministic fallback, then truncated to ten.
 
 Use identical inputs in both paths. Record when reranking succeeds, falls back or is skipped because no candidates exist. Do not report an all-fallback run as measured model accuracy. If the model cannot be run, report only the deterministic baseline and mark the model comparison unavailable.
 
-The production model session is shared and retains its conversation history. The runner follows that behavior and evaluates cases sequentially in seed-file order; ordering and context retention can affect reproducibility. A `reranked` outcome means the model returned a usable order, which may be identical to the deterministic order.
+The historical model session is shared and retains its conversation history. With `--with-model`, the runner follows that behavior and evaluates cases sequentially in seed-file order; ordering and context retention can affect reproducibility. A `reranked` outcome means the model returned a usable order, which may be identical to the deterministic order.
 
 ### Metrics
 
@@ -108,11 +109,20 @@ Report each metric as a numerator, denominator and percentage. Include overall r
 
 ### Reproducibility and result records
 
-At execution time, record the evaluated Git revision, seed and schema checksums, dataset and cohort sizes, Node version, model revision and quantization, model-file checksum, generation settings and runtime/hardware details. Read the active model configuration from [`workers/email-rank-model.ts`](../../../workers/email-rank-model.ts) rather than maintaining a duplicate configuration in this document.
+At execution time, record the evaluated Git revision, seed and schema checksums, dataset and cohort sizes, Node version, model revision and quantization, model-file checksum, generation settings and runtime/hardware details. For the optional comparison, read the historical model configuration from [`model.ts`](model.ts) rather than maintaining a duplicate configuration in this document.
 
 Save per-case resolved domain and its source, generated candidates, deterministic and pipeline orders, selected top ten, expected-answer ranks, model outcome and any execution error. Expected answers remain scoring data, never prompt data. Future result artifacts should make aggregate metrics reproducible from these records.
 
 The first run is a diagnostic baseline, not a tuning set with a claimed independent test result. If its outcomes guide changes to patterns or ranking, collect a separate holdout from additional organizations before claiming generalization.
+
+## Accuracy improvements to evaluate next
+
+1. **Candidate coverage:** add first-initial plus surname without a separator (`jdoe`), surname-only (`doe`), and first plus surname without a separator (`janedoe`). These are observed omissions in the baseline. Compare full-set coverage and top-10 accuracy separately so adding candidates does not hide truncation losses.
+2. **Domain inputs:** collect independently supported company email domains where a website is absent or differs from the email domain. Keep the original baseline inputs frozen; never fill an evaluation input from its withheld answer.
+3. **Name handling:** review misses involving accents, multiple surnames, initials and published aliases. Use independently observed name overrides; do not guess nicknames from the answer.
+4. **Ranking:** evaluate organization-specific pattern evidence collected independently of the target answer. A larger candidate set alone cannot improve first-choice accuracy. Keep pattern-learning examples separate from scored targets, and test on additional organizations before claiming generalization.
+
+Change one factor at a time and compare against the saved baseline. Candidate generation remains unchanged in the model-removal change.
 
 ## Limitations
 
@@ -126,14 +136,16 @@ The first run is a diagnostic baseline, not a tuning set with a claimed independ
 
 Before execution, calculate and record the current file checksums and cohort counts, verify that all targets pass the existing form validation, IDs and case-insensitive expected addresses are unique, and input Notes contain no email addresses. These checks validate the seed package; they do not measure pipeline accuracy.
 
-Run from the repository root using the installed dependencies and model cache:
+Run from the repository root using the installed dependencies:
 
 ```sh
 node --experimental-strip-types --no-warnings docs/experiments/email-guess-accuracy/run.ts --selfcheck
 node --experimental-strip-types --no-warnings docs/experiments/email-guess-accuracy/run.ts
+# Optional reproduction of the historical model comparison (requires model cache):
+node --experimental-strip-types --no-warnings docs/experiments/email-guess-accuracy/run.ts --with-model
 ```
 
-The self-check exercises answer isolation, exact matching, denominator handling and macro averaging without loading model weights. The full run compares deterministic and model orders using the production functions and creates a new timestamped output directory. Postgres and Redis are not required for this offline experiment.
+The self-check exercises answer isolation, exact matching, denominator handling and macro averaging without loading model weights. The default full run evaluates the deterministic production order without importing the model runtime. The optional comparison evaluates the historical model order and creates a new timestamped output directory. Postgres and Redis are not required for this offline experiment.
 
 Each output directory contains `RESULTS.md` and `results.json`. The JSON includes the frozen input snapshot, generated candidates, selected orders, answer ranks, model outcomes, execution errors and runtime/source checksums. Source breakdowns use the case-ID prefix before the underscore; use the source prefix consistently when adding seeds. Model fallback counts and errors are retained in the report.
 

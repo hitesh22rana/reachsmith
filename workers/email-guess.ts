@@ -3,8 +3,7 @@ import { Worker } from "bullmq";
 import { eq } from "drizzle-orm";
 import { asUser } from "./db.ts";
 import { emailGuesses, targets } from "../db/schema.ts";
-import { rankCandidates, extractHandles } from "../lib/email-rank.ts";
-import { rankWithModel } from "./email-rank-model.ts";
+import { rankCandidates } from "../lib/email-rank.ts";
 import { nameParts } from "../lib/target-name.ts";
 
 function redisConnection() {
@@ -54,23 +53,7 @@ export async function processGuessJob(job: { data: { targetId: string; userId: s
       return;
     }
 
-    // SLM re-rank (backend, baked weights); deterministic order on any failure.
-    const modelOrder = await rankWithModel(
-      { fullName: target.fullName, company: target.company },
-      target.notes,
-      extractHandles(target.socialUrls).map((entry) => entry.handle),
-      fresh.map((candidate, index) => ({
-        id: String(index),
-        email: candidate.email,
-        pattern: candidate.pattern,
-        source: candidate.source,
-      })),
-    );
-    const byId = new Map(fresh.map((candidate, index) => [String(index), candidate]));
-    const ordered = (modelOrder ?? [...byId.keys()])
-      .map((id) => byId.get(id))
-      .filter((candidate) => candidate !== undefined)
-      .slice(0, SUGGESTION_LIMIT);
+    const ordered = fresh.slice(0, SUGGESTION_LIMIT);
 
     await db
       .insert(emailGuesses)
