@@ -1,0 +1,192 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Reachsmith email accuracy seed list",
+  "description": "Local evaluation seed list. Each target mirrors the add/edit form fields. primary_email is the known answer, withheld from the guesser. IDs must be unique. Omit unknown optional fields or use empty strings as the form does. Evidence is evaluation metadata, never guesser input.",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+      "id",
+      "target",
+      "evidence"
+    ],
+    "properties": {
+      "id": {
+        "type": "string",
+        "pattern": "^[a-zA-Z0-9_-]+$",
+        "description": "Stable unique case ID, e.g. person_001."
+      },
+      "target": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "full_name",
+          "primary_email"
+        ],
+        "properties": {
+          "full_name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100,
+            "pattern": "\\S"
+          },
+          "company": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "role_title": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "primary_email": {
+            "type": "string",
+            "format": "email",
+            "maxLength": 254,
+            "pattern": "^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$",
+            "description": "Known work email for this person, used only as the evaluation answer. The evaluator must remove this field before calling the guesser. Unlike the app form, an evaluation case requires a non-empty answer."
+          },
+          "domain": {
+            "anyOf": [
+              {
+                "const": ""
+              },
+              {
+                "type": "string",
+                "maxLength": 253,
+                "pattern": "^(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\\.)+[a-zA-Z]{2,}$",
+                "description": "Explicit company email domain known before seeing the answer. Omit to test website-derived or missing-domain behavior."
+              }
+            ]
+          },
+          "source_type": {
+            "type": "string",
+            "enum": [
+              "linkedin",
+              "github",
+              "website",
+              "manual",
+              "other"
+            ],
+            "default": "manual"
+          },
+          "location": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "company_website": {
+            "anyOf": [
+              {
+                "const": ""
+              },
+              {
+                "type": "string",
+                "format": "uri",
+                "pattern": "^https?://",
+                "maxLength": 2048
+              }
+            ]
+          },
+          "social_urls": {
+            "type": "string",
+            "pattern": "^\\s*(?:https?://\\S+[^\\S\\n]*(?:\\n\\s*https?://\\S+[^\\S\\n]*){0,4})?\\s*$",
+            "description": "Matches the form payload: up to five HTTP(S) profile URLs, one per line. In JSON, encode newlines as \\n. Blank lines are ignored."
+          },
+          "notes": {
+            "type": "string",
+            "maxLength": 2000,
+            "description": "Same Notes field as the form. Keep the known answer and any text revealing it out of notes to avoid answer leakage."
+          },
+          "first_name": {
+            "type": "string",
+            "maxLength": 100,
+            "description": "Edit form only: optional name split override. Blank or omitted uses the full-name split."
+          },
+          "last_name": {
+            "type": "string",
+            "maxLength": 100,
+            "description": "Edit form only: optional name split override. Blank or omitted uses the full-name split."
+          }
+        }
+      },
+      "evidence": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "evidence_type",
+          "checked_on"
+        ],
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "evidence_type": {
+                  "enum": [
+                    "official_directory",
+                    "self_published"
+                  ]
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "source_url"
+              ]
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "evidence_type": {
+                  "enum": [
+                    "direct_confirmation",
+                    "received_reply"
+                  ]
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "evidence_notes"
+              ],
+              "properties": {
+                "evidence_notes": {
+                  "minLength": 1,
+                  "pattern": "\\S"
+                }
+              }
+            }
+          }
+        ],
+        "properties": {
+          "evidence_type": {
+            "type": "string",
+            "enum": [
+              "official_directory",
+              "self_published",
+              "direct_confirmation",
+              "received_reply"
+            ],
+            "description": "Published evidence establishes association, not current deliverability. A saved primary_email alone is insufficient."
+          },
+          "source_url": {
+            "type": "string",
+            "format": "uri",
+            "pattern": "^https?://",
+            "maxLength": 2048
+          },
+          "checked_on": {
+            "type": "string",
+            "format": "date",
+            "description": "Date the evidence was checked, YYYY-MM-DD."
+          },
+          "evidence_notes": {
+            "type": "string",
+            "maxLength": 2000,
+            "description": "Evidence of person-address association, especially for confirmation or replies. Never passed to the model."
+          }
+        }
+      }
+    }
+  }
+}
