@@ -56,7 +56,7 @@ const initialCandidates = rankCandidates({ first_name: "J", last_name: "Smith", 
 assert.equal(initialCandidates.filter((candidate) => candidate.email === "jsmith@acme.com").length, 1, "overlapping initial/full-name patterns yield one suggestion");
 assert.deepEqual(rankCandidates({ first_name: "Cher", domain: "acme.com" }).map((candidate) => candidate.email), ["cher@acme.com"], "missing surname does not invent surname patterns");
 
-// These cases protect the worker-facing name-to-top-ten contract, including
+// These cases protect top-ten ranking quality, independently of list size, including
 // collisions where a weaker surname interpretation previously won deduplication.
 for (const [fullName, email] of [
   ["René Martin", "rene@acme.com"],
