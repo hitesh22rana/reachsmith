@@ -31,7 +31,6 @@ Compared with the [previous pattern expansion](../2026-10-01T14-44-45-258Z/RESUL
 - Domain-macro top-1 increased from 0.56% to 34.70%; domain-macro top-10 increased from 46.53% to 50.64%.
 - This is a tuning result on the inspected diagnostic dataset. The global priorities and new patterns were informed by these same seeds. An independent holdout across additional organizations is required before claiming generalization.
 
-Detailed snapshots, source checksums, candidate orders, and comparison diagnostics are in the adjacent local-only `results.json`, which is ignored by Git. Only this Markdown report is tracked.
 
 ## Overall
 
@@ -262,7 +261,40 @@ Each answer domain receives equal weight. Domains are used for scoring groups on
 
 ## Reproduction
 
-The adjacent local-only `results.json` contains the frozen seed snapshot, source checksums, runtime metadata, full generated candidates and per-case orders/ranks. Results can be recomputed from these case records without rerunning the pipeline.
+Re-run the evaluated Git revision with the recorded input checksums. Only this final report is retained.
+
+```json
+{
+  "started_at": "2026-10-01T15:05:35.691Z",
+  "git_revision": "6587b5097f715dc96e7cea4b23fce0769fe15746",
+  "tracked_changes_at_start": "",
+  "seeds_sha256": "303185feb88e6c0957db9813694ac0731c3d70e6b51dc7d5a8a384dcb5f12066",
+  "schema_sha256": "8718cce220a332740fdb9e6e7dc171e167a67a0fd240565374406766401a4002",
+  "source_sha256": {
+    "lib/email-patterns.ts": "8f452ad2d1126b9bc2e8d93ac267c0a143eb82fc32e3ec1e48b58d3af4c95f0f",
+    "lib/email-rank.ts": "b5b92693d373a3701e5b38107e21b0d35d8765f46c09cb86083f8a747138fd09",
+    "lib/target-name.ts": "e293553a6e911bd623122c215750b2340fbbfe435dc5a792ec9bcccbf7e43106",
+    "workers/email-guess.ts": "483b27a136e9eb452cf288e6ca0330af390947ef7e0ab36b94be48b0e8b435e1",
+    "features/targets/validation.ts": "bfc88d1b9be294440f86375b1f52ef6b67e0d434534df3b72d94ea498f7f1f53",
+    "package.json": "a33c69acd487957b33367f1ce103ad7e03ad867c1fbc1be11d75a83b7b5e9235",
+    "pnpm-lock.yaml": "7958dba45da0c221e4d14eef76e8107f4a90257d64e3124a58c762d0b1b156a8",
+    "docs/experiments/email-guess-accuracy/run.ts": "cf5d98b585a15c57c5113d93544e9e416c9a58265428d31f651675a40ed296dd"
+  },
+  "runtime": {
+    "node": "v25.2.1",
+    "platform": "darwin",
+    "arch": "arm64",
+    "cpu": "Apple M3",
+    "cpu_count": 8,
+    "memory_bytes": 17179869184
+  },
+  "source_grouping": "case ID prefix before underscore",
+  "matching": "trimmed, case-insensitive, exact address",
+  "suggestion_limit": 10,
+  "completed_at": "2026-10-01T15:05:35.737Z",
+  "elapsed_ms": 46
+}
+```
 
 ## Limits
 

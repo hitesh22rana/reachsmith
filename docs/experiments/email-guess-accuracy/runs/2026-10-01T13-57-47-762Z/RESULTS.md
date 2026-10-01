@@ -4,7 +4,7 @@ Completed: 2026-10-01T14:07:57.915Z
 
 Evaluated revision: `cb0c48df24344d8490a3d2fc342dcd27e819acba`
 
-This report retains the deterministic baseline from the original execution. Inference artifacts were removed during cleanup; the original timestamps and source hashes describe that execution, not a new run. Dataset totals and percentages describe this run only.
+This report retains the deterministic baseline from the original execution. Inference artifacts were removed during cleanup; the original timestamps and revision describe that execution, not a new run. Dataset totals and percentages describe this run only.
 
 ## Findings from this run
 
@@ -13,7 +13,7 @@ This report retains the deterministic baseline from the original execution. Infe
 - With a matching domain, 86 published addresses were still absent from the candidate set. Of these, 29 matched first-initial plus surname without a separator, 6 were surname-only, and 1 matched first-name plus surname without a separator. The remaining addresses require further examination of aliases or name handling. These categories are scoring diagnostics only; no candidate patterns were changed.
 - Among cases where the correct address was generated, top-1 accuracy was 5.80%. Both candidate generation and ranking need attention. Adding missing domains to seeds would create a separate input condition; it would not be an improvement to this measured pipeline.
 
-The aggregate scores and domain macro averages were independently recomputed from the saved per-case records and verified. This analysis concerns this completed run; future runs calculate their own sizes and metrics.
+The aggregate scores and domain macro averages were independently recomputed and verified before the report was finalized. This analysis concerns this completed run; future runs calculate their own sizes and metrics.
 
 ## Overall
 
@@ -244,7 +244,40 @@ Each answer domain receives equal weight. Domains are used for scoring groups on
 
 ## Reproduction
 
-The adjacent local-only `results.json` contains the frozen seed snapshot, source checksums, runtime metadata, full generated candidates and per-case orders/ranks. Results can be recomputed from these case records without rerunning the pipeline.
+Re-run the evaluated Git revision with the recorded input checksums. Only this final report is retained.
+
+```json
+{
+  "started_at": "2026-10-01T13:57:47.762Z",
+  "git_revision": "cb0c48df24344d8490a3d2fc342dcd27e819acba",
+  "tracked_changes_at_start": "",
+  "seeds_sha256": "303185feb88e6c0957db9813694ac0731c3d70e6b51dc7d5a8a384dcb5f12066",
+  "schema_sha256": "8718cce220a332740fdb9e6e7dc171e167a67a0fd240565374406766401a4002",
+  "source_sha256": {
+    "lib/email-patterns.ts": "54a3d3cbf7e735fbd66382b5fd5ddeb7aa009593a56b8a79963fb29910434c71",
+    "lib/email-rank.ts": "2a6fddb4458d7037f71562d303565d3242375cfa63bd376838dd4fed990be576",
+    "lib/target-name.ts": "e293553a6e911bd623122c215750b2340fbbfe435dc5a792ec9bcccbf7e43106",
+    "workers/email-guess.ts": "7c24ea4b24efbb0010332dbc30588fdec150a56c9dbfc6cae66804c12a0b27f7",
+    "features/targets/validation.ts": "bfc88d1b9be294440f86375b1f52ef6b67e0d434534df3b72d94ea498f7f1f53",
+    "package.json": "9c9c0965f060723925d67a9e27b6010bbfde65056807c4a89819212df0713b0e",
+    "pnpm-lock.yaml": "676e04fd881c4be700f81242c61a7ce70538c0894066b376b7fe2a9d395e5695",
+    "docs/experiments/email-guess-accuracy/run.ts": "d43345b7c78efefb3b089b429bdcf400e84f64ef979a3701d29953a30949d738"
+  },
+  "runtime": {
+    "node": "v25.2.1",
+    "platform": "darwin",
+    "arch": "arm64",
+    "cpu": "Apple M3",
+    "cpu_count": 8,
+    "memory_bytes": 17179869184
+  },
+  "source_grouping": "case ID prefix before underscore",
+  "matching": "trimmed, case-insensitive, exact address",
+  "suggestion_limit": 10,
+  "completed_at": "2026-10-01T14:07:57.915Z",
+  "elapsed_ms": 610153
+}
+```
 
 ## Limits
 
