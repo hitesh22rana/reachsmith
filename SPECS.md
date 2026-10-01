@@ -274,7 +274,7 @@ Given a target's name and company domain, generate up to ten ranked work-email s
 - Generate the six name patterns: `first.last`, `f.last`, `first`, `first_last`, `last.first`, and `f_last`.
 - Include social-handle candidates and notes addresses only at the resolved company domain.
 - Use `nameParts()` for the same name tokens used in outreach greetings.
-- Rank from notes context, pattern frequency, and other available evidence. Use deterministic ordering and keep every candidate on the company domain. Model reranking is disabled after the accuracy experiment found no improvement.
+- Rank from notes context, pattern frequency, and other available evidence. Use deterministic ordering and keep every candidate on the company domain.
 - Persist the top ten in `email_guesses` with source, pattern, context, and rank in `score`. Do not assign validity or deliverability status.
 
 ### 7.4 User decision
