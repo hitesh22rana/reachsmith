@@ -39,6 +39,23 @@ assert.ok(websiteCandidates.length > 0 && websiteCandidates.every((candidate) =>
 assert.equal(v.safeParse(DomainSchema, "acme..com").success, false);
 assert.equal(v.safeParse(DomainSchema, "-acme.com").success, false);
 
+// Newly supported patterns must be available without answer-bearing notes,
+// and an independently supplied same-domain note keeps its pattern label.
+for (const [email, pattern] of [
+  ["alovelace@acme.com", "flast"],
+  ["lovelace@acme.com", "last"],
+  ["adalovelace@acme.com", "firstlast"],
+]) {
+  const input = { first_name: "Ada", last_name: "Lovelace", domain: "acme.com" };
+  assert.ok(rankCandidates(input).some((candidate) => candidate.email === email), `generates ${email}`);
+  const noted = rankCandidates({ ...input, notes: `My email is ${email}` });
+  assert.equal(noted[0]?.email, email, "direct evidence ranks first");
+  assert.equal(noted[0]?.pattern, pattern, "notes recognize the supported pattern");
+}
+const initialCandidates = rankCandidates({ first_name: "J", last_name: "Smith", domain: "acme.com" });
+assert.equal(initialCandidates.filter((candidate) => candidate.email === "jsmith@acme.com").length, 1, "overlapping initial/full-name patterns yield one suggestion");
+assert.deepEqual(rankCandidates({ first_name: "Cher", domain: "acme.com" }).map((candidate) => candidate.email), ["cher@acme.com"], "missing surname does not invent surname patterns");
+
 // CSRF: only a present-and-foreign Origin is rejected.
 assert.equal(isCrossOrigin(null, HOST), false, "missing Origin allowed (non-browser client)");
 assert.equal(isCrossOrigin(SAME, HOST), false, "same origin allowed");
