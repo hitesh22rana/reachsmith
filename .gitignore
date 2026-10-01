@@ -42,3 +42,6 @@ yarn-error.log*
 next-env.d.ts
 
 .hf-cache/
+
+# Detailed email accuracy snapshots stay local.
+/docs/experiments/email-guess-accuracy/runs/*/results.json
