@@ -4,7 +4,7 @@
 
 ## Experiments
 
-- [Email guess accuracy](experiments/email-guess-accuracy/EXPERIMENT.md): prepared evaluation plan and curated seed data. Not run.
+- [Email guess accuracy](experiments/email-guess-accuracy/EXPERIMENT.md): evaluation plan, curated seeds, offline runner and generated results.
 
 ## Status
 
