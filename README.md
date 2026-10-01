@@ -28,6 +28,12 @@ Next.js App Router + TypeScript, Tailwind + shadcn/ui, Drizzle on Postgres, Bett
 - `node --experimental-strip-types --no-warnings scripts/check-email-worker.ts`: worker persistence check against a migrated local database; creates and cleans up disposable fixtures.
 - [Email guess accuracy](docs/experiments/email-guess-accuracy/EXPERIMENT.md): offline top-k and candidate-coverage evaluation against curated published addresses. Follow `MEMORY.md` for commands, answer isolation, and report retention. No database or Redis is needed for this experiment.
 
+## Development toolchain
+
+DevDependencies use explicit `^major.minor.patch` ranges. TypeScript stays on the newest API-compatible release while `typescript-eslint` requires the JavaScript compiler API. TypeScript 7 currently needs [side-by-side aliases](https://devblogs.microsoft.com/typescript/announcing-typescript-7-0/#running-side-by-side-with-typescript-6.0), so it is deferred to preserve the version-range format and working lint checks.
+
+ESLint 10 uses the official `@eslint/compat` wrapper for Next's existing React/import/accessibility plugins. Remove the wrapper when those plugins support the new rule API. Their current peer ranges still report ESLint compatibility warnings; the repository lint command runs with the wrapper.
+
 ## Code structure
 
 - `app/`: URL routes, API handlers, layouts, and global CSS.
