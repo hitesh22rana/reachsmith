@@ -4,7 +4,7 @@
 
 ## Experiments
 
-- [Email guess accuracy](experiments/email-guess-accuracy/EXPERIMENT.md): prepared evaluation plan and 289-case seed snapshot. Not run.
+- [Email guess accuracy](experiments/email-guess-accuracy/EXPERIMENT.md): prepared evaluation plan and curated seed data. Not run.
 
 ## Status
 
