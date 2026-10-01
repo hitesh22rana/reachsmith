@@ -19,7 +19,7 @@ Build on targets and the email-pipeline feature. SPECS.md sections 7 and 8 are t
 ## Ranking and storage
 
 - Persist the complete deduplicated candidate set per target with email, pattern_used, source, score, and optional context. Higher score means higher selected rank; the worker stores candidate count minus zero-based rank, so scores remain positive for any list size.
-- Only the email-guess BullMQ worker creates suggestion rows. Each run replaces the complete set in one transaction under a target row lock, including clearing stale rows when generation returns nothing. It reloads the target under asUser(userId, ...) and rechecks ownership before writing. Queue payloads carry targetId and userId as scope, not authority.
+- The email-guess worker handler creates suggestion rows, through BullMQ in production or directly from the local demo seed CLI. Each run replaces the complete set in one transaction under a target row lock, including clearing stale rows when generation returns nothing. It reloads the target under asUser(userId, ...) and rechecks ownership before writing. Queue payloads carry targetId and userId as scope, not authority.
 - A target edit that submits name, domain, company website, notes, or social URLs clears old suggestions and enqueues a new search. Unrelated edits leave suggestions alone.
 - GET /api/targets/[id]/guesses is scoped to the session owner and returns only rows matching the currently resolved domain, ordered by score descending.
 - No DNS or SMTP probe, verifier API, email-verify queue, validity status, verification metadata, or automatic primary_email selection is used.
