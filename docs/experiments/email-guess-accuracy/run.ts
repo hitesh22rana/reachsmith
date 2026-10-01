@@ -201,7 +201,7 @@ async function main() {
     "## Source breakdown", ...Object.entries(totals.by_source).map(([source, value]) => `### ${source}\n\n${table(value.baseline, value.pipeline)}`),
     "## Domain diagnostics", ...Object.entries(totals.by_domain_status).map(([status, value]) => `- ${status}: ${value.baseline.total}.`),
     "## Short biographies", table(totals.short_bios.baseline, totals.short_bios.pipeline),
-    "## Reproduction", "The adjacent [results.json](results.json) contains the frozen seed snapshot, source checksums, runtime metadata, full generated candidates and per-case orders/ranks. Results can be recomputed from these case records without rerunning the pipeline.",
+    "## Reproduction", "The adjacent local-only `results.json` contains the frozen seed snapshot, source checksums, runtime metadata, full generated candidates and per-case orders/ranks. Results can be recomputed from these case records without rerunning the pipeline.",
     "## Limits", "This is a diagnostic baseline on published contact directories, not a representative production benchmark or a deliverability check. Website/domain mismatches and missing candidate patterns require domain or candidate-generation changes. Use an independent holdout after tuning.",
   ].join("\n\n") + "\n";
   await writeFile(`${output}/RESULTS.md`, report, { flag: "wx" });
