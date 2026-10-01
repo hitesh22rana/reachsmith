@@ -10,15 +10,15 @@ Measure how often the current email guesser returns a person's published work or
 
 Use real people with independently published answers. Synthetic people cannot establish guessing accuracy because they have no real address to compare against. Published addresses establish person-address association, not current deliverability or employment.
 
-## Files and snapshot
+## Files and seed data
 
 | File | Purpose |
 | --- | --- |
-| [seeds.json](seeds.json) | Curated evaluation cases copied from the local seed database |
+| [seeds.json](seeds.json) | Curated evaluation cases from published sources |
 | [schema.json](schema.json) | JSON Schema for the form-shaped target and withheld evidence |
 | [EXPERIMENT.md](EXPERIMENT.md) | Objective, evaluation plan, source coverage and collection provenance |
 
-This folder is the repository snapshot for the experiment. The original `.local/email-evals/` files remain unchanged and Git-ignored. This snapshot is tracked in Git as requested; it is not an import into the application database. Source provenance and collection methods are documented below.
+This folder keeps the seed data and schema alongside the experiment plan. Source provenance and collection methods are documented below.
 
 The seed list can grow as more qualifying people are found. Calculate dataset sizes, cohort sizes and SHA-256 checksums from the actual files at execution time, and store them in the run results. Freeze the evaluated files for each run so later additions do not change its reported denominator.
 
