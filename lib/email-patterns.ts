@@ -1,4 +1,4 @@
-// Frequency order doubles as priority: first.last wins ties in §7.5.
+// Deterministic priority order; new patterns follow the existing baseline.
 const PATTERNS = [
   "first.last",
   "f.last",
@@ -6,6 +6,9 @@ const PATTERNS = [
   "first_last",
   "last.first",
   "f_last",
+  "flast",
+  "last",
+  "firstlast",
 ] as const;
 
 export type EmailPattern = (typeof PATTERNS)[number];
@@ -21,7 +24,7 @@ export function cleanPart(value: string | undefined): string {
   return (value ?? "").toLowerCase().replace(/[^a-z0-9]/g, "");
 }
 
-// Six SPEC patterns from {first_name, last_name, domain}. Parts needing a
+// Supported name patterns from {first_name, last_name, domain}. Parts needing a
 // missing name are skipped; every emitted address is syntax-checked.
 export function generateCandidates(input: {
   first_name?: string | undefined;
@@ -41,6 +44,9 @@ export function generateCandidates(input: {
     first_last: last ? `${first}_${last}` : null,
     "last.first": last ? `${last}.${first}` : null,
     f_last: last ? `${first[0]}_${last}` : null,
+    flast: last ? `${first[0]}${last}` : null,
+    last: last || null,
+    firstlast: last ? `${first}${last}` : null,
   };
   return PATTERNS.flatMap((pattern) => {
     const part = local[pattern];
