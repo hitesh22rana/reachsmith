@@ -177,8 +177,6 @@ async function main() {
   }
   const totals = summary(cases);
   const completed = new Date();
-  const result = { metadata: { ...metadata, completed_at: completed.toISOString(), elapsed_ms: completed.getTime() - started.getTime() }, seed_snapshot: snapshot, summary: totals, cases };
-  await writeFile(`${output}/results.json`, JSON.stringify(result, null, 2) + "\n", { flag: "wx" });
   const rate = (hit: number, denominator: number) => denominator ? `${(100 * hit / denominator).toFixed(2)}% (${hit}/${denominator})` : "n/a (empty cohort)";
   const table = (base: ReturnType<typeof metrics>, pipeline: ReturnType<typeof metrics>) => [
     "| Metric | Deterministic | Current pipeline |", "| --- | --- | --- |",
@@ -201,7 +199,9 @@ async function main() {
     "## Source breakdown", ...Object.entries(totals.by_source).map(([source, value]) => `### ${source}\n\n${table(value.baseline, value.pipeline)}`),
     "## Domain diagnostics", ...Object.entries(totals.by_domain_status).map(([status, value]) => `- ${status}: ${value.baseline.total}.`),
     "## Short biographies", table(totals.short_bios.baseline, totals.short_bios.pipeline),
-    "## Reproduction", "The adjacent local-only `results.json` contains the frozen seed snapshot, source checksums, runtime metadata, full generated candidates and per-case orders/ranks. Results can be recomputed from these case records without rerunning the pipeline.",
+    "## Reproduction", "Re-run the evaluated Git revision with the recorded input checksums. Only this final report is retained; per-case working data stays in memory.",
+    "```json\n" + JSON.stringify({ ...metadata, completed_at: completed.toISOString(), elapsed_ms: completed.getTime() - started.getTime() }, null, 2) + "\n```",
+    "## Execution errors", ...cases.filter((row) => row.pipeline_error || row.baseline_error).map((row) => `- ${row.id}: ${row.pipeline_error ?? row.baseline_error}`),
     "## Limits", "This is a diagnostic baseline on published contact directories, not a representative production benchmark or a deliverability check. Website/domain mismatches and missing candidate patterns require domain or candidate-generation changes. Use an independent holdout after tuning.",
   ].join("\n\n") + "\n";
   await writeFile(`${output}/RESULTS.md`, report, { flag: "wx" });
