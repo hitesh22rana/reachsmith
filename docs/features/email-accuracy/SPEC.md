@@ -11,10 +11,10 @@ Build on targets and the email-pipeline feature. SPECS.md sections 7 and 8 are t
 ## Domain boundary
 
 1. The explicit target domain wins.
-2. Otherwise derive a provisional domain only from a straightforward HTTP(S) company website hostname. Strip www; reject IPs, localhost, public mailbox providers, social sites, hosted-page domains, link shorteners, and ambiguous subdomains. Do not fetch or scrape the website.
+2. Otherwise derive a provisional registrable domain from an HTTP(S) company website using `tldts` and the Public Suffix List, including company subdomains and multi-label suffixes. Reject IPs, localhost, reserved names, unknown suffixes, public mailbox providers, social sites, hosted/private suffixes, and link shorteners, including their subdomains. A registrable website domain is still provisional and may differ from the email domain. Do not fetch or scrape the website.
 3. Without a trustworthy domain, create no suggestions and ask the owner for the company email domain. Never fall back to Gmail or a notes address.
 4. Include an address found in notes only when its domain exactly matches the resolved company domain. A personal address at another domain remains in notes but is neither a suggestion nor pattern evidence.
-5. The supported name patterns and social-handle candidates use nameParts() and the resolved company domain. Candidates are ranked deterministically.
+5. The supported name patterns and social-handle candidates use nameParts() and the resolved company domain. Candidates are ranked deterministically. Biography Notes can supply observed aliases and fuller names under the constraints in SPECS.md section 7.3; those interpretations do not change greetings or stored names.
 
 ## Ranking and storage
 
