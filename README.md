@@ -21,11 +21,18 @@ Next.js App Router + TypeScript, Tailwind + shadcn/ui, Drizzle on Postgres, Bett
 - `pnpm dev` and, for the email pipeline, `pnpm worker`
 - Production images: `docker compose --profile prod up --build` (migrates, then runs web + worker with deterministic email ranking)
 
+## Local demo data
+
+After signing up locally, run `pnpm db:seed you@example.com` with that account's email. Configure both database roles and apply migrations first. The owner connection finds the account; demo targets, audience presets, templates, and outreach rows are created together under tenant RLS. Existing audience presets are reused. Suggestions use the production worker handler directly, so Redis and a running worker are not required for seeding.
+
+Rerunning preserves existing demo records and the selected primary email, and refreshes the complete suggestion list. New demo addresses use `example.com`. These fictional fixtures are for exploring the app; accuracy evaluations use the separately curated published-address dataset.
+
 ## Checks and experiments
 
 - `pnpm selfcheck`: shared pure-function checks.
 - `pnpm typecheck` and `pnpm lint`: application checks.
 - `node --experimental-strip-types --no-warnings scripts/check-email-worker.ts`: worker persistence check against a migrated local database; creates and cleans up disposable fixtures.
+- `node --experimental-strip-types --no-warnings scripts/check-seed.ts`: demo CLI check for audience reuse, rendered outreach, complete suggestions, reruns, and tenant scope; creates and cleans up disposable fixtures.
 - [Email guess accuracy](docs/experiments/email-guess-accuracy/EXPERIMENT.md): offline top-k and candidate-coverage evaluation against curated published addresses. Follow `MEMORY.md` for commands, answer isolation, and report retention. No database or Redis is needed for this experiment.
 
 ## Development toolchain

@@ -16,7 +16,7 @@ Foundation + Better Auth for session ownership. Independent of targets. Audience
   - `placeholders` is always recomputed server-side from `body` on write; a client-sent `placeholders` is ignored, never trusted.
 - Validation: more than 50 distinct placeholders, or any name failing `PLACEHOLDER_NAME`, returns 400 with the offending name. The check lives in the route, not in the schema: a valibot check carries one static message and cannot name the offender, so a second, vaguer error channel in the schema would only ever win the race. The editor shows the same per-placeholder problems live under the body, which is the better place for them.
 - APIs: `GET/POST /api/templates`, `GET/PATCH/DELETE /api/templates/[id]`, all `user_id`-scoped. `POST`/`PATCH` take `audience` as free text and resolve-or-create the `audiences` row server-side (never a client `audience_id`). `TemplateJsonSchema` gains `audience: v.nullable(v.string())` and `placeholders: v.array(PlaceholderSchema)`. Bodies validated with feature schemas and shared `parseBody` (`lib/validators.ts`), 400 + message on failure; client fetching via TanStack Query.
-- UI: `/templates` list (name, channel, audience, updated_at) + editor (name, channel, audience input with a native `datalist`, purpose, body). Editor renders the detected placeholders as chips under the body and states the rule: lowercase `snake_case` in double braces, up to 50.
+- UI: `/templates` list (name, channel, audience, updated_at) + editor (name, channel, audience input using the shared `Autocomplete`, purpose, body). Editor renders the detected placeholders as chips under the body and states the rule: lowercase `snake_case` in double braces, up to 50.
 
 ## Security
 
@@ -27,7 +27,7 @@ Foundation + Better Auth for session ownership. Independent of targets. Audience
 
 1. `render.ts`: generic `renderTemplate`, `parsePlaceholders`, `TARGET_VAR_NAMES`, name/limit schemas. Unit check in `scripts/selfcheck.ts`: known-var substitution, unknown var left intact, 51 placeholders rejected, bad name rejected.
 2. `placeholders` column + `$type` + `PlaceholderSchema` + recompute on write in `toTemplateInsert`/`toTemplatePatch`, and add it to `toTemplateJson`.
-3. Editor: placeholder chips, the `snake_case` hint, audience input with a native `datalist` against `GET /api/audiences`.
+3. Editor: placeholder chips, the `snake_case` hint, audience input using the shared `Autocomplete` against `GET /api/audiences`.
 4. Docs sync: `SPECS.md` §3.4 and §6.3, `AGENTS.md`, `docs/README.md` drop the four-var list and the `audience_type` enum.
 
 ## Acceptance
