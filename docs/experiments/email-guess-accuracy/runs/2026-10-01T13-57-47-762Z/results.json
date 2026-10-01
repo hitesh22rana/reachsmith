@@ -10,7 +10,6 @@
       "lib/email-rank.ts": "2a6fddb4458d7037f71562d303565d3242375cfa63bd376838dd4fed990be576",
       "lib/target-name.ts": "e293553a6e911bd623122c215750b2340fbbfe435dc5a792ec9bcccbf7e43106",
       "workers/email-guess.ts": "7c24ea4b24efbb0010332dbc30588fdec150a56c9dbfc6cae66804c12a0b27f7",
-      "workers/email-rank-model.ts": "3fe41ba50e02e921fafa37ed871b65e2e31c1ca41122f852443daef87868e660",
       "features/targets/validation.ts": "bfc88d1b9be294440f86375b1f52ef6b67e0d434534df3b72d94ea498f7f1f53",
       "package.json": "9c9c0965f060723925d67a9e27b6010bbfde65056807c4a89819212df0713b0e",
       "pnpm-lock.yaml": "676e04fd881c4be700f81242c61a7ce70538c0894066b376b7fe2a9d395e5695",
@@ -24,19 +23,12 @@
       "cpu_count": 8,
       "memory_bytes": 17179869184
     },
-    "model": {
-      "uri": "hf:Qwen/Qwen2.5-0.5B-Instruct-GGUF/qwen2.5-0.5b-instruct-q4_k_m.gguf#9217f5db79a29953eb74d5343926648285ec7e67",
-      "sha256": "74a4da8c9fdbcd15bd1f6d01d621410d31c6fc00986f5eb687824e7b93d7a9db",
-      "backend": "metal",
-      "system_info": "MTL : EMBED_LIBRARY = 1 | CPU : NEON = 1 | ARM_FMA = 1 | MATMUL_INT8 = 1 | DOTPROD = 1 | ACCELERATE = 1 | REPACK = 1 | ",
-      "configuration_source": "import {\n  getLlama,\n  resolveModelFile,\n  LlamaChatSession,\n  type Llama,\n} from \"node-llama-cpp\";\n\n// Backend rank stage. Output shape is enforced at generation level by a\n// JSON-schema grammar over candidate indices, so unknown IDs are\n// unrepresentable and every response parses. Deterministic order stands\n// on any failure.\n\ninterface RankInput {\n  id: string;\n  email: string;\n  pattern: string;\n  source: string;\n}\n\n// Pinned to the same revision the Dockerfile bakes (MODEL_SHA). Without the\n// `#rev` fragment this resolves against `main`, so a moved tag would change\n// the weights the worker loads.\nconst MODEL_FILE =\n  \"hf:Qwen/Qwen2.5-0.5B-Instruct-GGUF/qwen2.5-0.5b-instruct-q4_k_m.gguf\" +\n  \"#9217f5db79a29953eb74d5343926648285ec7e67\";\nconst MODEL_CACHE = process.env.HF_MODEL_CACHE ?? \"./.hf-cache\";\n\n// One model, one context, one prompt at a time.\n//\n// The old guard held the *resolved* session, which does nothing while the\n// first load is still in flight: the email-guess worker runs at concurrency\n// 5, so five jobs entered here in the same tick, all saw null, and each\n// loaded its own copy of the weights. Five model loads, five contexts, and\n// four of them thrown away, which is what the repeated \"control-looking\n// token\" line at startup was. That line itself is llama.cpp noticing a vocab\n// entry that is named like a special token but is not typed as one; it\n// overrides the type and carries on, so it is the count that is the signal,\n// not the message.\n//\n// Memoizing the promise makes the session shared for real, so the prompts go\n// through one queue too: two jobs prompting on the same context sequence\n// would interleave and overwrite each other's chat history.\nlet llama: Llama | null = null;\nlet session: Promise<LlamaChatSession | null> | null = null;\nlet queue: Promise<unknown> = Promise.resolve();\n\nfunction getSession(): Promise<LlamaChatSession | null> {\n  session ??= (async () => {\n    try {\n      llama = await getLlama();\n      // Second argument is a *directory*. Passing the file path used to make\n      // ensureDir throw EEXIST, the catch below swallowed it, and the rank\n      // stage never ran in the shipped image. The image bakes the file at this\n      // directory, so nothing is fetched at runtime; the `#rev` pin above is\n      // what keeps a local fallback download honest.\n      const modelPath = await resolveModelFile(MODEL_FILE, MODEL_CACHE);\n      const model = await llama?.loadModel({ modelPath });\n      if (!model) {\n        throw new Error(\"Model failed to load\");\n      }\n      const context = await model.createContext();\n      return new LlamaChatSession({ contextSequence: context.getSequence() });\n    } catch (error) {\n      console.error(\"SLM rank stage unavailable, using deterministic order\", error);\n      return null;\n    }\n  })();\n  return session;\n}\n\n// Each call waits for the one before it, and a failure does not stall the\n// chain: the next rank call is still worth attempting.\nfunction serialize<T>(run: () => Promise<T>): Promise<T> {\n  const result = queue.then(run, run);\n  queue = result.then(\n    () => undefined,\n    () => undefined,\n  );\n  return result;\n}\n\nfunction buildPrompt(\n  target: { fullName: string; company: string | null },\n  notes: string | null,\n  handles: string[],\n  candidates: RankInput[],\n): string {\n  const lines = candidates.map(\n    (candidate, index) =>\n      `${index}: ${candidate.email} (${candidate.source}, ${candidate.pattern})`,\n  );\n  return [\n    `Rank these email candidates for ${target.fullName}${target.company ? ` at ${target.company}` : \"\"}, best first.`,\n    `Notes: ${notes || \"none\"}.`,\n    `Usernames this person uses elsewhere: ${handles.length > 0 ? handles.join(\", \") : \"none\"}.`,\n    ...lines,\n    `Reply with JSON {\"order\":[candidate numbers, best first]} using only these numbers: ${candidates.map((_, index) => index).join(\", \")}.`,\n  ].join(\"\\n\");\n}\n\n// Reorder candidate IDs best-first. Returns null when the model is\n// unavailable or its output is unusable; the caller keeps deterministic order.\nexport function rankWithModel(\n  target: { fullName: string; company: string | null },\n  notes: string | null,\n  handles: string[],\n  candidates: RankInput[],\n): Promise<string[] | null> {\n  if (candidates.length === 0) {\n    return Promise.resolve(null);\n  }\n  return serialize(() => rank(target, notes, handles, candidates));\n}\n\nasync function rank(\n  target: { fullName: string; company: string | null },\n  notes: string | null,\n  handles: string[],\n  candidates: RankInput[],\n): Promise<string[] | null> {\n  const active = await getSession();\n  const engine = llama;\n  if (!active || !engine) {\n    return null;\n  }\n  try {\n    const grammar = await engine.createGrammarForJsonSchema({\n      type: \"object\",\n      properties: {\n        order: {\n          type: \"array\",\n          items: { enum: candidates.map((_, index) => index) },\n        },\n      },\n      required: [\"order\"],\n    });\n    const response = await active.prompt(buildPrompt(target, notes, handles, candidates), {\n      grammar,\n      temperature: 0,\n      maxTokens: 200,\n    });\n    const parsed = grammar.parse(response) as { order: number[] };\n    const byIndex = new Map(candidates.map((candidate, index) => [index, candidate.id]));\n    const ranked = [...new Set(parsed.order)]\n      .map((index) => byIndex.get(index))\n      .filter((id): id is string => id !== undefined);\n    if (ranked.length === 0) {\n      return null;\n    }\n    // Omitted candidates keep deterministic positions.\n    const placed = new Set(ranked);\n    return [...ranked, ...candidates.map((c) => c.id).filter((id) => !placed.has(id))];\n  } catch (error) {\n    console.error(\"SLM ranking failed, using deterministic order\", error);\n    return null;\n  }\n}\n",
-      "preparation_error": null
-    },
     "source_grouping": "case ID prefix before underscore",
     "matching": "trimmed, case-insensitive, exact address",
     "suggestion_limit": 10,
     "completed_at": "2026-10-01T14:07:57.915Z",
-    "elapsed_ms": 610153
+    "elapsed_ms": 610153,
+    "retained_results": "Deterministic baseline retained from the original execution; inference artifacts removed during cleanup. Original timestamps and source hashes describe that execution, not a new run."
   },
   "seed_snapshot": [
     {
@@ -6969,11 +6961,6 @@
         "5": 0.35427069199457256,
         "10": 0.35427069199457256
       }
-    },
-    "model_outcomes": {
-      "reranked": 233,
-      "fallback": 0,
-      "skipped": 56
     }
   },
   "cases": [
@@ -7059,11 +7046,8 @@
       "baseline_rank": 4,
       "pipeline_rank": 4,
       "candidate_rank": 4,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 2171.290833
+      "pipeline_error": null
     },
     {
       "id": "w3c_cahlbach",
@@ -7147,11 +7131,8 @@
       "baseline_rank": 4,
       "pipeline_rank": 4,
       "candidate_rank": 4,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 302.0147500000003
+      "pipeline_error": null
     },
     {
       "id": "w3c_remibetin",
@@ -7235,11 +7216,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 322.9832499999993
+      "pipeline_error": null
     },
     {
       "id": "w3c_bbos",
@@ -7323,11 +7301,8 @@
       "baseline_rank": 4,
       "pipeline_rank": 4,
       "candidate_rank": 4,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 345.58258399999977
+      "pipeline_error": null
     },
     {
       "id": "w3c_carine",
@@ -7411,11 +7386,8 @@
       "baseline_rank": 4,
       "pipeline_rank": 4,
       "candidate_rank": 4,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 319.27745799999957
+      "pipeline_error": null
     },
     {
       "id": "w3c_sylvia",
@@ -7499,11 +7471,8 @@
       "baseline_rank": 4,
       "pipeline_rank": 4,
       "candidate_rank": 4,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 635.9669999999996
+      "pipeline_error": null
     },
     {
       "id": "w3c_lcarcone",
@@ -7587,11 +7556,8 @@
       "baseline_rank": 4,
       "pipeline_rank": 4,
       "candidate_rank": 4,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 322.94445799999994
+      "pipeline_error": null
     },
     {
       "id": "w3c_p20n",
@@ -7675,11 +7641,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 409.56804099999954
+      "pipeline_error": null
     },
     {
       "id": "w3c_fd",
@@ -7763,11 +7726,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 602.2202080000006
+      "pipeline_error": null
     },
     {
       "id": "w3c_tamsin",
@@ -7851,11 +7811,8 @@
       "baseline_rank": 4,
       "pipeline_rank": 4,
       "candidate_rank": 4,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 424.9383339999995
+      "pipeline_error": null
     },
     {
       "id": "w3c_mcf",
@@ -7939,11 +7896,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 551.7975420000002
+      "pipeline_error": null
     },
     {
       "id": "w3c_kfranqueiro",
@@ -8027,11 +7981,8 @@
       "baseline_rank": 2,
       "pipeline_rank": 2,
       "candidate_rank": 2,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 555.589582999999
+      "pipeline_error": null
     },
     {
       "id": "w3c_ejfraser",
@@ -8115,11 +8066,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 391.9300409999996
+      "pipeline_error": null
     },
     {
       "id": "w3c_christineg",
@@ -8203,11 +8151,8 @@
       "baseline_rank": 4,
       "pipeline_rank": 4,
       "candidate_rank": 4,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 442.5895840000012
+      "pipeline_error": null
     },
     {
       "id": "w3c_dom",
@@ -8291,11 +8236,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 424.1881250000006
+      "pipeline_error": null
     },
     {
       "id": "w3c_shawn",
@@ -8379,11 +8321,8 @@
       "baseline_rank": 4,
       "pipeline_rank": 4,
       "candidate_rank": 4,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 483.89487499999996
+      "pipeline_error": null
     },
     {
       "id": "w3c_ivan",
@@ -8467,11 +8406,8 @@
       "baseline_rank": 4,
       "pipeline_rank": 4,
       "candidate_rank": 4,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 640.1880830000009
+      "pipeline_error": null
     },
     {
       "id": "w3c_hoschka",
@@ -8555,11 +8491,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 705.2961250000008
+      "pipeline_error": null
     },
     {
       "id": "w3c_chu",
@@ -8643,11 +8576,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 439.9990830000006
+      "pipeline_error": null
     },
     {
       "id": "w3c_rishida",
@@ -8731,11 +8661,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 690.805042
+      "pipeline_error": null
     },
     {
       "id": "w3c_ijacobs",
@@ -8819,11 +8746,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 753.7545829999999
+      "pipeline_error": null
     },
     {
       "id": "w3c_xueyuan",
@@ -8907,11 +8831,8 @@
       "baseline_rank": 4,
       "pipeline_rank": 4,
       "candidate_rank": 4,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 467.91229100000055
+      "pipeline_error": null
     },
     {
       "id": "w3c_kahan",
@@ -8986,11 +8907,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 502.54020800000035
+      "pipeline_error": null
     },
     {
       "id": "w3c_alex",
@@ -9074,11 +8992,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 482.869834000001
+      "pipeline_error": null
     },
     {
       "id": "w3c_vivien",
@@ -9162,11 +9077,8 @@
       "baseline_rank": 4,
       "pipeline_rank": 4,
       "candidate_rank": 4,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 568.7671250000003
+      "pipeline_error": null
     },
     {
       "id": "w3c_ylafon",
@@ -9250,11 +9162,8 @@
       "baseline_rank": 2,
       "pipeline_rank": 2,
       "candidate_rank": 2,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 585.9432919999999
+      "pipeline_error": null
     },
     {
       "id": "w3c_plehegar",
@@ -9338,11 +9247,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 763.5245829999985
+      "pipeline_error": null
     },
     {
       "id": "w3c_angel",
@@ -9426,11 +9332,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 778.398167000003
+      "pipeline_error": null
     },
     {
       "id": "w3c_zhenjie",
@@ -9514,11 +9417,8 @@
       "baseline_rank": 4,
       "pipeline_rank": 4,
       "candidate_rank": 4,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 518.3795000000027
+      "pipeline_error": null
     },
     {
       "id": "w3c_chris",
@@ -9602,11 +9502,8 @@
       "baseline_rank": 4,
       "pipeline_rank": 4,
       "candidate_rank": 4,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 707.2210830000004
+      "pipeline_error": null
     },
     {
       "id": "w3c_coralie",
@@ -9690,11 +9587,8 @@
       "baseline_rank": 4,
       "pipeline_rank": 4,
       "candidate_rank": 4,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 638.3669169999994
+      "pipeline_error": null
     },
     {
       "id": "w3c_dmontalvo",
@@ -9778,11 +9672,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 617.1295420000024
+      "pipeline_error": null
     },
     {
       "id": "w3c_jmurai",
@@ -9866,11 +9757,8 @@
       "baseline_rank": 4,
       "pipeline_rank": 4,
       "candidate_rank": 4,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 890.8612080000021
+      "pipeline_error": null
     },
     {
       "id": "w3c_sonofri",
@@ -9954,11 +9842,8 @@
       "baseline_rank": 4,
       "pipeline_rank": 4,
       "candidate_rank": 4,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 819.3585409999978
+      "pipeline_error": null
     },
     {
       "id": "w3c_gerald",
@@ -10042,11 +9927,8 @@
       "baseline_rank": 4,
       "pipeline_rank": 4,
       "candidate_rank": 4,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 623.5959169999987
+      "pipeline_error": null
     },
     {
       "id": "w3c_dsr",
@@ -10130,11 +10012,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 950.6554590000014
+      "pipeline_error": null
     },
     {
       "id": "w3c_ran",
@@ -10218,11 +10097,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 613.8554579999982
+      "pipeline_error": null
     },
     {
       "id": "w3c_jean_gui",
@@ -10306,11 +10182,8 @@
       "baseline_rank": 2,
       "pipeline_rank": 2,
       "candidate_rank": 2,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 708.6402909999997
+      "pipeline_error": null
     },
     {
       "id": "w3c_makinko",
@@ -10385,11 +10258,8 @@
       "baseline_rank": 3,
       "pipeline_rank": 3,
       "candidate_rank": 3,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 495.4820409999993
+      "pipeline_error": null
     },
     {
       "id": "w3c_himorin",
@@ -10473,11 +10343,8 @@
       "baseline_rank": 4,
       "pipeline_rank": 4,
       "candidate_rank": 4,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 595.5489589999997
+      "pipeline_error": null
     },
     {
       "id": "w3c_tzviya",
@@ -10561,11 +10428,8 @@
       "baseline_rank": 4,
       "pipeline_rank": 4,
       "candidate_rank": 4,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 779.8349170000001
+      "pipeline_error": null
     },
     {
       "id": "w3c_mike",
@@ -10658,11 +10522,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 697.8237079999999
+      "pipeline_error": null
     },
     {
       "id": "w3c_rswick",
@@ -10746,11 +10607,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 873.4185839999991
+      "pipeline_error": null
     },
     {
       "id": "w3c_amy",
@@ -10834,11 +10692,8 @@
       "baseline_rank": 4,
       "pipeline_rank": 4,
       "candidate_rank": 4,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 708.0740000000005
+      "pipeline_error": null
     },
     {
       "id": "w3c_rigo",
@@ -10922,11 +10777,8 @@
       "baseline_rank": 4,
       "pipeline_rank": 4,
       "candidate_rank": 4,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 583.635709000002
+      "pipeline_error": null
     },
     {
       "id": "w3c_twhalen",
@@ -11010,11 +10862,8 @@
       "baseline_rank": 4,
       "pipeline_rank": 4,
       "candidate_rank": 4,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 651.843458000003
+      "pipeline_error": null
     },
     {
       "id": "w3c_kevin",
@@ -11098,11 +10947,8 @@
       "baseline_rank": 4,
       "pipeline_rank": 4,
       "candidate_rank": 4,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 636.4509170000019
+      "pipeline_error": null
     },
     {
       "id": "w3c_xiaoqian",
@@ -11186,11 +11032,8 @@
       "baseline_rank": 4,
       "pipeline_rank": 4,
       "candidate_rank": 4,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 686.5567090000004
+      "pipeline_error": null
     },
     {
       "id": "w3c_xfq",
@@ -11274,11 +11117,8 @@
       "baseline_rank": 2,
       "pipeline_rank": 2,
       "candidate_rank": 2,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 686.5519999999997
+      "pipeline_error": null
     },
     {
       "id": "w3c_naomi",
@@ -11362,11 +11202,8 @@
       "baseline_rank": 4,
       "pipeline_rank": 4,
       "candidate_rank": 4,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 716.7061250000006
+      "pipeline_error": null
     },
     {
       "id": "eff_lisa_wright",
@@ -11396,11 +11233,8 @@
       "baseline_rank": 1,
       "pipeline_rank": 1,
       "candidate_rank": 1,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 345.80570799999987
+      "pipeline_error": null
     },
     {
       "id": "eff_rindala_alajaji",
@@ -11475,11 +11309,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 647.7297909999979
+      "pipeline_error": null
     },
     {
       "id": "eff_veridiana_alimonti",
@@ -11554,11 +11385,8 @@
       "baseline_rank": 1,
       "pipeline_rank": 1,
       "candidate_rank": 1,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 687.1745420000007
+      "pipeline_error": null
     },
     {
       "id": "eff_daly_barnett",
@@ -11633,11 +11461,8 @@
       "baseline_rank": 3,
       "pipeline_rank": 3,
       "candidate_rank": 3,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 658.4363749999975
+      "pipeline_error": null
     },
     {
       "id": "eff_william_budington",
@@ -11712,11 +11537,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 865.4035409999997
+      "pipeline_error": null
     },
     {
       "id": "eff_kim_carlson",
@@ -11791,11 +11613,8 @@
       "baseline_rank": 3,
       "pipeline_rank": 3,
       "candidate_rank": 3,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 635.700625000005
+      "pipeline_error": null
     },
     {
       "id": "eff_lena_cohen",
@@ -11870,11 +11689,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 616.0877909999981
+      "pipeline_error": null
     },
     {
       "id": "eff_paige_collings",
@@ -11949,11 +11765,8 @@
       "baseline_rank": 3,
       "pipeline_rank": 3,
       "candidate_rank": 3,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 696.7091670000009
+      "pipeline_error": null
     },
     {
       "id": "eff_sophia_cope",
@@ -12028,11 +11841,8 @@
       "baseline_rank": 3,
       "pipeline_rank": 3,
       "candidate_rank": 3,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 1010.662166999995
+      "pipeline_error": null
     },
     {
       "id": "eff_keri",
@@ -12107,11 +11917,8 @@
       "baseline_rank": 3,
       "pipeline_rank": 3,
       "candidate_rank": 3,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 678.2276249999995
+      "pipeline_error": null
     },
     {
       "id": "eff_andrew_crocker",
@@ -12186,11 +11993,8 @@
       "baseline_rank": 3,
       "pipeline_rank": 3,
       "candidate_rank": 3,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 991.1079160000008
+      "pipeline_error": null
     },
     {
       "id": "eff_hugh_dandrade",
@@ -12265,11 +12069,8 @@
       "baseline_rank": 3,
       "pipeline_rank": 3,
       "candidate_rank": 3,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 842.5144999999975
+      "pipeline_error": null
     },
     {
       "id": "eff_kelly_esguerra",
@@ -12344,11 +12145,8 @@
       "baseline_rank": 3,
       "pipeline_rank": 3,
       "candidate_rank": 3,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 705.2149580000041
+      "pipeline_error": null
     },
     {
       "id": "eff_elizabeth_lisa_femia",
@@ -12423,11 +12221,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 823.1188330000004
+      "pipeline_error": null
     },
     {
       "id": "eff_cara_gagliano",
@@ -12502,11 +12297,8 @@
       "baseline_rank": 3,
       "pipeline_rank": 3,
       "candidate_rank": 3,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 801.0431669999962
+      "pipeline_error": null
     },
     {
       "id": "eff_eva_galperin",
@@ -12581,11 +12373,8 @@
       "baseline_rank": 3,
       "pipeline_rank": 3,
       "candidate_rank": 3,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 849.2367500000037
+      "pipeline_error": null
     },
     {
       "id": "eff_gennie_gebhart",
@@ -12660,11 +12449,8 @@
       "baseline_rank": 3,
       "pipeline_rank": 3,
       "candidate_rank": 3,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 769.182041
+      "pipeline_error": null
     },
     {
       "id": "eff_will_greenberg",
@@ -12739,11 +12525,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 652.0144579999978
+      "pipeline_error": null
     },
     {
       "id": "eff_david_greene",
@@ -12818,11 +12601,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 1165.8658339999965
+      "pipeline_error": null
     },
     {
       "id": "eff_dr_matthew_guariglia_0",
@@ -12897,11 +12677,8 @@
       "baseline_rank": 3,
       "pipeline_rank": 3,
       "candidate_rank": 3,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 998.9172909999979
+      "pipeline_error": null
     },
     {
       "id": "eff_karen_gullo",
@@ -12976,11 +12753,8 @@
       "baseline_rank": 3,
       "pipeline_rank": 3,
       "candidate_rank": 3,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 1162.5453750000015
+      "pipeline_error": null
     },
     {
       "id": "eff_sarah_hamid",
@@ -13055,11 +12829,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 809.6984579999989
+      "pipeline_error": null
     },
     {
       "id": "eff_tierney_hamilton",
@@ -13134,11 +12905,8 @@
       "baseline_rank": 3,
       "pipeline_rank": 3,
       "candidate_rank": 3,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 856.8797080000004
+      "pipeline_error": null
     },
     {
       "id": "eff_alexis_hancock",
@@ -13213,11 +12981,8 @@
       "baseline_rank": 3,
       "pipeline_rank": 3,
       "candidate_rank": 3,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 1148.1605000000054
+      "pipeline_error": null
     },
     {
       "id": "eff_jacob_hoffman_andrews",
@@ -13292,11 +13057,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 837.5789159999986
+      "pipeline_error": null
     },
     {
       "id": "eff_hudson_hongo",
@@ -13371,11 +13133,8 @@
       "baseline_rank": 3,
       "pipeline_rank": 3,
       "candidate_rank": 3,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 836.9466659999962
+      "pipeline_error": null
     },
     {
       "id": "eff_saira_hussain",
@@ -13450,11 +13209,8 @@
       "baseline_rank": 3,
       "pipeline_rank": 3,
       "candidate_rank": 3,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 1270.4622079999972
+      "pipeline_error": null
     },
     {
       "id": "eff_rebecca_jeschke",
@@ -13529,11 +13285,8 @@
       "baseline_rank": 3,
       "pipeline_rank": 3,
       "candidate_rank": 3,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 1079.542499999996
+      "pipeline_error": null
     },
     {
       "id": "eff_aaron_jue",
@@ -13608,11 +13361,8 @@
       "baseline_rank": 3,
       "pipeline_rank": 3,
       "candidate_rank": 3,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 894.0463339999988
+      "pipeline_error": null
     },
     {
       "id": "eff_maggie_kazmierczak",
@@ -13687,11 +13437,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 820.1245839999974
+      "pipeline_error": null
     },
     {
       "id": "eff_jason_kelley",
@@ -13766,11 +13513,8 @@
       "baseline_rank": 3,
       "pipeline_rank": 3,
       "candidate_rank": 3,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 1111.4670419999966
+      "pipeline_error": null
     },
     {
       "id": "eff_thorin_klosowski_0",
@@ -13845,11 +13589,8 @@
       "baseline_rank": 3,
       "pipeline_rank": 3,
       "candidate_rank": 3,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 30815.225833999997
+      "pipeline_error": null
     },
     {
       "id": "eff_laura_lemus",
@@ -13924,11 +13665,8 @@
       "baseline_rank": 3,
       "pipeline_rank": 3,
       "candidate_rank": 3,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 704.1190829999978
+      "pipeline_error": null
     },
     {
       "id": "eff_beryl_lipton",
@@ -14003,11 +13741,8 @@
       "baseline_rank": 3,
       "pipeline_rank": 3,
       "candidate_rank": 3,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 1033.1592079999973
+      "pipeline_error": null
     },
     {
       "id": "eff_jennifer_lynch",
@@ -14082,11 +13817,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 1236.5291670000006
+      "pipeline_error": null
     },
     {
       "id": "eff_dave_maass",
@@ -14161,11 +13893,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 707.5661249999976
+      "pipeline_error": null
     },
     {
       "id": "eff_aaron_mackey",
@@ -14240,11 +13969,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 876.6718330000003
+      "pipeline_error": null
     },
     {
       "id": "eff_india_mckinney",
@@ -14319,11 +14045,8 @@
       "baseline_rank": 3,
       "pipeline_rank": 3,
       "candidate_rank": 3,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 770.4392499999958
+      "pipeline_error": null
     },
     {
       "id": "eff_corynne_mcsherry",
@@ -14398,11 +14121,8 @@
       "baseline_rank": 3,
       "pipeline_rank": 3,
       "candidate_rank": 3,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 1475.4969159999891
+      "pipeline_error": null
     },
     {
       "id": "eff_alexy_mikhailichenko",
@@ -14477,11 +14197,8 @@
       "baseline_rank": 3,
       "pipeline_rank": 3,
       "candidate_rank": 3,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 748.6090829999885
+      "pipeline_error": null
     },
     {
       "id": "eff_rory_mir",
@@ -14556,11 +14273,8 @@
       "baseline_rank": 3,
       "pipeline_rank": 3,
       "candidate_rank": 3,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 777.4288339999912
+      "pipeline_error": null
     },
     {
       "id": "eff_shirin_mori",
@@ -14635,11 +14349,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 31819.171291000006
+      "pipeline_error": null
     },
     {
       "id": "eff_allison_morris",
@@ -14714,11 +14425,8 @@
       "baseline_rank": 3,
       "pipeline_rank": 3,
       "candidate_rank": 3,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 750.624708000003
+      "pipeline_error": null
     },
     {
       "id": "eff_joe_mullin",
@@ -14793,11 +14501,8 @@
       "baseline_rank": 3,
       "pipeline_rank": 3,
       "candidate_rank": 3,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 805.4903330000234
+      "pipeline_error": null
     },
     {
       "id": "eff_devanshi_nishar",
@@ -14872,11 +14577,8 @@
       "baseline_rank": 3,
       "pipeline_rank": 3,
       "candidate_rank": 3,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 839.6111669999955
+      "pipeline_error": null
     },
     {
       "id": "eff_tori_noble",
@@ -14951,11 +14653,8 @@
       "baseline_rank": 3,
       "pipeline_rank": 3,
       "candidate_rank": 3,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 905.1790000000037
+      "pipeline_error": null
     },
     {
       "id": "eff_haley_pedersen",
@@ -15030,11 +14729,8 @@
       "baseline_rank": 3,
       "pipeline_rank": 3,
       "candidate_rank": 3,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 793.2700830000103
+      "pipeline_error": null
     },
     {
       "id": "eff_erica_portnoy",
@@ -15109,11 +14805,8 @@
       "baseline_rank": 3,
       "pipeline_rank": 3,
       "candidate_rank": 3,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 846.3387499999953
+      "pipeline_error": null
     },
     {
       "id": "eff_cooper_quintin",
@@ -15188,11 +14881,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 1041.9982500000042
+      "pipeline_error": null
     },
     {
       "id": "eff_josh_richman_0",
@@ -15267,11 +14957,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 1240.6452080000017
+      "pipeline_error": null
     },
     {
       "id": "eff_katitza_rodriguez",
@@ -15346,11 +15033,8 @@
       "baseline_rank": 3,
       "pipeline_rank": 3,
       "candidate_rank": 3,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 31733.792125000007
+      "pipeline_error": null
     },
     {
       "id": "eff_sara_romero",
@@ -15425,11 +15109,8 @@
       "baseline_rank": 1,
       "pipeline_rank": 1,
       "candidate_rank": 1,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 728.1435420000053
+      "pipeline_error": null
     },
     {
       "id": "eff_christian_romero_0",
@@ -15504,11 +15185,8 @@
       "baseline_rank": 3,
       "pipeline_rank": 3,
       "candidate_rank": 3,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 737.3709999999846
+      "pipeline_error": null
     },
     {
       "id": "eff_christoph_schmon",
@@ -15583,11 +15261,8 @@
       "baseline_rank": 3,
       "pipeline_rank": 3,
       "candidate_rank": 3,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 1101.2740829999966
+      "pipeline_error": null
     },
     {
       "id": "eff_adam_schwartz",
@@ -15662,11 +15337,8 @@
       "baseline_rank": 3,
       "pipeline_rank": 3,
       "candidate_rank": 3,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 1095.2528750000056
+      "pipeline_error": null
     },
     {
       "id": "eff_david_sobel",
@@ -15741,11 +15413,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 930.8569169999973
+      "pipeline_error": null
     },
     {
       "id": "eff_melissa_srago",
@@ -15820,11 +15489,8 @@
       "baseline_rank": 3,
       "pipeline_rank": 3,
       "candidate_rank": 3,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 805.1868749999849
+      "pipeline_error": null
     },
     {
       "id": "eff_mitch_stoltz",
@@ -15899,11 +15565,8 @@
       "baseline_rank": 3,
       "pipeline_rank": 3,
       "candidate_rank": 3,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 1065.705249999999
+      "pipeline_error": null
     },
     {
       "id": "eff_kenyatta_thomas",
@@ -15978,11 +15641,8 @@
       "baseline_rank": 3,
       "pipeline_rank": 3,
       "candidate_rank": 3,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 987.5674170000129
+      "pipeline_error": null
     },
     {
       "id": "eff_lee_tien",
@@ -16057,11 +15717,8 @@
       "baseline_rank": 3,
       "pipeline_rank": 3,
       "candidate_rank": 3,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 894.8201250000275
+      "pipeline_error": null
     },
     {
       "id": "eff_katharine_trendacosta",
@@ -16136,11 +15793,8 @@
       "baseline_rank": 3,
       "pipeline_rank": 3,
       "candidate_rank": 3,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 31525.882374999986
+      "pipeline_error": null
     },
     {
       "id": "eff_f_mario_trujillo",
@@ -16197,11 +15851,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 675.7856250000186
+      "pipeline_error": null
     },
     {
       "id": "eff_hayley_tsukayama",
@@ -16276,11 +15927,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 970.0555410000088
+      "pipeline_error": null
     },
     {
       "id": "eff_kit_walsh",
@@ -16355,11 +16003,8 @@
       "baseline_rank": 3,
       "pipeline_rank": 3,
       "candidate_rank": 3,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 934.809042000008
+      "pipeline_error": null
     },
     {
       "id": "eff_carlos_wertheman",
@@ -16434,11 +16079,8 @@
       "baseline_rank": 1,
       "pipeline_rank": 1,
       "candidate_rank": 1,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 773.2456660000025
+      "pipeline_error": null
     },
     {
       "id": "eff_jillian_york",
@@ -16513,11 +16155,8 @@
       "baseline_rank": 3,
       "pipeline_rank": 3,
       "candidate_rank": 3,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 1472.8478750000068
+      "pipeline_error": null
     },
     {
       "id": "fsfe_kirschner",
@@ -16601,11 +16240,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 914.8098749999772
+      "pipeline_error": null
     },
     {
       "id": "fsfe_lohmus",
@@ -16680,11 +16316,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 948.2551669999957
+      "pipeline_error": null
     },
     {
       "id": "fsfe_albers",
@@ -16777,11 +16410,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 896.1678339999926
+      "pipeline_error": null
     },
     {
       "id": "fsfe_bakker",
@@ -16865,11 +16495,8 @@
       "baseline_rank": 2,
       "pipeline_rank": 2,
       "candidate_rank": 2,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 970.5078749999811
+      "pipeline_error": null
     },
     {
       "id": "fsfe_diekershoff",
@@ -16944,11 +16571,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 31644.830209000007
+      "pipeline_error": null
     },
     {
       "id": "fsfe_greve",
@@ -17059,11 +16683,8 @@
       "baseline_rank": 4,
       "pipeline_rank": 4,
       "candidate_rank": 4,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 1160.5929159999941
+      "pipeline_error": null
     },
     {
       "id": "fsfe_ku",
@@ -17138,11 +16759,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 771.7568749999919
+      "pipeline_error": null
     },
     {
       "id": "fsfe_lasota",
@@ -17217,11 +16835,8 @@
       "baseline_rank": 1,
       "pipeline_rank": 1,
       "candidate_rank": 1,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 893.3790830000071
+      "pipeline_error": null
     },
     {
       "id": "fsfe_mehl",
@@ -17296,11 +16911,8 @@
       "baseline_rank": 1,
       "pipeline_rank": 1,
       "candidate_rank": 1,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 829.918291000009
+      "pipeline_error": null
     },
     {
       "id": "fsfe_presutti",
@@ -17375,11 +16987,8 @@
       "baseline_rank": 3,
       "pipeline_rank": 3,
       "candidate_rank": 3,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 738.2624579999829
+      "pipeline_error": null
     },
     {
       "id": "fsfe_reiter",
@@ -17463,11 +17072,8 @@
       "baseline_rank": 4,
       "pipeline_rank": 4,
       "candidate_rank": 4,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 964.1237919999985
+      "pipeline_error": null
     },
     {
       "id": "fsfe_rikken",
@@ -17551,11 +17157,8 @@
       "baseline_rank": 1,
       "pipeline_rank": 1,
       "candidate_rank": 1,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 901.3389580000076
+      "pipeline_error": null
     },
     {
       "id": "fsfe_roy",
@@ -17639,11 +17242,8 @@
       "baseline_rank": 2,
       "pipeline_rank": 2,
       "candidate_rank": 2,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 868.477790999983
+      "pipeline_error": null
     },
     {
       "id": "fsfe_sander",
@@ -17718,11 +17318,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 887.1226670000178
+      "pipeline_error": null
     },
     {
       "id": "fsfe_schiessle",
@@ -17815,11 +17412,8 @@
       "baseline_rank": 3,
       "pipeline_rank": 3,
       "candidate_rank": 3,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 1222.7826659999846
+      "pipeline_error": null
     },
     {
       "id": "fsfe_sehn",
@@ -17894,11 +17488,8 @@
       "baseline_rank": 3,
       "pipeline_rank": 3,
       "candidate_rank": 3,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 33685.66683400003
+      "pipeline_error": null
     },
     {
       "id": "ct_kathy_connolly",
@@ -17973,11 +17564,8 @@
       "baseline_rank": 3,
       "pipeline_rank": 3,
       "candidate_rank": 3,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 719.8031670000055
+      "pipeline_error": null
     },
     {
       "id": "ct_caryn_b_davis",
@@ -18052,11 +17640,8 @@
       "baseline_rank": 3,
       "pipeline_rank": 3,
       "candidate_rank": 3,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 737.3921670000418
+      "pipeline_error": null
     },
     {
       "id": "ct_karyl_evans",
@@ -18131,11 +17716,8 @@
       "baseline_rank": 3,
       "pipeline_rank": 3,
       "candidate_rank": 3,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 817.6531660000328
+      "pipeline_error": null
     },
     {
       "id": "ct_sylvia_nichols",
@@ -18210,11 +17792,8 @@
       "baseline_rank": 3,
       "pipeline_rank": 3,
       "candidate_rank": 3,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 757.9499580000411
+      "pipeline_error": null
     },
     {
       "id": "ct_susan_nock",
@@ -18289,11 +17868,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 913.0628750000033
+      "pipeline_error": null
     },
     {
       "id": "afp_sari_mcconnell",
@@ -18377,11 +17953,8 @@
       "baseline_rank": 4,
       "pipeline_rank": 4,
       "candidate_rank": 4,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 966.4884579999489
+      "pipeline_error": null
     },
     {
       "id": "afp_michael_stein",
@@ -18474,11 +18047,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 905.157750000013
+      "pipeline_error": null
     },
     {
       "id": "ibm_sikhar_patranabis",
@@ -18553,11 +18123,8 @@
       "baseline_rank": 1,
       "pipeline_rank": 1,
       "candidate_rank": 1,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 735.7346670000115
+      "pipeline_error": null
     },
     {
       "id": "ieee_mukta_farooq",
@@ -18575,11 +18142,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "skipped",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 0
+      "pipeline_error": null
     },
     {
       "id": "ieee_rajiv_joshi",
@@ -18597,11 +18161,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "skipped",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 0
+      "pipeline_error": null
     },
     {
       "id": "ieee_ioannis_john_kymissis",
@@ -18619,11 +18180,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "skipped",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 0
+      "pipeline_error": null
     },
     {
       "id": "ieee_jesus_del_alamo",
@@ -18641,11 +18199,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "skipped",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 0
+      "pipeline_error": null
     },
     {
       "id": "ieee_shimeng_yu",
@@ -18663,11 +18218,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "skipped",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 0
+      "pipeline_error": null
     },
     {
       "id": "ieee_jiann_shiun_peter_yuan",
@@ -18685,11 +18237,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "skipped",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 0
+      "pipeline_error": null
     },
     {
       "id": "ieee_vikram_l_dalal",
@@ -18707,11 +18256,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "skipped",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 0
+      "pipeline_error": null
     },
     {
       "id": "ieee_patrick_fay",
@@ -18729,11 +18275,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "skipped",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 0
+      "pipeline_error": null
     },
     {
       "id": "ieee_deji_akinwande",
@@ -18751,11 +18294,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "skipped",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 0
+      "pipeline_error": null
     },
     {
       "id": "ieee_kaustav_banerjee",
@@ -18773,11 +18313,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "skipped",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 0
+      "pipeline_error": null
     },
     {
       "id": "ieee_albert_wang",
@@ -18795,11 +18332,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "skipped",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 0
+      "pipeline_error": null
     },
     {
       "id": "ieee_anthony_yen",
@@ -18817,11 +18351,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "skipped",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 0
+      "pipeline_error": null
     },
     {
       "id": "ieee_jamal_deen",
@@ -18839,11 +18370,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "skipped",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 0
+      "pipeline_error": null
     },
     {
       "id": "ieee_joachim_n_burghartz",
@@ -18861,11 +18389,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "skipped",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 0
+      "pipeline_error": null
     },
     {
       "id": "ieee_nazek_el_atab",
@@ -18883,11 +18408,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "skipped",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 0
+      "pipeline_error": null
     },
     {
       "id": "ieee_elena_gnani",
@@ -18905,11 +18427,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "skipped",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 0
+      "pipeline_error": null
     },
     {
       "id": "ieee_tibor_grasser",
@@ -18927,11 +18446,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "skipped",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 0
+      "pipeline_error": null
     },
     {
       "id": "ieee_benjamin_iniguez",
@@ -18949,11 +18465,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "skipped",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 0
+      "pipeline_error": null
     },
     {
       "id": "ieee_lluis_f_marsal",
@@ -18971,11 +18484,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "skipped",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 0
+      "pipeline_error": null
     },
     {
       "id": "ieee_enrique_miranda",
@@ -18993,11 +18503,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "skipped",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 0
+      "pipeline_error": null
     },
     {
       "id": "ieee_arokia_nathan",
@@ -19015,11 +18522,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "skipped",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 0
+      "pipeline_error": null
     },
     {
       "id": "ieee_mikael_ostling",
@@ -19037,11 +18541,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "skipped",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 0
+      "pipeline_error": null
     },
     {
       "id": "ieee_claudio_paoloni",
@@ -19059,11 +18560,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "skipped",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 0
+      "pipeline_error": null
     },
     {
       "id": "ieee_angele_h_m_e_reinders",
@@ -19081,11 +18579,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "skipped",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 0
+      "pipeline_error": null
     },
     {
       "id": "ieee_enrico_sangiorgi",
@@ -19103,11 +18598,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "skipped",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 0
+      "pipeline_error": null
     },
     {
       "id": "ieee_frank_schwierz",
@@ -19125,11 +18617,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "skipped",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 0
+      "pipeline_error": null
     },
     {
       "id": "ieee_radu_sporea",
@@ -19147,11 +18636,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "skipped",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 0
+      "pipeline_error": null
     },
     {
       "id": "ieee_merlyne_de_souza",
@@ -19169,11 +18655,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "skipped",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 0
+      "pipeline_error": null
     },
     {
       "id": "ieee_alba_avila",
@@ -19191,11 +18674,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "skipped",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 0
+      "pipeline_error": null
     },
     {
       "id": "ieee_victor_grimblatt",
@@ -19213,11 +18693,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "skipped",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 0
+      "pipeline_error": null
     },
     {
       "id": "ieee_edmundo_a_gutierrez_d",
@@ -19235,11 +18712,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "skipped",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 0
+      "pipeline_error": null
     },
     {
       "id": "ieee_joao_martino",
@@ -19257,11 +18731,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "skipped",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 0
+      "pipeline_error": null
     },
     {
       "id": "ieee_felix_palumbo",
@@ -19279,11 +18750,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "skipped",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 0
+      "pipeline_error": null
     },
     {
       "id": "ieee_marcelo_pavanello",
@@ -19301,11 +18769,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "skipped",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 0
+      "pipeline_error": null
     },
     {
       "id": "ieee_yang_chai",
@@ -19323,11 +18788,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "skipped",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 0
+      "pipeline_error": null
     },
     {
       "id": "ieee_mansun_j_chan",
@@ -19345,11 +18807,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "skipped",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 0
+      "pipeline_error": null
     },
     {
       "id": "ieee_yogesh_singh_chauhan",
@@ -19367,11 +18826,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "skipped",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 0
+      "pipeline_error": null
     },
     {
       "id": "ieee_steve_s_chung",
@@ -19389,11 +18845,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "skipped",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 0
+      "pipeline_error": null
     },
     {
       "id": "ieee_abhisek_dixit",
@@ -19411,11 +18864,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "skipped",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 0
+      "pipeline_error": null
     },
     {
       "id": "ieee_xiaojun_guo",
@@ -19433,11 +18883,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "skipped",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 0
+      "pipeline_error": null
     },
     {
       "id": "ieee_anisul_haque",
@@ -19455,11 +18902,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "skipped",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 0
+      "pipeline_error": null
     },
     {
       "id": "ieee_tuo_hung_alex_hou",
@@ -19477,11 +18921,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "skipped",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 0
+      "pipeline_error": null
     },
     {
       "id": "ieee_ru_huang",
@@ -19499,11 +18940,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "skipped",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 0
+      "pipeline_error": null
     },
     {
       "id": "ieee_tian_ling_ren",
@@ -19521,11 +18959,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "skipped",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 0
+      "pipeline_error": null
     },
     {
       "id": "ieee_mayank_shrivastava",
@@ -19543,11 +18978,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "skipped",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 0
+      "pipeline_error": null
     },
     {
       "id": "ieee_hei_wong",
@@ -19565,11 +18997,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "skipped",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 0
+      "pipeline_error": null
     },
     {
       "id": "ieee_huaqiang_wu",
@@ -19587,11 +19016,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "skipped",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 0
+      "pipeline_error": null
     },
     {
       "id": "boardsource_marlee_carlos",
@@ -19666,11 +19092,8 @@
       "baseline_rank": 3,
       "pipeline_rank": 3,
       "candidate_rank": 3,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 809.9880000000121
+      "pipeline_error": null
     },
     {
       "id": "boardsource_stephanie_cooper",
@@ -19745,11 +19168,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 750.5779159999802
+      "pipeline_error": null
     },
     {
       "id": "boardsource_aaron_stroman",
@@ -19767,11 +19187,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "skipped",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 0
+      "pipeline_error": null
     },
     {
       "id": "boardsource_brenda_a_frederick",
@@ -19846,11 +19263,8 @@
       "baseline_rank": 3,
       "pipeline_rank": 3,
       "candidate_rank": 3,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 787.9494999999879
+      "pipeline_error": null
     },
     {
       "id": "boardsource_rachel_humphrey",
@@ -19925,11 +19339,8 @@
       "baseline_rank": 3,
       "pipeline_rank": 3,
       "candidate_rank": 3,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 30336.359708000033
+      "pipeline_error": null
     },
     {
       "id": "boardsource_denise_bellows_kumar",
@@ -20004,11 +19415,8 @@
       "baseline_rank": 3,
       "pipeline_rank": 3,
       "candidate_rank": 3,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 775.4624999999651
+      "pipeline_error": null
     },
     {
       "id": "boardsource_chris_lambert",
@@ -20083,11 +19491,8 @@
       "baseline_rank": 3,
       "pipeline_rank": 3,
       "candidate_rank": 3,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 771.2528750000056
+      "pipeline_error": null
     },
     {
       "id": "boardsource_adrienne_selsor",
@@ -20162,11 +19567,8 @@
       "baseline_rank": 3,
       "pipeline_rank": 3,
       "candidate_rank": 3,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 792.9710829999531
+      "pipeline_error": null
     },
     {
       "id": "boardsource_anne_rehkopf_townsend",
@@ -20241,11 +19643,8 @@
       "baseline_rank": 3,
       "pipeline_rank": 3,
       "candidate_rank": 3,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 699.376500000013
+      "pipeline_error": null
     },
     {
       "id": "boardsource_laura_orr",
@@ -20320,11 +19719,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 729.8368330000085
+      "pipeline_error": null
     },
     {
       "id": "boardsource_bill_musick",
@@ -20342,11 +19738,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "skipped",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 0
+      "pipeline_error": null
     },
     {
       "id": "boardsource_carrie_alexander",
@@ -20421,11 +19814,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 800.3811250000144
+      "pipeline_error": null
     },
     {
       "id": "boardsource_camilo_villalpando",
@@ -20500,11 +19890,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 726.6180419999873
+      "pipeline_error": null
     },
     {
       "id": "boardsource_cathy_allen",
@@ -20579,11 +19966,8 @@
       "baseline_rank": 3,
       "pipeline_rank": 3,
       "candidate_rank": 3,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 744.7788329999894
+      "pipeline_error": null
     },
     {
       "id": "boardsource_esther_nolton",
@@ -20658,11 +20042,8 @@
       "baseline_rank": 3,
       "pipeline_rank": 3,
       "candidate_rank": 3,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 775.2050419999869
+      "pipeline_error": null
     },
     {
       "id": "boardsource_erin_gordon",
@@ -20737,11 +20118,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 743.8350409999839
+      "pipeline_error": null
     },
     {
       "id": "boardsource_tim_ducker",
@@ -20816,11 +20194,8 @@
       "baseline_rank": 3,
       "pipeline_rank": 3,
       "candidate_rank": 3,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 753.8631249999744
+      "pipeline_error": null
     },
     {
       "id": "boardsource_jennifer_coscia",
@@ -20895,11 +20270,8 @@
       "baseline_rank": 3,
       "pipeline_rank": 3,
       "candidate_rank": 3,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 30356.89275
+      "pipeline_error": null
     },
     {
       "id": "boardsource_clare_jordan",
@@ -20974,11 +20346,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 731.1728330000187
+      "pipeline_error": null
     },
     {
       "id": "boardsource_claire_gastanaga",
@@ -21053,11 +20422,8 @@
       "baseline_rank": 3,
       "pipeline_rank": 3,
       "candidate_rank": 3,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 759.8089170000167
+      "pipeline_error": null
     },
     {
       "id": "boardsource_erin_hastey",
@@ -21132,11 +20498,8 @@
       "baseline_rank": 3,
       "pipeline_rank": 3,
       "candidate_rank": 3,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 716.8404579999624
+      "pipeline_error": null
     },
     {
       "id": "boardsource_david_sternberg",
@@ -21211,11 +20574,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 760.3993750000373
+      "pipeline_error": null
     },
     {
       "id": "boardsource_deena_margolis",
@@ -21290,11 +20650,8 @@
       "baseline_rank": 3,
       "pipeline_rank": 3,
       "candidate_rank": 3,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 723.1807499999995
+      "pipeline_error": null
     },
     {
       "id": "boardsource_dennis_johnson",
@@ -21369,11 +20726,8 @@
       "baseline_rank": 3,
       "pipeline_rank": 3,
       "candidate_rank": 3,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 731.0790419999976
+      "pipeline_error": null
     },
     {
       "id": "boardsource_diana_marquis",
@@ -21448,11 +20802,8 @@
       "baseline_rank": 3,
       "pipeline_rank": 3,
       "candidate_rank": 3,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 792.793834000011
+      "pipeline_error": null
     },
     {
       "id": "boardsource_debra_forand",
@@ -21527,11 +20878,8 @@
       "baseline_rank": 3,
       "pipeline_rank": 3,
       "candidate_rank": 3,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 759.759458000015
+      "pipeline_error": null
     },
     {
       "id": "boardsource_glenda_hicks",
@@ -21606,11 +20954,8 @@
       "baseline_rank": 3,
       "pipeline_rank": 3,
       "candidate_rank": 3,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 738.5605840000208
+      "pipeline_error": null
     },
     {
       "id": "boardsource_janetta_cravens",
@@ -21685,11 +21030,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 772.806500000006
+      "pipeline_error": null
     },
     {
       "id": "boardsource_jenny_bergman",
@@ -21764,11 +21106,8 @@
       "baseline_rank": 3,
       "pipeline_rank": 3,
       "candidate_rank": 3,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 751.4474170000176
+      "pipeline_error": null
     },
     {
       "id": "boardsource_eddrick_martin",
@@ -21843,11 +21182,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 30280.380082999996
+      "pipeline_error": null
     },
     {
       "id": "boardsource_jenny_carrillo",
@@ -21922,11 +21258,8 @@
       "baseline_rank": 3,
       "pipeline_rank": 3,
       "candidate_rank": 3,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 768.3827499999898
+      "pipeline_error": null
     },
     {
       "id": "boardsource_emily_lavin",
@@ -22001,11 +21334,8 @@
       "baseline_rank": 3,
       "pipeline_rank": 3,
       "candidate_rank": 3,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 737.337583000015
+      "pipeline_error": null
     },
     {
       "id": "boardsource_eric_ewald",
@@ -22080,11 +21410,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 691.844207999995
+      "pipeline_error": null
     },
     {
       "id": "boardsource_josh_kilgas",
@@ -22159,11 +21486,8 @@
       "baseline_rank": 3,
       "pipeline_rank": 3,
       "candidate_rank": 3,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 780.2896249999758
+      "pipeline_error": null
     },
     {
       "id": "boardsource_jason_rae",
@@ -22238,11 +21562,8 @@
       "baseline_rank": 3,
       "pipeline_rank": 3,
       "candidate_rank": 3,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 709.035166000016
+      "pipeline_error": null
     },
     {
       "id": "boardsource_jeff_smith",
@@ -22317,11 +21638,8 @@
       "baseline_rank": 3,
       "pipeline_rank": 3,
       "candidate_rank": 3,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 694.9481249999953
+      "pipeline_error": null
     },
     {
       "id": "boardsource_kerry_pereira_watterson",
@@ -22396,11 +21714,8 @@
       "baseline_rank": 3,
       "pipeline_rank": 3,
       "candidate_rank": 3,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 805.0807500000228
+      "pipeline_error": null
     },
     {
       "id": "boardsource_judy_freiwirth",
@@ -22475,11 +21790,8 @@
       "baseline_rank": 3,
       "pipeline_rank": 3,
       "candidate_rank": 3,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 767.1560000000172
+      "pipeline_error": null
     },
     {
       "id": "boardsource_kim_andrews",
@@ -22554,11 +21866,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 764.6744999999646
+      "pipeline_error": null
     },
     {
       "id": "boardsource_kate_shirah",
@@ -22633,11 +21942,8 @@
       "baseline_rank": 3,
       "pipeline_rank": 3,
       "candidate_rank": 3,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 800.472958999977
+      "pipeline_error": null
     },
     {
       "id": "boardsource_kris_mcrea",
@@ -22712,11 +22018,8 @@
       "baseline_rank": 3,
       "pipeline_rank": 3,
       "candidate_rank": 3,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 750.5774159999564
+      "pipeline_error": null
     },
     {
       "id": "boardsource_kerri_mollard",
@@ -22791,11 +22094,8 @@
       "baseline_rank": 3,
       "pipeline_rank": 3,
       "candidate_rank": 3,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 30343.329999999958
+      "pipeline_error": null
     },
     {
       "id": "boardsource_laura_alexander",
@@ -22870,11 +22170,8 @@
       "baseline_rank": 3,
       "pipeline_rank": 3,
       "candidate_rank": 3,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 784.1447499999776
+      "pipeline_error": null
     },
     {
       "id": "boardsource_linda_jenkins",
@@ -22949,11 +22246,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 711.2481660000049
+      "pipeline_error": null
     },
     {
       "id": "boardsource_lisa_anne_thompson_taylor",
@@ -23028,11 +22322,8 @@
       "baseline_rank": 3,
       "pipeline_rank": 3,
       "candidate_rank": 3,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 750.9423749999842
+      "pipeline_error": null
     },
     {
       "id": "boardsource_lynda_jeffries",
@@ -23107,11 +22398,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 754.5748330000206
+      "pipeline_error": null
     },
     {
       "id": "boardsource_mari_aguirre_rodriguez",
@@ -23186,11 +22474,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 785.5521670000162
+      "pipeline_error": null
     },
     {
       "id": "boardsource_maria_fernandez",
@@ -23265,11 +22550,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 802.9632920000004
+      "pipeline_error": null
     },
     {
       "id": "boardsource_erin_hedges",
@@ -23344,11 +22626,8 @@
       "baseline_rank": 3,
       "pipeline_rank": 3,
       "candidate_rank": 3,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 736.7991250000196
+      "pipeline_error": null
     },
     {
       "id": "boardsource_mark_marion",
@@ -23366,11 +22645,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "skipped",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 0
+      "pipeline_error": null
     },
     {
       "id": "boardsource_marty_martin",
@@ -23445,11 +22721,8 @@
       "baseline_rank": 4,
       "pipeline_rank": 4,
       "candidate_rank": 4,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 741.9646660000435
+      "pipeline_error": null
     },
     {
       "id": "boardsource_mary_dell_hayes",
@@ -23524,11 +22797,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 743.7077500000014
+      "pipeline_error": null
     },
     {
       "id": "boardsource_makiyah_moody",
@@ -23603,11 +22873,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 781.0542920000153
+      "pipeline_error": null
     },
     {
       "id": "boardsource_natasha_dresner",
@@ -23682,11 +22949,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 819.7174159999704
+      "pipeline_error": null
     },
     {
       "id": "boardsource_mary_kay_delvo",
@@ -23761,11 +23025,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 30243.512999999977
+      "pipeline_error": null
     },
     {
       "id": "boardsource_noah_spiegel",
@@ -23840,11 +23101,8 @@
       "baseline_rank": 3,
       "pipeline_rank": 3,
       "candidate_rank": 3,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 707.8760410000104
+      "pipeline_error": null
     },
     {
       "id": "boardsource_olympia_ammon",
@@ -23919,11 +23177,8 @@
       "baseline_rank": 3,
       "pipeline_rank": 3,
       "candidate_rank": 3,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 808.4166669999831
+      "pipeline_error": null
     },
     {
       "id": "boardsource_patricia_mccowan",
@@ -23998,11 +23253,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 784.5401249999995
+      "pipeline_error": null
     },
     {
       "id": "boardsource_rena_henderson_mason",
@@ -24077,11 +23329,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 742.383833000029
+      "pipeline_error": null
     },
     {
       "id": "boardsource_sara_levin",
@@ -24099,11 +23348,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "skipped",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 0
+      "pipeline_error": null
     },
     {
       "id": "boardsource_shari_miles_cohen",
@@ -24178,11 +23424,8 @@
       "baseline_rank": 3,
       "pipeline_rank": 3,
       "candidate_rank": 3,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 760.5215420000022
+      "pipeline_error": null
     },
     {
       "id": "boardsource_sharmila_rao_thakkar",
@@ -24257,11 +23500,8 @@
       "baseline_rank": 3,
       "pipeline_rank": 3,
       "candidate_rank": 3,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 775.3621669999557
+      "pipeline_error": null
     },
     {
       "id": "boardsource_susan_sacks",
@@ -24336,11 +23576,8 @@
       "baseline_rank": 3,
       "pipeline_rank": 3,
       "candidate_rank": 3,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 745.1873340000166
+      "pipeline_error": null
     },
     {
       "id": "boardsource_susan_taylor",
@@ -24358,11 +23595,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "skipped",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 0
+      "pipeline_error": null
     },
     {
       "id": "boardsource_toni_capra",
@@ -24437,11 +23671,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 752.6923329999554
+      "pipeline_error": null
     },
     {
       "id": "boardsource_timothy_figley",
@@ -24516,11 +23747,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 741.7210000000196
+      "pipeline_error": null
     },
     {
       "id": "boardsource_tracy_vanderneck",
@@ -24595,11 +23823,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 737.1752499999711
+      "pipeline_error": null
     },
     {
       "id": "boardsource_vernetta_walker",
@@ -24674,11 +23899,8 @@
       "baseline_rank": 3,
       "pipeline_rank": 3,
       "candidate_rank": 3,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 784.4483330000076
+      "pipeline_error": null
     },
     {
       "id": "boardsource_wendy_biro_pollard",
@@ -24753,11 +23975,8 @@
       "baseline_rank": 3,
       "pipeline_rank": 3,
       "candidate_rank": 3,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 30557.62695799995
+      "pipeline_error": null
     },
     {
       "id": "alliance_anne_symons",
@@ -24832,11 +24051,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 918.2101249999832
+      "pipeline_error": null
     },
     {
       "id": "alliance_annika_borvansky",
@@ -24911,11 +24127,8 @@
       "baseline_rank": 3,
       "pipeline_rank": 3,
       "candidate_rank": 3,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 847.7167909999844
+      "pipeline_error": null
     },
     {
       "id": "boardsource_wendy_jeffries",
@@ -24990,11 +24203,8 @@
       "baseline_rank": 3,
       "pipeline_rank": 3,
       "candidate_rank": 3,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 776.8151669999352
+      "pipeline_error": null
     },
     {
       "id": "alliance_alexander_miceli",
@@ -25069,11 +24279,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 901.4260419999482
+      "pipeline_error": null
     },
     {
       "id": "alliance_carlye_armstrong",
@@ -25148,11 +24355,8 @@
       "baseline_rank": 3,
       "pipeline_rank": 3,
       "candidate_rank": 3,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 830.5821249999572
+      "pipeline_error": null
     },
     {
       "id": "alliance_alexandra_howson",
@@ -25236,11 +24440,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 917.9291250000242
+      "pipeline_error": null
     },
     {
       "id": "alliance_christine_welniak",
@@ -25258,11 +24459,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "skipped",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 0
+      "pipeline_error": null
     },
     {
       "id": "alliance_andrew_bowser",
@@ -25280,11 +24478,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "skipped",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 0
+      "pipeline_error": null
     },
     {
       "id": "cooley_mischi_a_marca",
@@ -25359,11 +24554,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 800.0915409999434
+      "pipeline_error": null
     },
     {
       "id": "alliance_anita_misra_press",
@@ -25381,11 +24573,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "skipped",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 0
+      "pipeline_error": null
     },
     {
       "id": "cooley_etenish_abebe",
@@ -25460,11 +24649,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 771.4317090000259
+      "pipeline_error": null
     },
     {
       "id": "cooley_mateus_kaba_aboud",
@@ -25539,11 +24725,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 757.7805420000805
+      "pipeline_error": null
     },
     {
       "id": "cooley_stephen_abreu",
@@ -25618,11 +24801,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 872.6149170000572
+      "pipeline_error": null
     },
     {
       "id": "cooley_sarah_ackohen",
@@ -25697,11 +24877,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 30610.52466700005
+      "pipeline_error": null
     },
     {
       "id": "fenwick_gregory_p_adams",
@@ -25776,11 +24953,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 870.8634999999776
+      "pipeline_error": null
     },
     {
       "id": "cooley_peter_adams",
@@ -25855,11 +25029,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 649.6900840000017
+      "pipeline_error": null
     },
     {
       "id": "cooley_isha_agarwal",
@@ -25934,11 +25105,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 726.8069169999799
+      "pipeline_error": null
     },
     {
       "id": "fenwick_rosan_l_agbajoh",
@@ -26013,11 +25181,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 938.3205000000307
+      "pipeline_error": null
     },
     {
       "id": "fenwick_irene_aguirre",
@@ -26092,11 +25257,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 850.6025420000078
+      "pipeline_error": null
     },
     {
       "id": "fenwick_payam_ahmadi",
@@ -26171,11 +25333,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 927.2272920000833
+      "pipeline_error": null
     },
     {
       "id": "cooley_jamin_agosti",
@@ -26250,11 +25409,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 735.9084169999696
+      "pipeline_error": null
     },
     {
       "id": "fenwick_andrew_t_albertson",
@@ -26329,11 +25485,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 952.310749999946
+      "pipeline_error": null
     },
     {
       "id": "cooley_vanessa_agudelo",
@@ -26408,11 +25561,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 834.1343750000233
+      "pipeline_error": null
     },
     {
       "id": "orrick_ali_abugheida",
@@ -26487,11 +25637,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 919.9719170000171
+      "pipeline_error": null
     },
     {
       "id": "orrick_joseph_adamson",
@@ -26566,11 +25713,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 31539.397457999992
+      "pipeline_error": null
     },
     {
       "id": "orrick_jesse_paul_albani",
@@ -26645,11 +25789,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 857.0200419999892
+      "pipeline_error": null
     },
     {
       "id": "orrick_neetu_ahlawat",
@@ -26724,11 +25865,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 952.1785829999717
+      "pipeline_error": null
     },
     {
       "id": "orrick_vedika_ahlgren",
@@ -26803,11 +25941,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 920.9147920000833
+      "pipeline_error": null
     },
     {
       "id": "orrick_adetola_tola_ajayi",
@@ -26882,11 +26017,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 869.7577919999603
+      "pipeline_error": null
     },
     {
       "id": "alliance_claudia_prahst",
@@ -26904,11 +26036,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "skipped",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 0
+      "pipeline_error": null
     },
     {
       "id": "orrick_helen_aki",
@@ -26983,11 +26112,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 954.1500830000732
+      "pipeline_error": null
     },
     {
       "id": "alliance_sarah_porter",
@@ -27062,11 +26188,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 902.6398339999141
+      "pipeline_error": null
     },
     {
       "id": "orrick_dawit_aklilu",
@@ -27141,11 +26264,8 @@
       "baseline_rank": null,
       "pipeline_rank": null,
       "candidate_rank": null,
-      "model_outcome": "reranked",
-      "fallback_reason": null,
       "baseline_error": null,
-      "pipeline_error": null,
-      "model_ms": 861.2066669999622
+      "pipeline_error": null
     }
   ]
 }

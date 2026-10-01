@@ -4,12 +4,11 @@ Completed: 2026-10-01T14:07:57.915Z
 
 Evaluated revision: `cb0c48df24344d8490a3d2fc342dcd27e819acba`
 
-This is a generated run report. Dataset totals and percentages describe this run only.
+This report retains the deterministic baseline from the original execution. Inference artifacts were removed during cleanup; the original timestamps and source hashes describe that execution, not a new run. Dataset totals and percentages describe this run only.
 
 ## Findings from this run
 
-- The model returned valid orders for the cases with suggestions, with no fallbacks or execution errors. Every selected order was identical to the deterministic order, so the model produced no ranking improvement in this run. A successful model call does not establish a changed or better ranking.
-- The correct published address entered the candidate set in 47.75% of cases. Reranking alone cannot raise top-10 accuracy above that candidate coverage on these inputs.
+- The correct published address entered the candidate set in 47.75% of cases. Ranking alone cannot raise top-10 accuracy above that candidate coverage on these inputs.
 - Missing or rejected domain inputs prevented suggestions in 56 cases. In another 9 cases, the resolved website domain differed from the published email domain. These remain in the overall denominator.
 - With a matching domain, 86 published addresses were still absent from the candidate set. Of these, 29 matched first-initial plus surname without a separator, 6 were surname-only, and 1 matched first-name plus surname without a separator. The remaining addresses require further examination of aliases or name handling. These categories are scoring diagnostics only; no candidate patterns were changed.
 - Among cases where the correct address was generated, top-1 accuracy was 5.80%. Both candidate generation and ranking need attention. Adding missing domains to seeds would create a separate input condition; it would not be an improvement to this measured pipeline.
@@ -27,9 +26,7 @@ The aggregate scores and domain macro averages were independently recomputed fro
 | Candidate coverage | 47.75% (138/289) | 47.75% (138/289) |
 | Suggestion coverage | 80.62% (233/289) | 80.62% (233/289) |
 
-Model outcomes: {"reranked":233,"fallback":0,"skipped":56}. Baseline errors: 0; pipeline errors: 0.
 
-The current-pipeline column includes successful reranks and any production fallback cases.
 
 ## Input cohorts
 
@@ -247,8 +244,8 @@ Each answer domain receives equal weight. Domains are used for scoring groups on
 
 ## Reproduction
 
-The adjacent [results.json](results.json) contains the frozen seed snapshot, source/model checksums, runtime metadata, full generated candidates and per-case orders/ranks. Results can be recomputed from these case records without running the model again.
+The adjacent [results.json](results.json) contains the frozen seed snapshot, source checksums, runtime metadata, full generated candidates and per-case orders/ranks. Results can be recomputed from these case records without rerunning the pipeline.
 
 ## Limits
 
-This is a diagnostic baseline on published contact directories, not a representative production benchmark or a deliverability check. Website/domain mismatches and missing candidate patterns cannot be repaired by reranking. Use an independent holdout after tuning.
+This is a diagnostic baseline on published contact directories, not a representative production benchmark or a deliverability check. Website/domain mismatches and missing candidate patterns require domain or candidate-generation changes. Use an independent holdout after tuning.

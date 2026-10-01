@@ -2,7 +2,7 @@
 
 ## Status
 
-The measured baseline found no improvement from model reranking. Production now uses deterministic ranking. The offline runner evaluates that pipeline by default; `--with-model` enables the historical model comparison. Each completed run saves its results and reproducibility metadata under `runs/`.
+Production and the offline runner use deterministic ranking. Each completed run saves its results and reproducibility metadata under `runs/`.
 
 ## Objective
 
@@ -51,11 +51,11 @@ The sampled sources are not exhaustive. AAF and the San Diego Regional Chamber w
 
 Each seed has three fields:
 
-- `id`: stable evaluation case ID, never model context.
+- `id`: stable evaluation case ID, never pipeline input.
 - `target`: fields matching the current add/edit target form. `full_name` is the name input; `first_name` and `last_name` are optional edit-only overrides. `social_urls` is newline-separated text, not an array.
 - `evidence`: source URL, evidence type, inspection date and optional collection notes. `official_directory` describes where the answer was published; it is not a value the guesser is expected to return.
 
-`target.primary_email` is the expected answer. Before generating or reranking anything, remove `primary_email` and exclude the entire `evidence` object and case ID. Pass only the normal pipeline inputs. Never infer input domains, websites or name overrides from the withheld answer. Do not fetch source pages during evaluation, since they contain the answers.
+`target.primary_email` is the expected answer. Before generating anything, remove `primary_email` and exclude the entire `evidence` object and case ID. Pass only the normal pipeline inputs. Never infer input domains, websites or name overrides from the withheld answer. Do not fetch source pages during evaluation, since they contain the answers.
 
 Biographies contain no email addresses. Real social usernames and company website links remain legitimate form inputs. A username that resembles the answer is an observed signal, not a reason to manufacture or remove that input.
 
@@ -68,7 +68,7 @@ The implementation and [email accuracy feature contract](../../features/email-ac
 1. Map form fields to the worker's inputs. Split `social_urls` on newlines, trim entries and discard blank lines. Use [`nameParts()`](../../../lib/target-name.ts) with the full name and any published overrides.
 2. Use [`resolveDomain()` and `rankCandidates()`](../../../lib/email-rank.ts). The explicit domain wins; otherwise only an eligible company website hostname supplies a provisional domain. The current resolver accepts only a two-label hostname after stripping `www`, with blocked hosts excluded. A company name or a social profile alone does not supply a domain.
 3. Generate the six existing name patterns and eligible handle candidates. Notes addresses can also be candidates in production, but the seed bios intentionally contain no answer addresses.
-4. Keep the deterministic order. Production performs no model inference. The historical [`rankWithModel()`](model.ts) experiment can reorder the generated set with `--with-model`; it cannot add missing candidates or repair a wrong domain.
+4. Keep the deterministic order.
 5. Follow the [`email-guess` worker](../../../workers/email-guess.ts) selection order and top-10 limit. Evaluate fresh cases with no previously stored guesses.
 
 The offline runner evaluates these existing functions. Database import, queue processing and application UI behavior are outside this first accuracy experiment. No SMTP probing or outreach is performed.
@@ -85,33 +85,28 @@ The offline runner evaluates these existing functions. Database import, queue pr
 
 Derive cohort membership and counts from each run's seed file. Field presence does not establish successful domain resolution: the resolver may reject a supplied website, or accept a website domain that differs from the person's published email domain. Record rejected/missing domains and resolved-domain mismatches separately after execution. Preserve those cases in the overall denominator.
 
-### Compared orders
+### Selected order
 
-- Deterministic baseline: the full existing ranked set, then the worker's top-10 truncation.
-- Current pipeline: the same deterministic order, truncated to ten.
-- Optional historical model comparison (`--with-model`): the same set reranked with the pinned Qwen model, with deterministic fallback, then truncated to ten.
-
-Use identical inputs in both paths. Record when reranking succeeds, falls back or is skipped because no candidates exist. Do not report an all-fallback run as measured model accuracy. If the model cannot be run, report only the deterministic baseline and mark the model comparison unavailable.
-
-The historical model session is shared and retains its conversation history. With `--with-model`, the runner follows that behavior and evaluates cases sequentially in seed-file order; ordering and context retention can affect reproducibility. A `reranked` outcome means the model returned a usable order, which may be identical to the deterministic order.
+Evaluate the full deterministically ranked candidate set, then apply the worker's top-10 truncation. Keep the saved baseline as the comparison for later candidate-generation and ranking changes. The existing result format retains deterministic and pipeline columns, which currently use the same order.
 
 ### Metrics
 
 Compare trimmed, case-insensitive email strings. Do not merge dots, plus tags, aliases or different domains. The seed's selected published address is the only accepted label, so an alternative valid alias can still count as a miss.
 
 - **Top-k accuracy**, for `k = 1, 3, 5, 10`: cases with the expected address in the first `k` unique suggestions divided by cases in the reported cohort. Short lists are used as-is; empty lists are misses.
-- **Candidate coverage**: cases whose expected address appears anywhere in the full generated set before reranking or truncation, divided by cases in the reported cohort. This is the ceiling a reranker can achieve on that set.
+- **Candidate coverage**: cases whose expected address appears anywhere in the full generated set before truncation, divided by cases in the reported cohort. This is the accuracy ceiling achievable by ranking that set.
 - **Suggestion coverage**: cases producing at least one suggestion divided by cases in the reported cohort.
 - **Ranking accuracy conditional on candidate coverage**: top-k hits divided by cases where the expected address was generated. Report this alongside overall accuracy, not in place of it.
-- **Model fallback and execution errors**: counts and reasons. Never silently remove failed cases or treat a crashed case as successful abstention; report failures explicitly and retain them as non-hits in overall counts.
+- **Execution errors**: counts and reasons. Never silently remove failed cases or treat a crashed case as successful abstention; report failures explicitly and retain them as non-hits in overall counts.
 
 Report each metric as a numerator, denominator and percentage. Include overall results, each input cohort and each source. Also report a macro average across published email domains to reduce domination by large organizations; this uses answer domains only for scoring groups, never as guesser inputs, and is a proxy for organization balance rather than an exact company count. Known company labels can support additional breakdowns, with missing labels reported explicitly.
 
 ### Reproducibility and result records
 
-At execution time, record the evaluated Git revision, seed and schema checksums, dataset and cohort sizes, Node version, model revision and quantization, model-file checksum, generation settings and runtime/hardware details. For the optional comparison, read the historical model configuration from [`model.ts`](model.ts) rather than maintaining a duplicate configuration in this document.
+At execution time, record the evaluated Git revision, seed and schema checksums, dataset and cohort sizes, source checksums, Node version and runtime/hardware details.
 
-Save per-case resolved domain and its source, generated candidates, deterministic and pipeline orders, selected top ten, expected-answer ranks, model outcome and any execution error. Expected answers remain scoring data, never prompt data. Future result artifacts should make aggregate metrics reproducible from these records.
+Save per-case resolved domain and its source, generated candidates, selected top ten, expected-answer ranks and any execution error. Expected answers remain scoring data, never pipeline input. Result artifacts make aggregate metrics reproducible from these records.
+
 
 The first run is a diagnostic baseline, not a tuning set with a claimed independent test result. If its outcomes guide changes to patterns or ranking, collect a separate holdout from additional organizations before claiming generalization.
 
@@ -122,7 +117,7 @@ The first run is a diagnostic baseline, not a tuning set with a claimed independ
 3. **Name handling:** review misses involving accents, multiple surnames, initials and published aliases. Use independently observed name overrides; do not guess nicknames from the answer.
 4. **Ranking:** evaluate organization-specific pattern evidence collected independently of the target answer. A larger candidate set alone cannot improve first-choice accuracy. Keep pattern-learning examples separate from scored targets, and test on additional organizations before claiming generalization.
 
-Change one factor at a time and compare against the saved baseline. Candidate generation remains unchanged in the model-removal change.
+Change one factor at a time and compare against the saved baseline. Candidate generation remains unchanged in this cleanup.
 
 ## Limitations
 
@@ -141,13 +136,12 @@ Run from the repository root using the installed dependencies:
 ```sh
 node --experimental-strip-types --no-warnings docs/experiments/email-guess-accuracy/run.ts --selfcheck
 node --experimental-strip-types --no-warnings docs/experiments/email-guess-accuracy/run.ts
-# Optional reproduction of the historical model comparison (requires model cache):
-node --experimental-strip-types --no-warnings docs/experiments/email-guess-accuracy/run.ts --with-model
 ```
 
-The self-check exercises answer isolation, exact matching, denominator handling and macro averaging without loading model weights. The default full run evaluates the deterministic production order without importing the model runtime. The optional comparison evaluates the historical model order and creates a new timestamped output directory. Postgres and Redis are not required for this offline experiment.
+The self-check exercises answer isolation, exact matching, denominator handling and macro averaging. The full run evaluates the deterministic production order and creates a new timestamped output directory. Postgres and Redis are not required for this offline experiment.
 
-Each output directory contains `RESULTS.md` and `results.json`. The JSON includes the frozen input snapshot, generated candidates, selected orders, answer ranks, model outcomes, execution errors and runtime/source checksums. Source breakdowns use the case-ID prefix before the underscore; use the source prefix consistently when adding seeds. Model fallback counts and errors are retained in the report.
+Each output directory contains `RESULTS.md` and `results.json`. The JSON includes the frozen input snapshot, generated candidates, selected orders, answer ranks, execution errors and runtime/source checksums. Source breakdowns use the case-ID prefix before the underscore; use the source prefix consistently when adding seeds. Execution errors are retained in the report.
+
 
 ## Collection methods and provenance
 

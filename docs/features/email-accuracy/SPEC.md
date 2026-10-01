@@ -14,7 +14,7 @@ Build on targets and the email-pipeline feature. SPECS.md sections 7 and 8 are t
 2. Otherwise derive a provisional domain only from a straightforward HTTP(S) company website hostname. Strip www; reject IPs, localhost, public mailbox providers, social sites, hosted-page domains, link shorteners, and ambiguous subdomains. Do not fetch or scrape the website.
 3. Without a trustworthy domain, create no suggestions and ask the owner for the company email domain. Never fall back to Gmail or a notes address.
 4. Include an address found in notes only when its domain exactly matches the resolved company domain. A personal address at another domain remains in notes but is neither a suggestion nor pattern evidence.
-5. The six name patterns and social-handle candidates use nameParts() and the resolved company domain. Candidates are ranked deterministically, with no model inference.
+5. The six name patterns and social-handle candidates use nameParts() and the resolved company domain. Candidates are ranked deterministically.
 
 ## Ranking and storage
 
