@@ -7,7 +7,7 @@ ReachSmith is a personal outreach and contact engine focused on job hunting, ref
 - Collect and organize target contacts (recruiters, HRs, employees, hiring managers).
 - Store manually entered contact details and public profile references.
 - Generate personalized outreach messages from reusable templates.
-- Suggest likely work email addresses from names, domains, and context without claiming verification.
+- Suggest likely work email addresses from names, domains, and context with optional Emailable deliverability checks, without claiming person ownership.
 - Track outreach status, follow-ups, and outcomes over time.
 
 The core MVP is implemented in a private GitHub repository. Hosted service operations and integrations remain future work.
@@ -24,7 +24,7 @@ The core MVP is implemented in a private GitHub repository. Hosted service opera
   - Have a single place to track who they reached out to and what happened.
 - Implement an asynchronous pipeline to:
   - Generate likely email candidates from known patterns.
-  - Rank likely work email addresses without an external verifier.
+  - Rank likely work email addresses and optionally check deliverability with Emailable.
 - Provide a clean, responsive UI with good defaults, using shadcn/ui and open-source components.
 - Use Next.js as both frontend and backend, and Postgres with tenant row-level security.
 
@@ -67,7 +67,7 @@ User can:
 - ReachSmith:
   - Generates a small set of candidate emails using common patterns.
   - Ranks the complete deduplicated company-domain candidate set using notes, patterns, and social handles.
-  - Labels suggestions as unverified and lets the user copy or manually save an address for outreach.
+  - Labels unchecked guesses and provider results distinctly, and lets the user copy or manually save an address for outreach.
 
 ### 3.4 Outreach template management
 
@@ -126,7 +126,7 @@ For a selected contact:
 - **ORM**: Drizzle (for schema, migrations, and type-safe access).
 - **Styling/UI**: Tailwind CSS + shadcn/ui components.
 - **Background jobs**: BullMQ + Redis (e.g., Upstash or any hosted Redis).
-- **Email suggestions**: BullMQ worker with deterministic ranking; no external verifier.
+- **Email suggestions**: BullMQ workers with deterministic ranking and optional Emailable batch checks.
 - **Auth**: Better Auth with email/password.
 - **Validation**: Valibot with feature-owned schemas shared between forms and API routes; forms via react-hook-form + Valibot resolver.
 - **Client data**: TanStack Query; server components fetch directly.
@@ -184,6 +184,9 @@ Represents a target contact (recruiter, HR, employee, etc.).
 - `social_urls` (nullable text array of profile/reference URLs; forms accept up to five, one per line)
 - `location` (nullable)
 - `extra_enrichment` (nullable JSON, reserved; not populated by an MVP enrichment worker)
+- `email_generation` (generation ID, status, input fingerprint, generated domain)
+- `email_check` (confirmed address snapshot, remaining addresses, batch progress)
+- `email_verifications` (durable results keyed by normalized email address)
 - `source_type` (enum: `linkedin`, `github`, `website`, `manual`, `other`)
 - `enrichment_status` (enum: `not_started`, `pending`, `success`, `failed`)
 - `notes` (text)
@@ -246,7 +249,7 @@ Per-user free-text presets in `audiences`: `id`, `user_id`, `name`, `created_at`
 
 ### 7.1 Overview
 
-Given a target's name and company domain, generate and retain every ranked, deduplicated work-email candidate. Suggestions are unverified. The system does not claim that a mailbox exists, accepts messages, or belongs to the target. Only the user can save a `primary_email` for outreach. See `docs/features/email-accuracy/SPEC.md` for the current contract.
+Given a target's name and company domain, generate and retain every ranked, deduplicated work-email candidate. Guesses start unchecked. Optional Emailable results report deliverability, not proof that an address belongs to the target. Only the user can save a `primary_email` for outreach. See `docs/features/email-accuracy/SPEC.md` for the current contract.
 
 ### 7.2 Domain determination
 
@@ -261,12 +264,12 @@ Given a target's name and company domain, generate and retain every ranked, dedu
 - Include social-handle candidates and notes addresses only at the resolved company domain.
 - Use `nameParts()` for the same name tokens used in outreach greetings.
 - Rank using notes context, observed handles, fixed global pattern priorities, and penalties for alternative name interpretations. Same-domain notes can supply pattern evidence. Short given names observed in the biography rank above the unshortened given-name guess, while other biography interpretations receive a penalty; direct address evidence still ranks highest. Priorities were tuned on diagnostic seeds; no model or learned organization-specific ranking runs in production. Keep every candidate on the company domain.
-- Persist every candidate in `email_guesses` with source, pattern, context, and rank in `score`. Do not assign validity or deliverability status.
+- Persist every candidate in `email_guesses` with source, pattern, context, and rank in `score`. Keep deterministic ranking independent from optional provider results in `targets.email_verifications` JSONB keyed by normalized address.
 
 ### 7.4 User decision
 
-- Show the complete ranked list without pagination or a “Show more” step, with a copy action and an explicit "not verified" label.
-- Allow manual entry of any email, including a personal address, into `target.primary_email`. This is an owner selection, not a verification result.
+- Show the complete ranked list without pagination or a “Show more” step, with a copy action, unchecked labels, and optional provider state, score, check time, test-mode indication, and accept-all warnings.
+- Allow manual entry of any valid email address, including a personal address, into `target.primary_email`. Validate through the shared feature schema with inline feedback, without native browser popups. This is an owner selection, not a verification result.
 - The user sends outreach manually and tracks the outcome. A reply can be recorded through outreach status; copying or saving an address never proves deliverability.
 
 ### 7.5 Accuracy experiments
@@ -277,10 +280,10 @@ The [email guess accuracy experiment](docs/experiments/email-guess-accuracy/EXPE
 
 ## 8. Asynchronous Processing with BullMQ
 
-- `POST /api/targets` enqueues `email-guess { targetId, userId }`. A target edit affecting email-search inputs clears and regenerates its suggestions; unrelated edits do not restart the search.
+- `POST /api/targets` enqueues `email-guess { targetId, userId, generation }` once on creation. Target edits never regenerate or clear suggestions or verification. The owner uses `POST /api/targets/[id]/guesses` to regenerate manually; input fingerprints identify a stale list.
 - The standalone `email-guess` worker reloads the target under `asUser(userId, ...)`, checks ownership, resolves the domain, ranks candidates, and replaces the stored suggestions with the complete ranked set in one transaction. It runs outside Next.js and uses Redis/BullMQ.
 - The queue payload scopes RLS but does not authorize the job. A missing or cross-tenant target yields no writes.
-- The UI polls briefly while suggestions are generated, then shows the ranked list. No external verifier API, SMTP probe, `email-verify` queue, or automatic `primary_email` write is part of the MVP.
+- The UI polls briefly while suggestions are generated, then shows the ranked list. When `EMAILABLE_API_KEY` is configured, the owner can confirm a deliverability check for unchecked addresses, or explicitly recheck the complete set, in a credit-use dialog. Only then does the authenticated verify route queue `email-verify`. Creating or editing targets never spends verification credits. Verification uses private server-side credentials and batches of at most 1,000, checks available live credits before submission, and polls the provider without a public callback. Store progress and the immutable confirmed address list in `targets.email_check`, generation status and input fingerprint in `targets.email_generation`, and durable results by normalized address in `targets.email_verifications`. Regeneration preserves both checks and results. New candidates start unchecked; returning candidates reuse results and dates. Active checks finish their original snapshot even if regeneration removes those addresses. Generation and batch IDs reject duplicate or superseded check responses. Never automatically set `primary_email`. Targets use authenticated `POST /api/targets/[id]/verify` to start or resume a known batch. Ambiguous submissions are not automatically repeated.
 
 ---
 
@@ -335,9 +338,11 @@ Sections:
   - “Edit target” dialog covering every field.
 - Contact info:
   - Profile links, location, company website, and notes.
+  - Notes save automatically after an 800 ms typing pause or on blur, only when changed. Keep the editor styling steady, preserve newer typing during saves, and offer retry on failure.
 - Email suggestions section:
-  - Show ranked company-domain suggestions with a copy action.
-  - Allow the user to save an email manually for outreach.
+  - Show the ranked list from the last generation with a copy action. Edits show a quiet stale-input hint and a Regenerate suggestions action. Cached check results survive ranking changes and removed/returning addresses.
+  - Place the selected outreach email and manual email entry above the suggestions.
+  - Each suggestion offers explicit Use email and Copy actions. Show rank, source, verification state, score, and check date; keep existing results visible with a separate rechecking indicator. Regeneration and checking share a toolbar, with stale-input guidance distinguishing their behavior.
 - Outreach history (live):
   - List of Outreach records with status, sent date, copy button, and inline status change.
 - “New Outreach” button:
@@ -398,7 +403,7 @@ Phases 1 and 2 are implemented; phases 3 and 4 describe future work. See `docs/R
 - Implement EmailGuess model.
 - Implement BullMQ + Redis.
 - Implement the `email-guess` queue and deterministic ranking.
-- Surface ranked, unverified suggestions and the manually selected `primary_email` in the UI.
+- Surface ranked guesses and optional deliverability results and the manually selected `primary_email` in the UI.
 
 ### 11.3 Phase 3 – Enrichment & integrations
 

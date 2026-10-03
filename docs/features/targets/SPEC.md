@@ -14,7 +14,8 @@ Foundation + Better Auth for session ownership. Authentication is required; no h
 - APIs: `GET/POST /api/targets`, `GET/PATCH/DELETE /api/targets/[id]`. `POST` validates `full_name` required; sets `enrichment_status: not_started`. `DELETE` cascades to `Outreach` and `EmailGuess` rows via FK.
 - Validate `POST`/`PATCH` bodies with feature schemas and shared `parseBody` (`lib/validators.ts`), 400 + message on failure; client fetching via TanStack Query.
 - UI: `/targets` card grid (avatar, name, role at company, primary_email or "not set", latest outreach status or "No outreach yet"), 3-step add-target wizard with stepper (Basics, Contact, Notes plus review), `/targets/[id]` detail (header + edit-target dialog with every field, contact info/notes, email candidates, live outreach history).
-- `POST /api/targets` attempts to enqueue `email-guess { targetId, userId }`; a queue failure is logged without failing target creation.
+- Inline notes autosave after an 800 ms pause or on blur. Submit only changed, valid notes; serialize saves and preserve edits made during a request or background refresh. Keep styling steady without a Save button or success toast; failed saves retain the draft and offer Retry.
+- `POST /api/targets` attempts to enqueue `email-guess { targetId, userId, generation }` once; a queue failure is recorded without failing target creation. All edits, including notes autosave, preserve suggestions and verification. Later generation requires the owner's Regenerate suggestions action.
 
 ## Security
 
@@ -33,7 +34,7 @@ Foundation + Better Auth for session ownership. Authentication is required; no h
 - Create (wizard) → appears as a card → detail renders → edit any field via the edit dialog → delete removes row.
 - `POST` without `full_name` → 400. User B cannot read/update/delete user A's target (gets 404); other users' rows invisible in list.
 - The add wizard asks for no first/last name. A target added as `Bae Suzy` and left alone guesses `bae.suzy@…` *and* prefills `{{first_name}}` with `Bae`; adding the same person with the override filled in flips both to `Suzy`/`Bae` together.
-- With no explicit name overrides, renaming a target changes both email-pattern tokens and greeting prefill. Explicit overrides remain user-managed and are never automatically synchronized.
+- With no explicit name overrides, renaming a target changes greeting prefill and the email-pattern tokens used on the next manual regeneration. Explicit overrides remain user-managed and are never automatically synchronized.
 
 ## Non-goals
 Enrichment jobs. Suggestion generation/UI and outreach composition are owned by their feature specs. Deriving and persisting the name split on save: null leaves `nameParts()`'s fallback in charge and the field visibly empty until corrected, whereas a stored split would bake in a wrong reading of `Bae Suzy` as if it were known. Name-pattern detection or a per-locale surname database.
