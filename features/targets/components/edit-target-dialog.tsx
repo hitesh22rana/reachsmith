@@ -6,7 +6,7 @@ import { valibotResolver } from "@hookform/resolvers/valibot";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import * as v from "valibot";
-import { ChevronRight } from "lucide-react";
+import { ChevronRight, Pencil } from "lucide-react";
 import { FieldError } from "@/components/field-error";
 import { sendJson } from "@/lib/api";
 import { Button } from "@/components/ui/button";
@@ -110,7 +110,7 @@ export function EditTargetDialog({ target }: { target: ApiTarget }) {
 
   return (
     <Dialog open={open} onOpenChange={openDialog}>
-      <DialogTrigger render={<Button variant="outline" className="pressable">Edit target</Button>} />
+      <DialogTrigger render={<Button className="pressable"><Pencil aria-hidden="true" data-icon="inline-start" />Edit target</Button>} />
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-xl">
         <DialogHeader>
           <DialogTitle>Edit target</DialogTitle>

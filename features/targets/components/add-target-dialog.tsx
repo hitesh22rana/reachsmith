@@ -5,7 +5,7 @@ import { Controller, useForm, type UseFormReturn } from "react-hook-form";
 import { valibotResolver } from "@hookform/resolvers/valibot";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import * as v from "valibot";
-import { ArrowLeft, ArrowRight, Check } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -305,6 +305,7 @@ export function AddTargetDialog() {
       <DialogTrigger
         render={
           <Button className="pressable">
+            <Plus aria-hidden="true" data-icon="inline-start" />
             Add target
           </Button>
         }

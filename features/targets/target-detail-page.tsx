@@ -96,14 +96,12 @@ export default async function TargetDetailPage({
       </section>
 
       <section aria-label="Notes" className="animate-enter rounded-2xl border bg-card p-6">
-        <NotesForm id={target.id} notes={target.notes} />
+        <NotesForm key={target.id} id={target.id} notes={target.notes} />
       </section>
 
       <section aria-label="Email candidates" className="animate-enter rounded-2xl border bg-card p-6">
         <TargetEmailSection
-          // Reset record state on navigation and restart polling after an
-          // edit launches a fresh email search.
-          key={`${target.id}:${target.updatedAt.toISOString()}`}
+          key={target.id}
           targetId={target.id}
           primaryEmail={target.primaryEmail}
           domain={target.domain}

@@ -5,7 +5,7 @@ import { Controller, useForm, type UseFormReturn } from "react-hook-form";
 import { valibotResolver } from "@hookform/resolvers/valibot";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import * as v from "valibot";
-import { X } from "lucide-react";
+import { Plus, X } from "lucide-react";
 import { FieldError } from "@/components/field-error";
 import { Button } from "@/components/ui/button";
 import {
@@ -278,7 +278,7 @@ export function TemplateDialog({ template }: { template?: ApiTemplate }) {
               Edit
             </Button>
           ) : (
-            <Button className="pressable">New template</Button>
+            <Button className="pressable"><Plus aria-hidden="true" data-icon="inline-start" />New template</Button>
           )
         }
       />
