@@ -25,8 +25,7 @@ function deleteTarget(id: string): Promise<{ id: string }> {
 }
 
 // Past tense on purpose: the row reads as how the target arrived, where the
-// picker in the dialog reads as what you choose. Typed against the same enum
-// so a new source cannot arrive without a label here.
+// picker in the dialog reads as what you choose.
 const SOURCE_SUMMARIES = {
   manual: "Added manually",
   linkedin: "From LinkedIn",

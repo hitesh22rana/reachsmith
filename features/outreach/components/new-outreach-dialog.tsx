@@ -260,7 +260,7 @@ function ReviewStep({ items, body }: { items: { label: string; value: string }[]
           <p className="text-sm font-medium">Message</p>
           {/* break-words, not just pre-wrap: a pasted job link is one
               unbreakable token, and whitespace alone cannot wrap it. */}
-          <p className="max-h-40 min-w-0 overflow-y-auto wrap-break-word whitespace-pre-wrap rounded-xl border bg-muted/50 p-4 text-sm">
+          <p className="max-h-40 min-w-0 overflow-y-auto break-words whitespace-pre-wrap rounded-xl border bg-muted/50 p-4 text-sm">
             {body}
           </p>
         </div>
@@ -481,7 +481,7 @@ export function NewOutreachDialog({
         (next?.placeholders ?? []).map((placeholder) => [
           placeholder.name,
           variables[placeholder.name] ??
-          (placeholder.source === "target" ? (derived[placeholder.name] ?? "") : ""),
+            (placeholder.source === "target" ? (derived[placeholder.name] ?? "") : ""),
         ]),
       ),
     );

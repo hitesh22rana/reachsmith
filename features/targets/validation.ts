@@ -7,9 +7,8 @@ export const SourceTypeSchema = v.picklist(
 
 export type SourceType = v.InferOutput<typeof SourceTypeSchema>;
 
-// The one place the source list is written down, exactly as CHANNEL_LABELS
-// is for templates: every source picker maps over this, so adding a source
-// is one edit and an option cannot exist without a label.
+// The one place the source list is written down, as CHANNEL_LABELS is for
+// templates: every source picker maps over this.
 export const SOURCE_LABELS = {
   manual: "Manual",
   linkedin: "LinkedIn",
@@ -110,9 +109,8 @@ export const SocialUrlsSchema = v.optional(
   ),
 );
 
-// The notes field on its own, for the inline editor that PATCHes nothing else.
-// Shared with TargetCreateSchema so the editor cannot accept a note the route
-// would reject with a 400.
+// Shared with TargetCreateSchema so the inline notes editor cannot accept a
+// note the route would reject with a 400.
 export const NotesSchema = v.optional(
   v.pipe(v.string(), v.trim(), v.maxLength(2000, "Must be 2000 characters or fewer")),
 );

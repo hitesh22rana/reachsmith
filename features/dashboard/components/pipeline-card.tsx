@@ -3,9 +3,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { cn } from "@/lib/utils";
 import { STATUS_LABELS, type OutreachStatus } from "@/features/outreach/validation";
 
-// The dot colour is the only thing this card adds, so the labels come from
-// the one status map. Typed against the enum: a new status is a compile error
-// here instead of an undefined label in the legend.
 const OUTREACH_STATUSES = [
   { value: "draft", label: STATUS_LABELS.draft, dot: "bg-muted-foreground" },
   { value: "sent", label: STATUS_LABELS.sent, dot: "bg-sky-500" },
