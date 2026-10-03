@@ -10,6 +10,7 @@ import { Queue } from "bullmq";
 interface GuessJob {
   targetId: string;
   userId: string;
+  generation: string;
 }
 
 function connection() {
@@ -29,8 +30,8 @@ function lazyQueue<T>(name: string): () => Queue<T> {
 
 const guessQueue = lazyQueue<GuessJob>("email-guess");
 
-export function enqueueEmailGuess(targetId: string, userId: string): Promise<unknown> {
-  return guessQueue().add("guess", { targetId, userId }, {
+export function enqueueEmailGuess(targetId: string, userId: string, generation: string): Promise<unknown> {
+  return guessQueue().add("guess", { targetId, userId, generation }, {
     attempts: 3,
     backoff: { type: "exponential", delay: 5000 },
   });

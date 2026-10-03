@@ -43,7 +43,13 @@ async function main(): Promise<void> {
     await asUser(userId, (db) => db.delete(emailGuesses).where(eq(emailGuesses.userId, userId)));
     await seed();
     const second = await snapshot();
-    assert.deepEqual(second.targets, first.targets, "rerun preserves target fields and primary email");
+    const targetFields = (row: typeof targets.$inferSelect) => {
+      const { emailGeneration: _generation, updatedAt: _updatedAt, ...fields } = row;
+      void _generation;
+      void _updatedAt;
+      return fields;
+    };
+    assert.deepEqual(second.targets.map(targetFields), first.targets.map(targetFields), "rerun preserves target fields, paid results, and primary email");
     assert.deepEqual(second.templates, first.templates, "rerun does not duplicate templates");
     assert.deepEqual(second.outreaches, first.outreaches, "rerun preserves outreach history");
     assert.equal(second.guesses.length, first.guesses.length, "rerun restores suggestions");

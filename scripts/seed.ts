@@ -138,7 +138,10 @@ async function main(): Promise<void> {
       return target.id;
     });
     // Use the real persistence path without requiring Redis or a running worker.
-    await processGuessJob({ data: { targetId, userId: user.id } });
+    const generation = crypto.randomUUID();
+    await asUser(user.id, (db) => db.update(schema.targets).set({ emailGeneration: { id: generation, status: "pending" } })
+      .where(and(eq(schema.targets.id, targetId), eq(schema.targets.userId, user.id))));
+    await processGuessJob({ data: { targetId, userId: user.id, generation } });
     console.log(`Demo data ready for ${email}; email suggestions refreshed.`);
   } finally {
     await owner.end();

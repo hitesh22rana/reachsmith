@@ -129,6 +129,9 @@ export const targets = pgTable(
     domain: text("domain"),
     socialUrls: text("social_urls").array(),
     extraEnrichment: jsonb("extra_enrichment"),
+    emailCheck: jsonb("email_check").$type<EmailCheck>(),
+    emailGeneration: jsonb("email_generation").$type<EmailGeneration>(),
+    emailVerifications: jsonb("email_verifications").$type<Record<string, EmailVerification>>().notNull().default({}),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at")
       .defaultNow()
@@ -143,6 +146,34 @@ export const targets = pgTable(
 
 export type Target = typeof targets.$inferSelect;
 export type NewTarget = typeof targets.$inferInsert;
+
+export interface EmailCheck {
+  generation: string;
+  status: "pending" | "submitting" | "verifying" | "completed" | "failed";
+  test: boolean;
+  emails: string[];
+  remainingEmails: string[];
+  batchId?: string;
+  batchEmails?: string[];
+  error?: string;
+}
+
+export interface EmailGeneration {
+  id: string;
+  status: "pending" | "completed" | "failed";
+  inputKey?: string;
+  domain?: string | null;
+  error?: string;
+}
+
+export interface EmailVerification {
+  state: "deliverable" | "undeliverable" | "risky" | "unknown" | "duplicate";
+  reason: string | null;
+  acceptAll: boolean | null;
+  score: number | null;
+  checkedAt: string;
+  test: boolean;
+}
 
 export const channelEnum = pgEnum("channel", ["email", "linkedin_dm", "other"]);
 

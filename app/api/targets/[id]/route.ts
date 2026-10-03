@@ -1,9 +1,8 @@
 import { and, eq } from "drizzle-orm";
 import { NextResponse, type NextRequest } from "next/server";
 import { forUser } from "@/db";
-import { emailGuesses, targets } from "@/db/schema";
+import { targets } from "@/db/schema";
 import { getUserId } from "@/lib/auth";
-import { enqueueEmailGuess } from "@/lib/queues/email";
 import { toTargetJson, toTargetPatch } from "@/features/targets/server";
 import { parseBody } from "@/lib/validators";
 import { TargetPatchSchema } from "@/features/targets/validation";
@@ -49,35 +48,12 @@ export async function PATCH(request: NextRequest, context: RouteContext): Promis
     return NextResponse.json({ message: "No fields to update" }, { status: 400 });
   }
   const id = (await context.params).id;
-  const refreshGuess = ["full_name", "first_name", "last_name", "domain", "company_website", "notes", "social_urls"]
-    .some((field) => field in parsed.data);
-  const [updated] = await forUser(userId, (db) =>
-    (async () => {
-      const rows = await db
-        .update(targets)
-        .set({
-          ...patch,
-          updatedAt: new Date(),
-        })
-        .where(and(eq(targets.id, id), eq(targets.userId, userId)))
-        .returning();
-      if (rows[0] && refreshGuess) {
-        await db.delete(emailGuesses)
-          .where(and(eq(emailGuesses.targetId, id), eq(emailGuesses.userId, userId)));
-      }
-      return rows;
-    })(),
-  );
+  const [updated] = await forUser(userId, (db) => db.update(targets)
+    .set({ ...patch, updatedAt: new Date() })
+    .where(and(eq(targets.id, id), eq(targets.userId, userId)))
+    .returning());
   if (!updated) {
     return NextResponse.json({ message: "Not found" }, { status: 404 });
-  }
-  // Best effort: only evidence changes restart the company email search.
-  if (refreshGuess) {
-    try {
-      await enqueueEmailGuess(updated.id, userId);
-    } catch (error) {
-      console.error("Failed to enqueue email-guess", error);
-    }
   }
   return NextResponse.json({ target: toTargetJson(updated) });
 }

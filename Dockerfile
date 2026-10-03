@@ -52,5 +52,6 @@ RUN pnpm prune --prod
 COPY --chown=nextjs:nodejs workers ./workers
 COPY --chown=nextjs:nodejs lib ./lib
 COPY --chown=nextjs:nodejs db ./db
+COPY --chown=nextjs:nodejs features/email/emailable.ts ./features/email/emailable.ts
 USER nextjs
 CMD ["node", "--experimental-strip-types", "--no-warnings", "workers/run.ts"]

@@ -5,14 +5,18 @@ import type { TargetCreateInput, TargetPatchInput } from "./validation";
 // which the session already implies and no UI reads.
 export type TargetJson = Omit<
   Target,
-  "userId" | "createdAt" | "updatedAt"
+  "userId" | "emailCheck" | "emailGeneration" | "emailVerifications" | "createdAt" | "updatedAt"
 > & {
   createdAt: string;
   updatedAt: string;
 };
 
 export function toTargetJson(target: Target): TargetJson {
-  const { userId: _userId, ...rest } = target;
+  const { userId: _userId, emailCheck: _emailCheck, emailGeneration: _emailGeneration, emailVerifications: _emailVerifications, ...rest } = target;
+  void _userId;
+  void _emailCheck;
+  void _emailGeneration;
+  void _emailVerifications;
   return {
     ...rest,
     createdAt: target.createdAt.toISOString(),

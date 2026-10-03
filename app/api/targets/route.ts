@@ -56,10 +56,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   if (!parsed.ok) {
     return NextResponse.json({ message: parsed.message }, { status: 400 });
   }
+  const generation = crypto.randomUUID();
   const [target] = await forUser(userId, (db) =>
     db
       .insert(targets)
-      .values(toTargetInsert(userId, parsed.data))
+      .values({ ...toTargetInsert(userId, parsed.data), emailGeneration: { id: generation, status: "pending" } })
       .returning(),
   );
   if (!target) {
@@ -67,9 +68,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   }
   // Best effort: a downed queue must not fail target creation.
   try {
-    await enqueueEmailGuess(target.id, userId);
+    await enqueueEmailGuess(target.id, userId, generation);
   } catch (error) {
     console.error("Failed to enqueue email-guess", error);
+    await forUser(userId, (db) => db.update(targets).set({ emailGeneration: { id: generation, status: "failed", error: "Could not queue suggestions. Start the worker and regenerate suggestions." } })
+      .where(and(eq(targets.id, target.id), eq(targets.userId, userId))));
   }
   return NextResponse.json({ target: toTargetJson(target) }, { status: 201 });
 }

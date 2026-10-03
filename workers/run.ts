@@ -1,6 +1,9 @@
 import "dotenv/config";
 import { startGuessWorker } from "./email-guess.ts";
 
-startGuessWorker();
+import { startVerifyWorker } from "./email-verify.ts";
 
-console.log("reachsmith worker running (email-guess)");
+startGuessWorker();
+startVerifyWorker();
+
+console.log("reachsmith worker running (email-guess + email-verify)");

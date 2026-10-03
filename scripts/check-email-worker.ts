@@ -36,31 +36,38 @@ async function main(): Promise<void> {
     const read = () => asUser(userId, (db) => db.select().from(emailGuesses)
       .where(and(eq(emailGuesses.targetId, target.id), eq(emailGuesses.userId, userId)))
       .orderBy(desc(emailGuesses.score)));
-    const job = { data: { targetId: target.id, userId } };
+    const request = async () => {
+      const generation = crypto.randomUUID();
+      await asUser(userId, (db) => db.update(targets).set({ emailGeneration: { id: generation, status: "pending" } })
+        .where(and(eq(targets.id, target.id), eq(targets.userId, userId))));
+      return { data: { targetId: target.id, userId, generation } };
+    };
+    const job = await request();
     await processGuessJob(job);
     assert.deepEqual((await read()).map((row) => row.email), expected.map((candidate) => candidate.email), "persist every candidate in rank order");
 
     // Simulate a previously capped target and verify a rerun repairs its list.
     await asUser(userId, (db) => db.delete(emailGuesses)
       .where(and(eq(emailGuesses.targetId, target.id), eq(emailGuesses.userId, userId), eq(emailGuesses.email, expected.at(-1)!.email))));
-    await Promise.all([processGuessJob(job), processGuessJob(job)]);
+    const rerun = await request();
+    await Promise.all([processGuessJob(rerun), processGuessJob(rerun)]);
     const rows = await read();
     assert.deepEqual(rows.map((row) => row.email), expected.map((candidate) => candidate.email), "concurrent reruns restore the complete set without duplicates");
     assert(rows.every((row) => row.score > 0 && row.email.endsWith("@example.com")));
     assert(!rows.some((row) => row.email === "elsewhere@gmail.com"));
 
     // A mismatched payload must leave the real owner's suggestions untouched.
-    await processGuessJob({ data: { targetId: target.id, userId: userIds[1]! } });
+    await processGuessJob({ data: { targetId: target.id, userId: userIds[1]!, generation: rerun.data.generation } });
     assert.deepEqual(await read(), rows, "foreign job must not change owned rows");
     assert.equal((await asUser(userIds[1]!, (db) => db.select().from(emailGuesses))).length, 0);
 
     await asUser(userId, (db) => db.update(targets).set({ domain: "newexample.com" })
       .where(and(eq(targets.id, target.id), eq(targets.userId, userId))));
-    await processGuessJob(job);
+    await processGuessJob(await request());
     assert((await read()).every((row) => row.email.endsWith("@newexample.com")), "replace stale-domain rows");
     await asUser(userId, (db) => db.update(targets).set({ domain: null })
       .where(and(eq(targets.id, target.id), eq(targets.userId, userId))));
-    await processGuessJob(job);
+    await processGuessJob(await request());
     assert.deepEqual(await read(), [], "no-domain rerun clears stale suggestions");
     const [unchanged] = await asUser(userId, (db) => db.select().from(targets)
       .where(and(eq(targets.id, target.id), eq(targets.userId, userId))));
