@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
 import * as schema from "@/db/schema";
 import { resolveAudienceId } from "@/features/audiences/server";
@@ -34,13 +34,18 @@ export function toTemplateJson(template: Template, audienceName: string | null):
 }
 
 // The row may predate this save under different casing, so the name is read
-// back rather than echoing what was typed.
-export async function readBackAudienceName(db: Db, templateId: string): Promise<string | null> {
+// back rather than echoing what was typed. Owned explicitly, like every other
+// domain query: RLS is the second lock, not the only one.
+export async function readBackAudienceName(
+  db: Db,
+  userId: string,
+  templateId: string,
+): Promise<string | null> {
   const [row] = await db
     .select({ audienceName: audiences.name })
     .from(templates)
     .leftJoin(audiences, eq(templates.audienceId, audiences.id))
-    .where(eq(templates.id, templateId))
+    .where(and(eq(templates.id, templateId), eq(templates.userId, userId)))
     .limit(1);
   return row?.audienceName ?? null;
 }

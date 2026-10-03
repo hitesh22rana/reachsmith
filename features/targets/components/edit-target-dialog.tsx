@@ -7,6 +7,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import * as v from "valibot";
 import { ChevronRight } from "lucide-react";
+import { FieldError } from "@/components/field-error";
 import { sendJson } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import {
@@ -30,18 +31,12 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   TargetCreateSchema,
   TargetEnvelopeSchema,
+  SOURCE_LABELS,
+  SOURCE_OPTIONS,
   type ApiTarget,
 } from "../validation";
 
 type TargetFormInput = v.InferInput<typeof TargetCreateSchema>;
-
-const SOURCE_LABELS = {
-  manual: "Manual",
-  linkedin: "LinkedIn",
-  github: "GitHub",
-  website: "Website",
-  other: "Other",
-} as const;
 
 function saveTarget(id: string, data: TargetFormInput) {
   return sendJson(
@@ -50,17 +45,6 @@ function saveTarget(id: string, data: TargetFormInput) {
     v.parse(TargetCreateSchema, data),
     TargetEnvelopeSchema,
     "save target",
-  );
-}
-
-function FieldError({ message }: { message: string | undefined }) {
-  if (!message) {
-    return null;
-  }
-  return (
-    <p role="alert" className="text-xs text-destructive">
-      {message}
-    </p>
   );
 }
 
@@ -202,11 +186,11 @@ export function EditTargetDialog({ target }: { target: ApiTarget }) {
                       <SelectValue>{SOURCE_LABELS[field.value ?? "manual"]}</SelectValue>
                     </SelectTrigger>
                     <SelectContent alignItemWithTrigger={false}>
-                      <SelectItem value="manual">Manual</SelectItem>
-                      <SelectItem value="linkedin">LinkedIn</SelectItem>
-                      <SelectItem value="github">GitHub</SelectItem>
-                      <SelectItem value="website">Website</SelectItem>
-                      <SelectItem value="other">Other</SelectItem>
+                      {SOURCE_OPTIONS.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 )}

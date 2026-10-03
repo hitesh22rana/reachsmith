@@ -6,6 +6,7 @@ import { valibotResolver } from "@hookform/resolvers/valibot";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import * as v from "valibot";
 import { X } from "lucide-react";
+import { FieldError } from "@/components/field-error";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -66,17 +67,6 @@ function saveTemplate(id: string | null, data: TemplateFormInput) {
     v.parse(TemplateCreateSchema, data),
     TemplateEnvelopeSchema,
     "save template",
-  );
-}
-
-function FieldError({ message }: { message: string | undefined }) {
-  if (!message) {
-    return null;
-  }
-  return (
-    <p role="alert" className="text-xs text-destructive">
-      {message}
-    </p>
   );
 }
 

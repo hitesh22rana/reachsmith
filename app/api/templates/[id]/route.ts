@@ -65,7 +65,7 @@ export async function PATCH(request: NextRequest, context: RouteContext): Promis
     if (!template) {
       return { empty: false, template: null, audienceName: null };
     }
-    return { empty: false, template, audienceName: await readBackAudienceName(db, template.id) };
+    return { empty: false, template, audienceName: await readBackAudienceName(db, userId, template.id) };
   });
   if (result.empty) {
     return NextResponse.json({ message: "No fields to update" }, { status: 400 });

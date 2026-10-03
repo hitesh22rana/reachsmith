@@ -6,6 +6,7 @@ import { valibotResolver } from "@hookform/resolvers/valibot";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import * as v from "valibot";
 import { ArrowLeft, ArrowRight, Check } from "lucide-react";
+import { FieldError } from "@/components/field-error";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -52,17 +53,6 @@ const STEPS: { title: string; description: string; fields: FieldName[] }[] = [
 ];
 
 const LAST_STEP = STEPS.length - 1;
-
-function FieldError({ message }: { message: string | undefined }) {
-  if (!message) {
-    return null;
-  }
-  return (
-    <p role="alert" className="text-xs text-destructive">
-      {message}
-    </p>
-  );
-}
 
 function MessageStep({
   form,
@@ -270,7 +260,7 @@ function ReviewStep({ items, body }: { items: { label: string; value: string }[]
           <p className="text-sm font-medium">Message</p>
           {/* break-words, not just pre-wrap: a pasted job link is one
               unbreakable token, and whitespace alone cannot wrap it. */}
-          <p className="max-h-40 min-w-0 overflow-y-auto break-words whitespace-pre-wrap rounded-xl border bg-muted/50 p-4 text-sm">
+          <p className="max-h-40 min-w-0 overflow-y-auto wrap-break-word whitespace-pre-wrap rounded-xl border bg-muted/50 p-4 text-sm">
             {body}
           </p>
         </div>
@@ -491,7 +481,7 @@ export function NewOutreachDialog({
         (next?.placeholders ?? []).map((placeholder) => [
           placeholder.name,
           variables[placeholder.name] ??
-            (placeholder.source === "target" ? (derived[placeholder.name] ?? "") : ""),
+          (placeholder.source === "target" ? (derived[placeholder.name] ?? "") : ""),
         ]),
       ),
     );

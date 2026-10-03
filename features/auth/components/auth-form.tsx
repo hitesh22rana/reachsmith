@@ -5,6 +5,7 @@ import { useForm } from "react-hook-form";
 import { valibotResolver } from "@hookform/resolvers/valibot";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { FieldError } from "@/components/field-error";
 import { authClient } from "@/features/auth/client";
 import {
   LoginSchema,
@@ -34,17 +35,6 @@ async function submitAuth(payload: AuthPayload): Promise<string | null> {
     return result.error.message ?? "Authentication failed";
   }
   return null;
-}
-
-function FieldError({ message }: { message: string | undefined }) {
-  if (!message) {
-    return null;
-  }
-  return (
-    <p role="alert" className="text-sm text-destructive">
-      {message}
-    </p>
-  );
 }
 
 function LoginForm() {

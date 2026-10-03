@@ -26,9 +26,15 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Stepper } from "@/components/ui/stepper";
+import { FieldError } from "@/components/field-error";
 import { ReviewList } from "@/components/review-list";
 import { sendJson } from "@/lib/api";
-import { TargetCreateSchema, TargetEnvelopeSchema } from "../validation";
+import {
+  TargetCreateSchema,
+  TargetEnvelopeSchema,
+  SOURCE_LABELS,
+  SOURCE_OPTIONS,
+} from "../validation";
 
 type TargetFormInput = v.InferInput<typeof TargetCreateSchema>;
 type FieldName = keyof TargetFormInput;
@@ -63,27 +69,8 @@ const STEPS: { title: string; description: string; fields: FieldName[] }[] = [
 
 const LAST_STEP = STEPS.length - 1;
 
-const SOURCE_LABELS = {
-  manual: "Manual",
-  linkedin: "LinkedIn",
-  github: "GitHub",
-  website: "Website",
-  other: "Other",
-} as const;
-
 function createTarget(data: TargetFormInput) {
   return sendJson("POST", "/api/targets", data, TargetEnvelopeSchema, "create target");
-}
-
-function FieldError({ message }: { message: string | undefined }) {
-  if (!message) {
-    return null;
-  }
-  return (
-    <p role="alert" className="text-sm text-destructive">
-      {message}
-    </p>
-  );
 }
 
 function RequiredMark() {
@@ -164,9 +151,9 @@ function ContactStep({ form }: { form: StepForm }) {
                   <SelectValue>{SOURCE_LABELS[field.value ?? "manual"]}</SelectValue>
                 </SelectTrigger>
                 <SelectContent alignItemWithTrigger={false}>
-                  {Object.entries(SOURCE_LABELS).map(([value, label]) => (
-                    <SelectItem key={value} value={value}>
-                      {label}
+                  {SOURCE_OPTIONS.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
                     </SelectItem>
                   ))}
                 </SelectContent>

@@ -10,15 +10,7 @@ import { ActivityCard, type ActivityItem } from "./components/activity-card";
 import { PipelineCard } from "./components/pipeline-card";
 import { AddFirstTargetCta, StatCards } from "./components/stat-cards";
 import { CHANNEL_LABELS } from "@/features/templates/validation";
-
-const STATUS_LABELS: Record<string, string> = {
-  draft: "Draft",
-  sent: "Sent",
-  replied: "Replied",
-  no_response: "No response",
-  rejected: "Rejected",
-  success: "Success",
-};
+import { STATUS_LABELS } from "@/features/outreach/validation";
 
 function roleAtCompany(roleTitle: string | null, company: string | null): string {
   const parts = [roleTitle, company].filter(Boolean).join(" at ");
@@ -124,7 +116,7 @@ export default async function DashboardPage() {
         key: `outreach-${o.id}`,
         at: o.lastStatusChangeAt,
         title: name,
-        detail: `Outreach · ${STATUS_LABELS[o.status] ?? o.status} · ${CHANNEL_LABELS[o.channel] ?? o.channel}`,
+        detail: `Outreach · ${STATUS_LABELS[o.status]} · ${CHANNEL_LABELS[o.channel] ?? o.channel}`,
         href: "/outreach",
         face: name,
       };

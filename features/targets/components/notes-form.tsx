@@ -10,13 +10,11 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { sendJson } from "@/lib/api";
-import { TargetEnvelopeSchema, TargetPatchSchema } from "../validation";
+import { TargetEnvelopeSchema, TargetPatchSchema, NotesSchema } from "../validation";
 
-const NotesSchema = v.object({
-  notes: v.optional(v.string()),
-});
+const NotesFormSchema = v.object({ notes: NotesSchema });
 
-type NotesInput = v.InferOutput<typeof NotesSchema>;
+type NotesInput = v.InferOutput<typeof NotesFormSchema>;
 
 function saveNotes(id: string, data: NotesInput) {
   return sendJson(
@@ -39,7 +37,7 @@ export function NotesForm({ id, notes }: { id: string; notes: string | null }) {
     handleSubmit,
     formState: { isSubmitting },
   } = useForm<NotesInput>({
-    resolver: valibotResolver(NotesSchema),
+    resolver: valibotResolver(NotesFormSchema),
     // values, not defaultValues: always mounted with no open to reset on, and
     // the edit dialog above edits the same column, so saving there used to
     // leave this textarea stale. Re-syncs on a real server change only.

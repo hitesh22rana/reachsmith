@@ -5,6 +5,23 @@ export const SourceTypeSchema = v.picklist(
   "Pick a valid source",
 );
 
+export type SourceType = v.InferOutput<typeof SourceTypeSchema>;
+
+// The one place the source list is written down, exactly as CHANNEL_LABELS
+// is for templates: every source picker maps over this, so adding a source
+// is one edit and an option cannot exist without a label.
+export const SOURCE_LABELS = {
+  manual: "Manual",
+  linkedin: "LinkedIn",
+  github: "GitHub",
+  website: "Website",
+  other: "Other",
+} as const satisfies Record<SourceType, string>;
+
+export const SOURCE_OPTIONS = (
+  Object.keys(SOURCE_LABELS) as SourceType[]
+).map((value) => ({ value, label: SOURCE_LABELS[value] }));
+
 const OptionalTextSchema = (max: number) =>
   v.optional(
     v.pipe(v.string(), v.trim(), v.maxLength(max, `Must be ${max} characters or fewer`)),
@@ -93,6 +110,13 @@ export const SocialUrlsSchema = v.optional(
   ),
 );
 
+// The notes field on its own, for the inline editor that PATCHes nothing else.
+// Shared with TargetCreateSchema so the editor cannot accept a note the route
+// would reject with a 400.
+export const NotesSchema = v.optional(
+  v.pipe(v.string(), v.trim(), v.maxLength(2000, "Must be 2000 characters or fewer")),
+);
+
 export const TargetCreateSchema = v.object({
   full_name: v.pipe(
     v.string(),
@@ -106,7 +130,7 @@ export const TargetCreateSchema = v.object({
   role_title: OptionalTextSchema(100),
   primary_email: OptionalEmailSchema,
   source_type: v.optional(SourceTypeSchema, "manual"),
-  notes: OptionalTextSchema(2000),
+  notes: NotesSchema,
   location: OptionalTextSchema(100),
   company_website: OptionalUrlSchema,
   domain: DomainSchema,

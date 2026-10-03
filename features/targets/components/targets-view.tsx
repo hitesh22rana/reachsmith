@@ -2,16 +2,17 @@
 
 import Link from "next/link";
 import { useMutation, useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, ArrowUpRight, Mail, Users } from "lucide-react";
+import { ArrowUpRight, Mail, Users } from "lucide-react";
 import { DeletedSchema, getJson, sendJson } from "@/lib/api";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { LoadMore } from "@/components/load-more";
+import { BackLink } from "@/components/back-link";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/empty-state";
 import { DeleteDialog } from "@/components/delete-dialog";
 import { AddTargetDialog } from "./add-target-dialog";
-import { TargetListSchema, type TargetPage } from "../validation";
+import { TargetListSchema, type SourceType, type TargetPage } from "../validation";
 import { cn, initials } from "@/lib/utils";
 
 function fetchTargets(cursor: string | undefined): Promise<TargetPage> {
@@ -23,13 +24,16 @@ function deleteTarget(id: string): Promise<{ id: string }> {
   return sendJson("DELETE", `/api/targets/${id}`, undefined, DeletedSchema, "delete target");
 }
 
-const SOURCE_LABELS = {
+// Past tense on purpose: the row reads as how the target arrived, where the
+// picker in the dialog reads as what you choose. Typed against the same enum
+// so a new source cannot arrive without a label here.
+const SOURCE_SUMMARIES = {
   manual: "Added manually",
   linkedin: "From LinkedIn",
   github: "From GitHub",
   website: "From website",
   other: "Other source",
-} as const;
+} as const satisfies Record<SourceType, string>;
 
 const RESERVED_SLOTS = ["reserved-one", "reserved-two", "reserved-three"] as const;
 
@@ -92,15 +96,7 @@ export function TargetsView() {
 
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-6 px-6 py-12">
-      <div className="animate-enter">
-        <Link
-          href="/dashboard"
-          className="inline-flex items-center gap-1 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
-        >
-          <ArrowLeft className="size-4" aria-hidden="true" />
-          Back to dashboard
-        </Link>
-      </div>
+      <BackLink href="/dashboard">Back to dashboard</BackLink>
       <div className="animate-enter flex flex-wrap items-center justify-between gap-4">
         <div className="space-y-1">
           <h1 className="text-3xl font-semibold tracking-tight">Targets</h1>
@@ -164,7 +160,7 @@ export function TargetsView() {
               </CardContent>
               <CardFooter className="justify-between gap-2 bg-transparent py-3">
                 <span className="text-xs font-medium text-muted-foreground">
-                  {SOURCE_LABELS[target.sourceType]}
+                  {SOURCE_SUMMARIES[target.sourceType]}
                 </span>
                 <div className="flex items-center gap-1">
                   <Link

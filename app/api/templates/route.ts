@@ -49,7 +49,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     if (!template) {
       return null;
     }
-    return { template, audienceName: await readBackAudienceName(db, template.id) };
+    return { template, audienceName: await readBackAudienceName(db, userId, template.id) };
   });
   if (!created) {
     return NextResponse.json({ message: "Failed to create template" }, { status: 500 });

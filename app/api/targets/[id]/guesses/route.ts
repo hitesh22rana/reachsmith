@@ -35,7 +35,9 @@ export async function GET(_request: NextRequest, context: RouteContext): Promise
       // Return the complete candidate set for this target in rank order.
       // created_at cannot give that order: the guess worker
       // inserts a whole ranked batch in one statement, so every candidate
-      // shares a transaction timestamp. score is the ranking it computed.
+      // shares a transaction timestamp. score is the position the worker
+      // assigned (best first), not the confidence from lib/email-rank.ts —
+      // do not read it as a percentage.
       .orderBy(desc(emailGuesses.score), desc(emailGuesses.createdAt)),
   );
   return NextResponse.json({

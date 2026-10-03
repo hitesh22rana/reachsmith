@@ -1,15 +1,19 @@
 import Image from "next/image";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import { STATUS_LABELS, type OutreachStatus } from "@/features/outreach/validation";
 
+// The dot colour is the only thing this card adds, so the labels come from
+// the one status map. Typed against the enum: a new status is a compile error
+// here instead of an undefined label in the legend.
 const OUTREACH_STATUSES = [
-  { value: "draft", label: "Draft", dot: "bg-muted-foreground" },
-  { value: "sent", label: "Sent", dot: "bg-sky-500" },
-  { value: "replied", label: "Replied", dot: "bg-emerald-500" },
-  { value: "no_response", label: "No response", dot: "bg-amber-500" },
-  { value: "rejected", label: "Rejected", dot: "bg-rose-500" },
-  { value: "success", label: "Success", dot: "bg-emerald-700" },
-] as const;
+  { value: "draft", label: STATUS_LABELS.draft, dot: "bg-muted-foreground" },
+  { value: "sent", label: STATUS_LABELS.sent, dot: "bg-sky-500" },
+  { value: "replied", label: STATUS_LABELS.replied, dot: "bg-emerald-500" },
+  { value: "no_response", label: STATUS_LABELS.no_response, dot: "bg-amber-500" },
+  { value: "rejected", label: STATUS_LABELS.rejected, dot: "bg-rose-500" },
+  { value: "success", label: STATUS_LABELS.success, dot: "bg-emerald-700" },
+] as const satisfies readonly { value: OutreachStatus; label: string; dot: string }[];
 
 export function PipelineCard({
   outreachCount,
