@@ -41,7 +41,7 @@ Live keys spend credits for checks; the worker checks available credits before e
 - `node --experimental-strip-types --no-warnings scripts/check-seed.ts`: demo CLI check for audience reuse, rendered outreach, complete suggestions, reruns, and tenant scope; creates and cleans up disposable fixtures.
 - `node --experimental-strip-types --no-warnings scripts/check-email-verification.ts`: mocked-provider worker integration check against the local database and Redis database 15; no live credits used, fixtures cleaned up.
 - `node --experimental-strip-types --no-warnings scripts/check-email-api.ts`: after `pnpm build`, starts a temporary API server with a test key and Redis database 15, checks authenticated edits/regeneration/credit consent and tenant isolation, then removes fixtures and queued jobs. No browser or provider calls.
-- [Email guess accuracy](docs/experiments/email-guess-accuracy/EXPERIMENT.md): offline top-k and candidate-coverage evaluation against curated published addresses. Follow `MEMORY.md` for commands, answer isolation, and report retention. No database or Redis is needed for this experiment.
+- [Email guess accuracy](docs/experiments/email-guess-accuracy/EXPERIMENT.md): offline top-k and candidate-coverage evaluation with a privately supplied dataset. The runner and schema are public; real contact seeds and reports remain local and ignored. Follow `MEMORY.md` for commands, answer isolation, and report retention. No database or Redis is needed for this experiment.
 
 ## Development toolchain
 

@@ -4,7 +4,7 @@
 
 ## Experiments
 
-- [Email guess accuracy](experiments/email-guess-accuracy/EXPERIMENT.md): evaluation plan, curated seeds, offline runner and final Markdown reports. Run instructions and retention rules are in `MEMORY.md`. Seed totals belong in each report; tuning results require an independent holdout before claiming generalization.
+- [Email guess accuracy](experiments/email-guess-accuracy/EXPERIMENT.md): evaluation plan, schema, and offline runner. Real contact seeds and reports remain private local files excluded from Git and Docker. Run instructions and retention rules are in `MEMORY.md`. Seed totals belong in each report; tuning results require an independent holdout before claiming generalization.
 
 ## Status
 

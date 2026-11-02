@@ -2,7 +2,7 @@
 
 ## Status
 
-Production and the offline runner use deterministic ranking. Each completed run saves its results and reproducibility metadata under `runs/`.
+Production and the offline runner use deterministic ranking. The repository includes the plan, schema, runner, and synthetic self-checks. Real contact datasets and generated reports are private local files excluded from Git and Docker. A fresh clone can run `--selfcheck`; full evaluation requires a locally supplied `seeds.json` matching the schema.
 
 ## Objective
 
@@ -14,17 +14,17 @@ Use real people with independently published answers. Synthetic people cannot es
 
 | File | Purpose |
 | --- | --- |
-| [seeds.json](seeds.json) | Curated evaluation cases from published sources |
+| `seeds.json` (local, ignored) | Privately supplied evaluation cases |
 | [schema.json](schema.json) | JSON Schema for the form-shaped target and withheld evidence |
 | [EXPERIMENT.md](EXPERIMENT.md) | Objective, evaluation plan, source coverage and collection provenance |
 | [run.ts](run.ts) | Offline runner and metric/answer-isolation self-check |
-| `runs/<timestamp>/` | Final Markdown report for each execution |
+| `runs/<timestamp>/` (local, ignored) | Private report for each execution |
 
-This folder keeps the seed data and schema alongside the experiment plan. Source provenance and collection methods are documented below.
+Keep private seed data alongside the tracked schema and plan without committing it. Source provenance and collection methods for local evaluation are documented below.
 
 The seed list can grow as more qualifying people are found. Calculate dataset sizes, cohort sizes and SHA-256 checksums from the actual files at execution time, and store them in the run results. Record the evaluated Git revision and input checksums so later additions do not change a completed report's denominator.
 
-Completed reports are stored in [runs/](runs/). Each report describes its own evaluated snapshot; results are not duplicated here.
+Completed reports stay in the local ignored `runs/` directory. Each report describes its own evaluated snapshot; results are not duplicated here.
 
 ## Sources
 
@@ -131,7 +131,7 @@ The first expansion added first-initial plus surname without a separator (`flast
 3. **Name handling:** review misses involving accents, multiple surnames, initials and published aliases. Use independently observed name overrides; do not guess nicknames from the answer.
 4. **Ranking:** evaluate organization-specific pattern evidence collected independently of the target answer. A larger candidate set alone cannot improve first-choice accuracy. Keep pattern-learning examples separate from scored targets, and test on additional organizations before claiming generalization.
 
-Record candidate-generation and ranking changes explicitly and compare against the saved baseline. Compare changes on the same seed snapshot. Preserve historical reports and use their recorded Git revisions and checksums to recover the evaluated inputs; expanding or correcting seeds creates a new snapshot.
+Record candidate-generation and ranking changes explicitly and compare against the saved baseline. Compare changes on the same seed snapshot. Preserve historical reports locally and use their recorded Git revisions and checksums to identify the evaluated inputs; expanding or correcting seeds creates a new snapshot. Evaluation inputs are not stored in Git.
 
 ## Limitations
 
@@ -143,7 +143,7 @@ Record candidate-generation and ranking changes explicitly and compare against t
 
 ## Preparation checks and handoff
 
-Before a recorded run, commit code and seed changes and start with a clean tracked working tree. The runner records checksums, cohort counts, revision, and tracked changes, and validates form fields, unique IDs/answers, evidence, and email-free Notes before scoring. It records dirty state but does not reject it. These preparation checks do not measure accuracy.
+Before a recorded run, commit code changes and start with a clean tracked working tree. Keep seeds and results local, including source provenance and checksums. The runner records checksums, cohort counts, revision, and tracked changes, and validates form fields, unique IDs/answers, evidence, and email-free Notes before scoring. It records dirty state but does not reject it. These preparation checks do not measure accuracy.
 
 Run from the repository root using the installed dependencies:
 

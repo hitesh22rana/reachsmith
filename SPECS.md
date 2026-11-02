@@ -10,7 +10,7 @@ ReachSmith is a personal outreach and contact engine focused on job hunting, ref
 - Suggest likely work email addresses from names, domains, and context with optional Emailable deliverability checks, without claiming person ownership.
 - Track outreach status, follow-ups, and outcomes over time.
 
-The core MVP is implemented in a private GitHub repository. Hosted service operations and integrations remain future work.
+The core MVP is implemented in this repository. Hosted service operations and integrations remain future work.
 
 ---
 
